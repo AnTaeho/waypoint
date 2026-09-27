@@ -7,20 +7,38 @@ struct WaypointApp: App {
     /// 실행 인자 `-WaypointSampleData`면 메모리 저장소에 시안 장면을 채워 쓴다(파일에 남지 않는다).
     static let usesSampleData = ProcessInfo.processInfo.arguments.contains("-WaypointSampleData")
 
+    static let mainWindowID = "main"
+
     let container: ModelContainer
+    #if os(macOS)
+    /// 로컬 서버·outbox 흡수·상태 타이머. 샘플 모드에서는 열지 않는다(메모리 저장소에 실제 기록이 섞이고 outbox를 비워 잃지 않게).
+    let services: AppServices?
+    #endif
 
     init() {
         container = Self.makeContainer()
+        #if os(macOS)
+        services = Self.usesSampleData ? nil : AppServices(container: container)
+        services?.start()
+        #endif
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: Self.mainWindowID) {
             RootView()
                 .tint(Theme.liveText)
         }
         .modelContainer(container)
         #if os(macOS)
         .defaultSize(width: Theme.Size.windowWidth, height: Theme.Size.windowHeight)
+        #endif
+
+        #if os(macOS)
+        // 메뉴 막대에 상주해 창을 닫아도 서버가 돈다.
+        MenuBarExtra("Waypoint", systemImage: "signpost.right") {
+            MenuBarContent(services: services)
+                .modelContainer(container)
+        }
         #endif
     }
 
