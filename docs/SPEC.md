@@ -59,7 +59,7 @@ Card         id, project, number:Int, title, body(markdown),
              status: idea | next | active | done | archived,
              parent: Card?, criteria:[Criterion], 
              origin: claude | manual, originSessionId?,
-             nextSessionNote?, createdAt, updatedAt, doneAt?
+             nextSessionNote?, statusBeforeActive?, createdAt, updatedAt, doneAt?
 
 Criterion    text, isDone
 
@@ -80,11 +80,13 @@ GuideDoc     id, project, relPath, content, contentHash, lastSyncedAt
 GuideVersion doc, content, at, source: app | local
 ```
 
+CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.unique)`를 쓰지 않고 키·ID 중복은 코드에서 막는다. 모든 속성은 기본값이 있거나 옵셔널, 관계는 옵셔널이고 역관계를 둔다. enum은 원시 문자열로 저장한다.
+
 ### 파생 규칙
 
 - 카드가 **작업중** = 열린 `CardSession` 중 세션 `state == live`인 것이 1개 이상.
 - 세션 `stalled` = `endedAt == nil` 이고 `now - lastSeenAt > stallTimeout` (설정값, 기본 15분).
-- 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태로 돌아간다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
+- 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. 그사이 사용자가 상태를 바꿨으면(`status != active`) 그대로 둔다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
 - 대시보드 "작업중" 목록 = 프로젝트별로 묶은 (세션, 카드) 쌍. 같은 프로젝트에 세션 2개가 서로 다른 카드를 작업하면 그 프로젝트 아래 2줄.
 
 ## 5. 훅 → 기록 매핑
