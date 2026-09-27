@@ -31,6 +31,10 @@ enum Theme {
     /// 본문 맨 위 페이지 제목. 세리프 500.
     static let pageTitle = Font.system(size: 26, weight: .medium, design: .serif)
     static let section = Font.system(size: 13, weight: .semibold)
+    /// 카드 상세 본문의 구역 제목(완료 조건·히스토리)
+    static let sectionLarge = Font.system(size: 14, weight: .semibold)
+    /// 인스펙터 구역 제목
+    static let inspectorSection = Font.system(size: 12, weight: .semibold)
     static let body = Font.system(size: 13)
     static let bodyMedium = Font.system(size: 13, weight: .medium)
     static let bodyStrong = Font.system(size: 13, weight: .semibold)

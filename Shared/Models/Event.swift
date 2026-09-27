@@ -88,6 +88,7 @@ public enum EventValue: Codable, Sendable, Hashable {
 
     public var stringValue: String? { if case .string(let v) = self { v } else { nil } }
     public var intValue: Int? { if case .int(let v) = self { v } else { nil } }
+    public var boolValue: Bool? { if case .bool(let v) = self { v } else { nil } }
 }
 
 extension EventValue: ExpressibleByStringLiteral, ExpressibleByIntegerLiteral, ExpressibleByBooleanLiteral {
