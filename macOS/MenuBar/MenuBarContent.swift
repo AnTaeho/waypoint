@@ -10,11 +10,17 @@ struct MenuBarContent: View {
 
     @Query(filter: #Predicate<Project> { $0.archivedAt == nil }, sort: \Project.name)
     private var projects: [Project]
+    /// 끝나지 않은 세션만 읽는다(끝난 세션은 계속 쌓이므로 프로젝트의 세션 전체를 돌지 않는다).
+    @Query(filter: #Predicate<Session> { $0.endedAt == nil })
+    private var openSessions: [Session]
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let now = Date()
-        let lines = projects.compactMap { line(for: $0, now: now) }
+        let byProject = Dictionary(grouping: openSessions.filter { $0.kind == .main }) {
+            $0.project?.persistentModelID
+        }
+        let lines = projects.compactMap { line(for: $0, sessions: byProject[$0.persistentModelID] ?? [], now: now) }
         if lines.isEmpty {
             Text("진행 중인 작업 없음")
         } else {
@@ -36,9 +42,9 @@ struct MenuBarContent: View {
     }
 
     /// 「가계부 앱 · 작업 2 · 멈춤 1」. 끝나지 않은 메인 세션이 없으면 nil.
-    private func line(for project: Project, now: Date) -> String? {
+    private func line(for project: Project, sessions: [Session], now: Date) -> String? {
         var live = 0, stalled = 0
-        for session in project.sessions ?? [] where session.kind == .main {
+        for session in sessions {
             switch SessionRules.state(of: session, now: now) {
             case .live: live += 1
             case .stalled: stalled += 1

@@ -18,3 +18,17 @@ import Testing
         #expect(SessionStateCache.refresh([live, stalled, ended], now: t0) == 0)
     }
 }
+
+@Suite struct LastEventCacheTests {
+    @Test func recordMovesLastEventForwardOnly() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        #expect(p.lastEventAt == nil)
+        let card = p.makeCard(in: ctx, title: "a", at: t0)
+        Event.record(.note, in: ctx, card: card, at: t0 + 60, payload: ["text": "x"])
+        #expect(p.lastEventAt == t0 + 60)
+        Event.record(.note, in: ctx, project: p, at: t0 + 10) // 늦게 온 옛 기록
+        #expect(p.lastEventAt == t0 + 60)
+        #expect(DashboardQuery.summary(for: p, now: t0 + 120).lastActivityAt == t0 + 60)
+    }
+}

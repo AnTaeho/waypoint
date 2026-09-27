@@ -145,7 +145,8 @@ public enum DashboardQuery {
             default: break
             }
         }
-        let times: [Date] = (project.events ?? []).map(\.at)
+        // 이벤트는 훅마다 쌓이므로 전체를 읽지 않고 `lastEventAt` 캐시를 쓴다.
+        let times: [Date] = [project.lastEventAt].compactMap { $0 }
             + (project.sessions ?? []).map(\.lastSeenAt)
             + cards.map(\.updatedAt)
         return ProjectSummary(

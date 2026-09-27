@@ -13,6 +13,8 @@ public final class Project {
     public var nextCardNumber: Int = 1
     public var createdAt: Date = Date()
     public var archivedAt: Date?
+    /// 이 프로젝트 이벤트 중 가장 늦은 `at`. `Event.record`가 갱신한다(요약 계산이 이벤트 전체를 읽지 않게 하는 캐시).
+    public var lastEventAt: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \Card.project)
     public var cards: [Card]? = []
