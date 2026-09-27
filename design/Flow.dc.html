@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Claude 연동 구조</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#FAF9F5;color:#141413;font-family:'Anthropic Sans',system-ui,'Apple SD Gothic Neo','Noto Sans KR',sans-serif}
+.mono{font-family:'Anthropic Mono','JetBrains Mono','SF Mono',ui-monospace,monospace}
+</style>
+</helmet>
+<div style="width: 1440px; height: 760px; background: #FAF9F5; padding: 44px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 28px">
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-family: 'Anthropic Serif', Georgia, 'Noto Serif KR', serif; font-size: 28px; font-weight: 500">기록은 Claude가, 보는 건 앱에서</h1>
+    <div style="font-size: 15px; color: #3D3D3A">세션이 아니라 프로젝트 기준. 작업중 목록 = 그 프로젝트에 지금 붙어 있는 (세션, 카드) 쌍. 앱은 API를 호출하지 않는 순수 추적기예요.</div>
+  </div>
+
+  <div style="display: flex; align-items: stretch; gap: 0; flex-grow: 1">
+    <!-- Col 1 -->
+    <section style="width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #5E5D59">CLAUDE 세션</div>
+      <div style="background: #141413; color: #F0EEE6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 14px; font-weight: 600">세션 A · Claude Code</div>
+        <div class="mono" style="font-size: 11px; color: #9C9A92">~/dev/ledger · sess·7f2a</div>
+        <div style="margin-top: 6px; border-left: 1.5px solid #3D3D3A; padding-left: 10px; font-size: 13px">서브에이전트 <span class="mono" style="font-size: 11px; color: #D97757">test-writer</span></div>
+      </div>
+      <div style="background: #141413; color: #F0EEE6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 14px; font-weight: 600">세션 B · 다른 터미널</div>
+        <div class="mono" style="font-size: 11px; color: #9C9A92">~/dev/ledger · 같은 프로젝트</div>
+      </div>
+      <div style="background: #141413; color: #F0EEE6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 14px; font-weight: 600">세션 C · Claude Code</div>
+        <div class="mono" style="font-size: 11px; color: #9C9A92">~/dev/site · sess·c41e</div>
+      </div>
+    </section>
+
+    <div style="width: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: center">
+      <svg width="44" height="16" viewBox="0 0 44 16" fill="none" stroke="#5E5D59" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="40" y2="8"></line><polyline points="33 2 40 8 33 14"></polyline></svg>
+    </div>
+
+    <!-- Col 2 -->
+    <section style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #5E5D59">tracker 스킬 + 훅 → 무엇이 기록되나</div>
+      <div style="background: #FFFFFF; border: 1px solid rgba(31,30,29,0.15); border-radius: 12px; overflow: hidden; flex-grow: 1">
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 190px; gap: 14px; padding: 13px 18px; border-bottom: 1px solid rgba(31,30,29,0.08); align-items: center; font-size: 13px">
+          <span class="mono" style="font-size: 12px">SessionStart 훅</span>
+          <span>작업 폴더로 프로젝트 식별 (LDG), 세션 등록</span>
+          <span class="mono" style="font-size: 11px; color: #5E5D59">session.attach</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 190px; gap: 14px; padding: 13px 18px; border-bottom: 1px solid rgba(31,30,29,0.08); align-items: center; font-size: 13px">
+          <span class="mono" style="font-size: 12px">작업 착수 (스킬 규칙)</span>
+          <span>관련 카드 찾기 → 없으면 생성, <b style="color: #A8502F; font-weight: 600">작업중</b>으로</span>
+          <span class="mono" style="font-size: 11px; color: #5E5D59">card.start</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 190px; gap: 14px; padding: 13px 18px; border-bottom: 1px solid rgba(31,30,29,0.08); align-items: center; font-size: 13px">
+          <span class="mono" style="font-size: 12px">SubagentStart 훅</span>
+          <span>부모 세션에 묶인 하위 카드도 작업중으로</span>
+          <span class="mono" style="font-size: 11px; color: #5E5D59">card.start(parent)</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 190px; gap: 14px; padding: 13px 18px; border-bottom: 1px solid rgba(31,30,29,0.08); align-items: center; font-size: 13px">
+          <span class="mono" style="font-size: 12px">대화 중 “나중에…”</span>
+          <span>아이디어 / 다음 할 일 카드로 분리 기록</span>
+          <span class="mono" style="font-size: 11px; color: #5E5D59">card.create</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 190px; gap: 14px; padding: 13px 18px; border-bottom: 1px solid rgba(31,30,29,0.08); align-items: center; font-size: 13px">
+          <span class="mono" style="font-size: 12px">PostToolUse 훅</span>
+          <span>수정한 파일, 커밋을 카드 히스토리에</span>
+          <span class="mono" style="font-size: 11px; color: #5E5D59">card.log</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 190px; gap: 14px; padding: 13px 18px; border-bottom: 1px solid rgba(31,30,29,0.08); align-items: center; font-size: 13px">
+          <span class="mono" style="font-size: 12px">Stop · SessionEnd 훅</span>
+          <span>다음 세션 메모 작성, 작업중 해제 (완료는 확인 후)</span>
+          <span class="mono" style="font-size: 11px; color: #5E5D59">session.detach</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 190px; gap: 14px; padding: 13px 18px; align-items: center; font-size: 13px">
+          <span class="mono" style="font-size: 12px">지침 파일 변경</span>
+          <span>로컬 CLAUDE.md가 바뀌면 앱에 그대로 동기화</span>
+          <span class="mono" style="font-size: 11px; color: #5E5D59">file watcher</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="width: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: center">
+      <svg width="44" height="16" viewBox="0 0 44 16" fill="none" stroke="#5E5D59" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="40" y2="8"></line><polyline points="33 2 40 8 33 14"></polyline></svg>
+    </div>
+
+    <!-- Col 3 -->
+    <section style="width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #5E5D59">WAYPOINT</div>
+      <div style="background: #FFFFFF; border: 1px solid rgba(31,30,29,0.15); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px">
+        <div style="font-size: 14px; font-weight: 600">로컬 MCP 서버</div>
+        <div style="font-size: 12px; color: #3D3D3A; line-height: 1.5">Mac 앱에 내장. 스킬과 훅이 호출하는 유일한 입구</div>
+      </div>
+      <div style="display: flex; justify-content: center"><svg width="16" height="22" viewBox="0 0 16 22" fill="none" stroke="#5E5D59" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="2" x2="8" y2="19"></line><polyline points="3 14 8 19 13 14"></polyline></svg></div>
+      <div style="background: #FFFFFF; border: 1px solid rgba(31,30,29,0.15); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px">
+        <div style="font-size: 14px; font-weight: 600">SwiftData + CloudKit</div>
+        <div style="font-size: 12px; color: #3D3D3A; line-height: 1.5">프로젝트 · 카드 · 세션 · 이벤트 · 지침 문서</div>
+      </div>
+      <div style="display: flex; justify-content: center"><svg width="16" height="22" viewBox="0 0 16 22" fill="none" stroke="#5E5D59" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="2" x2="8" y2="19"></line><polyline points="3 14 8 19 13 14"></polyline></svg></div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <div style="background: #141413; color: #FAF9F5; border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 600; text-align: center">Mac 앱</div>
+        <div style="background: #141413; color: #FAF9F5; border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 600; text-align: center">iPhone</div>
+      </div>
+      <div style="margin-top: auto; background: #F7E6DC; border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #8A3F24; line-height: 1.6">세션이 응답 없이 끊기면 작업중 대신 <b>멈춤</b>으로 표시해서 좀비 상태를 막아요.</div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

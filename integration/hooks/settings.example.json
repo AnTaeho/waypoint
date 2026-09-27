@@ -1,0 +1,12 @@
+{
+  "_comment": "~/.claude/settings.json 의 hooks 에 병합. 이벤트 이름·matcher의 도구 이름은 최신 Claude Code 문서로 확인.",
+  "hooks": {
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh SessionStart", "timeout": 2 }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh UserPromptSubmit", "timeout": 2 }] }],
+    "PreToolUse":       [{ "matcher": "Task|Agent", "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh PreToolUse", "timeout": 2 }] }],
+    "PostToolUse":      [{ "matcher": "Edit|MultiEdit|Write|Bash", "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh PostToolUse", "timeout": 2 }] }],
+    "SubagentStop":     [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh SubagentStop", "timeout": 2 }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh Stop", "timeout": 2 }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh SessionEnd", "timeout": 2 }] }]
+  }
+}

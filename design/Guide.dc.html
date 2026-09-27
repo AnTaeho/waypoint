@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>지침 문서 — CLAUDE.md</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#FAF9F5;color:#141413;font-family:'Anthropic Sans',system-ui,'Apple SD Gothic Neo','Noto Sans KR',sans-serif}
+a{color:inherit;text-decoration:none}a:hover{color:#141413}
+.mono{font-family:'Anthropic Mono','JetBrains Mono','SF Mono',ui-monospace,monospace}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #FAF9F5; display: flex; flex-direction: column; overflow: hidden">
+  <header style="flex-shrink: 0; display: flex; flex-direction: column; gap: 0; background: #F5F4ED; border-bottom: 1px solid rgba(31,30,29,0.15)">
+    <div style="height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px">
+      <div style="display: flex; align-items: center; gap: 12px; font-size: 14px; color: #3D3D3A">
+        <a href="Project.dc.html" style="display: flex; align-items: center; gap: 6px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg>
+          가계부 앱
+        </a>
+        <span style="color: #9C9A92">/</span>
+        <span style="color: #141413; font-weight: 600">지침 문서</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px">
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #3D3D3A">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5E7045" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"></path></svg>
+          <span class="mono" style="font-size: 11px">~/dev/ledger/CLAUDE.md</span> 와 동기화됨 · 2분 전
+        </span>
+        <div style="display: flex; background: #F0EEE6; border-radius: 8px; padding: 3px">
+          <sc-if value="{{ isRead }}" hint-placeholder-val="{{ true }}">
+            <button type="button" aria-pressed="true" onClick="{{ setRead }}" style="height: 28px; padding: 0 14px; border: none; border-radius: 6px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; color: #141413; box-shadow: 0 1px 2px rgba(20,20,19,.1); cursor: pointer">읽기</button>
+            <button type="button" aria-pressed="false" onClick="{{ setEdit }}" style="height: 28px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; font: inherit; font-size: 13px; color: #3D3D3A; cursor: pointer">편집</button>
+          </sc-if>
+          <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ false }}">
+            <button type="button" aria-pressed="false" onClick="{{ setRead }}" style="height: 28px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; font: inherit; font-size: 13px; color: #3D3D3A; cursor: pointer">읽기</button>
+            <button type="button" aria-pressed="true" onClick="{{ setEdit }}" style="height: 28px; padding: 0 14px; border: none; border-radius: 6px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; color: #141413; box-shadow: 0 1px 2px rgba(20,20,19,.1); cursor: pointer">편집</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; gap: 4px; padding: 0 28px; font-size: 13px">
+      <a href="Guide.dc.html" class="mono" style="padding: 9px 12px; border-bottom: 2px solid #141413; font-weight: 500; font-size: 12px">CLAUDE.md</a>
+      <a href="Guide.dc.html" class="mono" style="padding: 9px 12px; color: #3D3D3A; font-size: 12px">docs/ARCHITECTURE.md</a>
+      <a href="Guide.dc.html" class="mono" style="padding: 9px 12px; color: #3D3D3A; font-size: 12px">.claude/skills/commit.md</a>
+      <button type="button" style="padding: 9px 12px; border: none; background: transparent; font: inherit; font-size: 13px; color: #5E5D59; cursor: pointer">+ 문서 올리기</button>
+    </div>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; min-height: 0">
+    <nav aria-label="목차" style="width: 220px; flex-shrink: 0; padding: 32px 24px 32px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #3D3D3A">
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: .06em; color: #5E5D59; margin-bottom: 4px">목차</div>
+      <a href="#g-overview" style="color: #141413; font-weight: 600">개요</a>
+      <a href="#g-style">코드 스타일</a>
+      <a href="#g-test">테스트</a>
+      <a href="#g-dont">하지 말 것</a>
+      <a href="#g-tracker">트래커 연동</a>
+    </nav>
+
+    <div style="flex-grow: 1; min-width: 0; padding: 32px 40px; box-sizing: border-box; overflow: hidden">
+      <sc-if value="{{ isRead }}" hint-placeholder-val="{{ true }}">
+        <article style="max-width: 700px; background: #FFFFFF; border: 1px solid rgba(31,30,29,0.15); border-radius: 14px; padding: 40px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; font-size: 15px; line-height: 1.75; color: #262624">
+          <h1 style="margin: 0; font-family: 'Anthropic Serif', Georgia, 'Noto Serif KR', serif; font-size: 28px; font-weight: 500; color: #141413; line-height: 1.3">가계부 앱 — Claude 작업 지침</h1>
+          <section id="g-overview" style="display: flex; flex-direction: column; gap: 8px">
+            <h2 style="margin: 0; font-family: 'Anthropic Serif', Georgia, 'Noto Serif KR', serif; font-size: 20px; font-weight: 500; color: #141413">개요</h2>
+            <p style="margin: 0">SwiftUI + SwiftData 기반 iOS 17 이상 앱. 외부 의존성은 최소화하고 Apple 프레임워크를 먼저 검토한다.</p>
+          </section>
+          <section id="g-style" style="display: flex; flex-direction: column; gap: 8px">
+            <h2 style="margin: 0; font-family: 'Anthropic Serif', Georgia, 'Noto Serif KR', serif; font-size: 20px; font-weight: 500; color: #141413">코드 스타일</h2>
+            <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px">
+              <li>View 파일이 150줄을 넘으면 하위 View로 분리</li>
+              <li>한국어 주석 허용, 공개 API에는 문서 주석</li>
+              <li>금액은 <code class="mono" style="font-size: 13px; background: #FAF9F5; border-radius: 4px; padding: 1px 5px">Decimal</code>만 사용, <code class="mono" style="font-size: 13px; background: #FAF9F5; border-radius: 4px; padding: 1px 5px">Double</code> 금지</li>
+            </ul>
+          </section>
+          <section id="g-test" style="display: flex; flex-direction: column; gap: 8px">
+            <h2 style="margin: 0; font-family: 'Anthropic Serif', Georgia, 'Noto Serif KR', serif; font-size: 20px; font-weight: 500; color: #141413">테스트</h2>
+            <p style="margin: 0">파서류는 <code class="mono" style="font-size: 13px; background: #FAF9F5; border-radius: 4px; padding: 1px 5px">Tests/Fixtures</code>의 샘플 영수증으로 검증한다. 완료 처리 전 반드시 실행:</p>
+            <pre class="mono" style="margin: 0; background: #141413; color: #F0EEE6; border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.6; overflow-x: auto">xcodebuild test -scheme Ledger \
+  -destination 'platform=iOS Simulator,name=iPhone 16'</pre>
+          </section>
+          <section id="g-tracker" style="display: flex; flex-direction: column; gap: 8px">
+            <h2 style="margin: 0; font-family: 'Anthropic Serif', Georgia, 'Noto Serif KR', serif; font-size: 20px; font-weight: 500; color: #141413">트래커 연동</h2>
+            <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px">
+              <li>작업을 시작하기 전에 해당 카드를 작업중으로 전환</li>
+              <li>“나중에”, “언젠가” 같은 언급은 아이디어 카드로 기록</li>
+            </ul>
+          </section>
+        </article>
+      </sc-if>
+      <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width: 700px; display: flex; flex-direction: column; gap: 10px">
+          <label for="guide-src" style="font-size: 12px; color: #5E5D59">Markdown 원문 — 저장하면 로컬 CLAUDE.md에도 반영돼요</label>
+          <textarea id="guide-src" class="mono" style="height: 640px; resize: none; border: 1px solid rgba(31,30,29,0.15); border-radius: 14px; background: #FFFFFF; padding: 28px 32px; font-size: 13px; line-height: 1.8; color: #262624; box-sizing: border-box; outline: none"># 가계부 앱 — Claude 작업 지침
+
+## 개요
+SwiftUI + SwiftData 기반 iOS 17 이상 앱.
+외부 의존성은 최소화하고 Apple 프레임워크를 먼저 검토한다.
+
+## 코드 스타일
+- View 파일이 150줄을 넘으면 하위 View로 분리
+- 한국어 주석 허용, 공개 API에는 문서 주석
+- 금액은 `Decimal`만 사용, `Double` 금지
+
+## 테스트
+파서류는 `Tests/Fixtures`의 샘플 영수증으로 검증한다.
+
+## 트래커 연동
+- 작업을 시작하기 전에 해당 카드를 작업중으로 전환
+- "나중에", "언젠가" 같은 언급은 아이디어 카드로 기록</textarea>
+          <div style="display: flex; justify-content: flex-end; gap: 8px">
+            <button type="button" onClick="{{ setRead }}" style="height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(31,30,29,0.15); background: #FFFFFF; font: inherit; font-size: 13px; cursor: pointer">취소</button>
+            <button type="button" onClick="{{ setRead }}" style="height: 34px; padding: 0 14px; border-radius: 8px; border: none; background: #141413; color: #FAF9F5; font: inherit; font-size: 13px; cursor: pointer">저장</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <aside aria-label="문서 정보와 버전" style="width: 380px; flex-shrink: 0; border-left: 1px solid rgba(31,30,29,0.15); background: #F5F4ED; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px">
+      <section style="background: #FFFFFF; border: 1px solid rgba(31,30,29,0.15); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="font-size: 14px; font-weight: 600">문서 정보</div>
+        <dl style="margin: 0; display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 10px; font-size: 13px">
+          <dt style="color: #5E5D59">로컬 경로</dt><dd class="mono" style="margin: 0; font-size: 12px">~/dev/ledger/CLAUDE.md</dd>
+          <dt style="color: #5E5D59">동기화</dt><dd style="margin: 0">양방향 · 2분 전</dd>
+          <dt style="color: #5E5D59">분량</dt><dd style="margin: 0">5개 섹션</dd>
+        </dl>
+        <div style="font-size: 12px; color: #5E5D59; line-height: 1.6">앱에서 저장하면 로컬 파일에, 로컬에서 고치면 앱에 반영돼요. 둘 다 바뀌었으면 비교 화면을 띄워요.</div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #5E5D59">버전 기록</h2>
+        <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; font-size: 13px">
+          <li style="display: flex; flex-direction: column; gap: 2px"><span>트래커 연동 섹션 추가</span><span style="font-size: 12px; color: #5E5D59">9월 26일 · 직접 수정 (앱)</span></li>
+          <li style="display: flex; flex-direction: column; gap: 2px"><span>테스트 명령어 시뮬레이터 지정</span><span style="font-size: 12px; color: #5E5D59">9월 24일 · 로컬 파일 변경 감지</span></li>
+          <li style="display: flex; flex-direction: column; gap: 2px"><span>최초 업로드</span><span style="font-size: 12px; color: #5E5D59">9월 20일 · 프로젝트 init</span></li>
+        </ol>
+      </section>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { mode: 'read' }; }
+  renderVals() {
+    var m = this.state.mode;
+    return {
+      isRead: m === 'read',
+      isEdit: m === 'edit',
+      setRead: () => this.setState({ mode: 'read' }),
+      setEdit: () => this.setState({ mode: 'edit' })
+    };
+  }
+}
+</script>
+</body>
+</html>

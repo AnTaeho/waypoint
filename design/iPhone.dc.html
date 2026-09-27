@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>iPhone — 작업중</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#FAF9F5;color:#141413;font-family:'Anthropic Sans',system-ui,'Apple SD Gothic Neo','Noto Sans KR',sans-serif}
+a{color:inherit;text-decoration:none}a:hover{color:#141413}
+.mono{font-family:'Anthropic Mono','JetBrains Mono','SF Mono',ui-monospace,monospace}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#D97757;animation:pulse 1.8s infinite;flex-shrink:0}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(217,119,87,.45)}70%{box-shadow:0 0 0 7px rgba(217,119,87,0)}100%{box-shadow:0 0 0 0 rgba(217,119,87,0)}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: #FAF9F5; display: flex; flex-direction: column; overflow: hidden">
+  <div style="flex-grow: 1; padding: 62px 18px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; overflow: hidden">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <div style="font-size: 13px; color: #5E5D59">9월 27일 일요일</div>
+      <h1 style="margin: 0; font-family: 'Anthropic Serif', Georgia, 'Noto Serif KR', serif; font-size: 30px; font-weight: 500">작업중 3</h1>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 10px">
+      <div style="background: #FFFFFF; border: 1.5px solid #D97757; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="live-dot"></span><span class="mono" style="font-size: 11px; color: #5E5D59">LDG-14 · 가계부 앱</span></div>
+          <span style="font-size: 12px; color: #A8502F; font-weight: 600">38분</span>
+        </div>
+        <div style="font-size: 15px; font-weight: 600; line-height: 1.4">영수증 OCR 결과를 거래 내역으로 매핑</div>
+        <div class="mono" style="font-size: 11px; color: #3D3D3A">Claude Code · ReceiptParser.swift</div>
+      </div>
+      <div style="background: #FFFFFF; border: 1.5px solid #D97757; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; margin-left: 16px">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="live-dot"></span><span class="mono" style="font-size: 11px; color: #5E5D59">LDG-16 · 서브에이전트</span></div>
+          <span style="font-size: 12px; color: #A8502F; font-weight: 600">12분</span>
+        </div>
+        <div style="font-size: 15px; font-weight: 600; line-height: 1.4">파서 단위 테스트 작성</div>
+      </div>
+      <div style="background: #FFFFFF; border: 1.5px solid #D97757; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="live-dot"></span><span class="mono" style="font-size: 11px; color: #5E5D59">WEB-9 · 포트폴리오</span></div>
+          <span style="font-size: 12px; color: #A8502F; font-weight: 600">1시간 5분</span>
+        </div>
+        <div style="font-size: 15px; font-weight: 600; line-height: 1.4">작업물 상세 페이지 레이아웃</div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 14px; font-weight: 600">방금 기록된 아이디어</h2>
+      <div style="border: 1.5px dashed #9C9A92; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 6px; background: #F5F4ED">
+        <span class="mono" style="font-size: 11px; color: #5E5D59">LDG-21 · 18분 전</span>
+        <div style="font-size: 15px; font-weight: 600">거래 내역 CSV 내보내기</div>
+        <div style="display: flex; gap: 8px; margin-top: 4px">
+          <button type="button" style="height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid rgba(31,30,29,0.15); background: #FFFFFF; font: inherit; font-size: 13px; cursor: pointer">다음 할 일로</button>
+          <button type="button" style="height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid rgba(31,30,29,0.15); background: #FFFFFF; font: inherit; font-size: 13px; cursor: pointer">보관</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <nav aria-label="탭" style="height: 84px; flex-shrink: 0; background: #F5F4ED; border-top: 1px solid rgba(31,30,29,0.15); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-top: 8px; box-sizing: border-box">
+    <a href="iPhone.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #A8502F">
+      <span style="height: 22px; display: flex; align-items: center"><span class="live-dot"></span></span>작업중
+    </a>
+    <a href="iPhone.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: #3D3D3A">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="5" height="16" rx="1.5"></rect><rect x="10" y="4" width="5" height="11" rx="1.5"></rect><rect x="17" y="4" width="4" height="7" rx="1.5"></rect></svg>프로젝트
+    </a>
+    <a href="iPhone.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: #3D3D3A">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 12 7 12 10 5 14 19 17 12 21 12"></polyline></svg>기록
+    </a>
+    <a href="iPhone.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: #3D3D3A">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><polyline points="14 3 14 8 19 8"></polyline></svg>지침
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
