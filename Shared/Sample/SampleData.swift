@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// 시안(design/*.dc.html)과 같은 장면을 `now` 기준 상대 시각으로 채운다. 샘플 모드(Sample.store) 전용.
+/// 시안(design/*.dc.html)과 같은 장면을 `now` 기준 상대 시각으로 채운다. 샘플 모드(메모리 저장소) 전용.
 public enum SampleData {
 
     /// 프로젝트가 하나도 없을 때만 넣고 저장한다. 넣었으면 true.
