@@ -28,7 +28,7 @@ extension HookProcessor {
 
         let prompt = input.toolInput["prompt"] as? String ?? ""
         let key = session.project?.key
-        let number = HookParsing.cardReferences(in: prompt).first { $0.key == key }?.number
+        let number = HookParsing.cardReferences(in: prompt).first(where: { $0.key == key })?.number
         let agentType = (input.toolInput["subagent_type"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let parentID = session.id
         var queue = livePending(for: parentID, at: date)

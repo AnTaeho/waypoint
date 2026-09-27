@@ -30,8 +30,8 @@ import Testing
 
     @Test func cardReferences() {
         let refs = HookParsing.cardReferences(in: "[LDG-16] 테스트, 참고 [WEB-3] 그리고 LDG-9는 괄호 없음 [ldg-1]")
-        #expect(refs.map(\.key) == ["LDG", "WEB"])
-        #expect(refs.map(\.number) == [16, 3])
+        #expect(refs.map { $0.key } == ["LDG", "WEB"])
+        #expect(refs.map { $0.number } == [16, 3])
     }
 
     @Test func lineCount() {
@@ -70,7 +70,7 @@ import Testing
             "tool_response": ["stdout": "", "bashEditDiff": ["changedFiles": ["/x/f.txt"]]],
         ])!
         let files = HookParsing.changedFiles(input)
-        #expect(files.map(\.path) == ["/x/f.txt"])
+        #expect(files.map { $0.path } == ["/x/f.txt"])
     }
 }
 
