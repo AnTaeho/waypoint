@@ -1,16 +1,17 @@
 import Foundation
 import SwiftData
 
-/// 대시보드 "작업중" 한 줄 = (카드, 세션) 열린 연결 하나.
+/// 대시보드 "작업중" 한 줄 = (카드, 세션) 열린 연결 하나, 또는 카드가 붙지 않은 끝나지 않은 메인 세션 하나(`card == nil`).
 public struct DashboardRow: Identifiable {
-    public let card: Card
+    /// nil이면 카드 없이 도는 메인 세션 줄
+    public let card: Card?
     public let session: Session
     /// 이 줄의 세션 상태(live 또는 stalled)
     public let workState: CardWorkState
     /// 0 = 메인 세션, 1 = 부모 세션 줄 바로 아래 서브에이전트
     public let depth: Int
 
-    public var id: String { "\(session.id)|\(card.id.uuidString)" }
+    public var id: String { "\(session.id)|\(card?.id.uuidString ?? "-")" }
 }
 
 public struct DashboardGroup: Identifiable {
@@ -23,9 +24,9 @@ public struct DashboardGroup: Identifiable {
 
 /// 프로젝트 표 한 줄 집계.
 public struct ProjectSummary {
-    /// 작업중(live) 카드 수. 표의 "작업중" 열.
+    /// 작업중(live) 카드 수 + 카드 없이 도는 live 메인 세션 수. 표의 "작업중" 열, 사이드바 개수.
     public let liveCount: Int
-    /// 열린 연결이 전부 멈춘 카드 수.
+    /// 열린 연결이 전부 멈춘 카드 수 + 카드 없이 멈춘 메인 세션 수.
     public let stalledCount: Int
     public let nextCount: Int
     public let ideaCount: Int
@@ -67,14 +68,15 @@ public enum DashboardQuery {
     }
 
     /// 한 프로젝트의 줄. 메인 줄은 세션 시작순, 서브에이전트 줄은 부모 세션의 마지막 줄 바로 아래(depth 1).
-    /// 부모 세션 줄이 없는 서브에이전트는 depth 0으로 메인 줄들 사이에 놓인다.
+    /// 카드가 붙지 않은 끝나지 않은 메인 세션은 카드 없는 줄 하나로 들어간다(서브에이전트는 카드가 있을 때만 줄이 된다).
+    /// 부모 세션 줄이 없는 서브에이전트(부모가 끝남)는 depth 0으로 메인 줄들 사이에 놓인다.
     public static func rows(
         for project: Project,
         now: Date,
         stallTimeout: TimeInterval = SessionRules.defaultStallTimeout
     ) -> [DashboardRow] {
         struct Pending {
-            let card: Card
+            let card: Card?
             let session: Session
             let state: CardWorkState
             let attachedAt: Date
@@ -89,9 +91,12 @@ public enum DashboardQuery {
             case .stalled: work = .stalled
             case .ended: continue
             }
-            for link in session.openCardSessions {
-                guard let card = link.card else { continue }
-                pending.append(Pending(card: card, session: session, state: work, attachedAt: link.attachedAt))
+            let links = session.openCardSessions.filter { $0.card != nil }
+            for link in links {
+                pending.append(Pending(card: link.card, session: session, state: work, attachedAt: link.attachedAt))
+            }
+            if links.isEmpty, session.kind == .main {
+                pending.append(Pending(card: nil, session: session, state: work, attachedAt: session.startedAt))
             }
         }
 
@@ -103,7 +108,9 @@ public enum DashboardQuery {
         func byTime(_ a: Pending, _ b: Pending) -> Bool {
             if a.session.startedAt != b.session.startedAt { return a.session.startedAt < b.session.startedAt }
             if a.attachedAt != b.attachedAt { return a.attachedAt < b.attachedAt }
-            return a.card.number < b.card.number
+            let an = a.card?.number ?? 0, bn = b.card?.number ?? 0
+            if an != bn { return an < bn }
+            return a.session.id < b.session.id
         }
 
         let top = pending.filter { !isNested($0) }.sorted(by: byTime)
@@ -145,7 +152,17 @@ public enum DashboardQuery {
             default: break
             }
         }
-        let times: [Date] = (project.events ?? []).map(\.at)
+        // 카드 없이 도는 메인 세션도 작업중·멈춤에 센다(대시보드 줄과 같은 기준).
+        for session in project.sessions ?? [] where session.kind == .main && session.endedAt == nil {
+            guard !session.openCardSessions.contains(where: { $0.card != nil }) else { continue }
+            switch SessionRules.state(of: session, now: now, stallTimeout: stallTimeout) {
+            case .live: live += 1
+            case .stalled: stalled += 1
+            case .ended: break
+            }
+        }
+        // 이벤트는 훅마다 쌓이므로 전체를 읽지 않고 `lastEventAt` 캐시를 쓴다.
+        let times: [Date] = [project.lastEventAt].compactMap { $0 }
             + (project.sessions ?? []).map(\.lastSeenAt)
             + cards.map(\.updatedAt)
         return ProjectSummary(

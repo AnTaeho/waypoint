@@ -51,7 +51,11 @@ public final class Event {
     ) -> Event {
         let event = Event(type: type, at: date, payload: payload.isEmpty ? nil : EventValue.encode(payload))
         context.insert(event)
-        event.project = project ?? card?.project ?? session?.project
+        let owner = project ?? card?.project ?? session?.project
+        event.project = owner
+        if let owner, date > (owner.lastEventAt ?? .distantPast) {
+            owner.lastEventAt = date
+        }
         event.card = card
         event.session = session
         return event

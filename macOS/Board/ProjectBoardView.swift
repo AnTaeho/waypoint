@@ -39,6 +39,8 @@ struct ProjectBoardView: View {
                     .padding(.horizontal, Theme.Spacing.pageH)
                 }
                 .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                // 창이 좁아 칸이 넘칠 때 넘긴다는 것이 보이게 막대를 늘 보인다.
+                .scrollIndicators(.visible, axes: .horizontal)
             }
             .padding(.vertical, Theme.Spacing.pageV)
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)

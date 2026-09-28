@@ -1,0 +1,78 @@
+import Foundation
+
+/// `cwd` → 프로젝트. 가장 가까운(가장 긴) 상위 `rootPath`를 고른다. 보관된 프로젝트는 뺀다.
+public enum ProjectMatcher {
+
+    /// `~`를 홈으로 펼치고 끝 `/`를 뗀 표준 경로.
+    public static func normalize(_ path: String, home: String = NSHomeDirectory()) -> String {
+        var expanded = path
+        if expanded == "~" {
+            expanded = home
+        } else if expanded.hasPrefix("~/") {
+            expanded = home + expanded.dropFirst(1)
+        }
+        let standardized = (expanded as NSString).standardizingPath
+        return standardized.count > 1 && standardized.hasSuffix("/") ? String(standardized.dropLast()) : standardized
+    }
+
+    /// `path`가 `root`와 같거나 그 아래인지(경로 구성 요소 단위).
+    public static func isInside(_ path: String, root: String) -> Bool {
+        guard !root.isEmpty else { return false }
+        if path == root { return true }
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        return path.hasPrefix(prefix)
+    }
+
+    public static func project(for cwd: String, in projects: [Project], home: String = NSHomeDirectory()) -> Project? {
+        guard !cwd.isEmpty else { return nil }
+        let target = normalize(cwd, home: home)
+        return projects
+            .filter { $0.archivedAt == nil && !$0.rootPath.isEmpty }
+            .map { (project: $0, root: normalize($0.rootPath, home: home)) }
+            .filter { isInside(target, root: $0.root) }
+            .max { $0.root.count < $1.root.count }?
+            .project
+    }
+
+    /// 프로젝트 기준 상대 경로. 프로젝트 밖이면 받은 그대로.
+    public static func relativePath(_ path: String, in project: Project, home: String = NSHomeDirectory()) -> String {
+        let root = normalize(project.rootPath, home: home)
+        let target = normalize(path, home: home)
+        guard target != root, isInside(target, root: root) else { return path }
+        return String(target.dropFirst(root.count + (root == "/" ? 0 : 1)))
+    }
+}
+
+/// 작업 폴더의 git 브랜치. `.git/HEAD`만 읽는다(git 명령을 부르지 않는다).
+public enum GitInfo {
+    /// `cwd`에서 위로 올라가며 `.git`을 찾는다. `.git`이 파일(worktree)이면 `gitdir:`을 따라간다.
+    public static func branch(at cwd: String, fileManager: FileManager = .default) -> String? {
+        guard !cwd.isEmpty else { return nil }
+        var dir = URL(fileURLWithPath: cwd, isDirectory: true).standardizedFileURL
+        for _ in 0..<32 {
+            let git = dir.appendingPathComponent(".git")
+            var isDir: ObjCBool = false
+            if fileManager.fileExists(atPath: git.path, isDirectory: &isDir) {
+                let gitDir: URL
+                if isDir.boolValue {
+                    gitDir = git
+                } else {
+                    guard let text = try? String(contentsOf: git, encoding: .utf8),
+                          let line = text.split(separator: "\n").first(where: { $0.hasPrefix("gitdir:") })
+                    else { return nil }
+                    let raw = line.dropFirst("gitdir:".count).trimmingCharacters(in: .whitespaces)
+                    gitDir = raw.hasPrefix("/") ? URL(fileURLWithPath: raw) : dir.appendingPathComponent(raw)
+                }
+                guard let head = try? String(contentsOf: gitDir.appendingPathComponent("HEAD"), encoding: .utf8)
+                else { return nil }
+                let trimmed = head.trimmingCharacters(in: .whitespacesAndNewlines)
+                let refPrefix = "ref: refs/heads/"
+                return trimmed.hasPrefix(refPrefix) ? String(trimmed.dropFirst(refPrefix.count)) : nil
+            }
+            let parent = dir.deletingLastPathComponent()
+            if parent.path == dir.path { return nil }
+            dir = parent
+        }
+        return nil
+    }
+}

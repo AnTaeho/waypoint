@@ -19,7 +19,23 @@ public enum SessionFormat {
         let latest = (card.events ?? [])
             .filter { $0.type == .fileChanged && $0.session === session }
             .max { $0.at < $1.at }
-        guard let path = latest?.payloadValues["path"]?.stringValue, !path.isEmpty else { return nil }
+        return fileName(of: latest)
+    }
+
+    /// 카드 없는 세션 줄: 이 세션과 그 서브에이전트가 카드 없이 남긴 가장 최근 `file.changed`의 파일 이름. 없으면 nil.
+    public static func recentFileName(session: Session) -> String? {
+        var sessions: [Session] = [session]
+        sessions.append(contentsOf: session.children ?? [])
+        var latest: Event?
+        for event in sessions.flatMap({ $0.events ?? [] })
+        where event.type == .fileChanged && event.card == nil && event.at > (latest?.at ?? .distantPast) {
+            latest = event
+        }
+        return fileName(of: latest)
+    }
+
+    private static func fileName(of event: Event?) -> String? {
+        guard let path = event?.payloadValues["path"]?.stringValue, !path.isEmpty else { return nil }
         return (path as NSString).lastPathComponent
     }
 }

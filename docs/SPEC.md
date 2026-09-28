@@ -87,24 +87,45 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 - 카드가 **작업중** = 열린 `CardSession` 중 세션 `state == live`인 것이 1개 이상.
 - 세션 `stalled` = `endedAt == nil` 이고 `now - lastSeenAt > stallTimeout` (설정값, 기본 15분).
 - 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. 그사이 사용자가 상태를 바꿨으면(`status != active`) 그대로 둔다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
-- 대시보드 "작업중" 목록 = 프로젝트별로 묶은 (세션, 카드) 쌍. 같은 프로젝트에 세션 2개가 서로 다른 카드를 작업하면 그 프로젝트 아래 2줄.
+- 대시보드 "작업중" 목록 = 프로젝트별로 묶은 (세션, 카드) 쌍 + 카드가 붙지 않은 끝나지 않은 메인 세션 한 줄씩(카드 칸 비움, 제목 자리 「카드 없음」, 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`). 같은 프로젝트에 세션 2개가 서로 다른 카드를 작업하면 그 프로젝트 아래 2줄. 세션에 카드가 붙으면 카드 없는 줄은 카드 줄로 바뀐다(중복 없음). 카드 없는 서브에이전트는 줄을 만들지 않는다. 제목의 「작업 N개」는 live 줄 수, 사이드바·프로젝트 표의 작업중·멈춤 수는 카드 수 + 카드 없는 메인 세션 수.
 
 ## 5. 훅 → 기록 매핑
 
 설정 예시: `integration/hooks/settings.example.json`. 사용자 전역(`~/.claude/settings.json`)에 둔다.
 **이벤트 이름과 입력 JSON 필드는 구현 시점의 Claude Code hooks 문서로 반드시 확인할 것.**
 
-| 훅 | 서버 동작 | 비고 |
-|---|---|---|
-| `SessionStart` | `cwd`로 프로젝트 조회 → 세션 생성. 응답 본문을 stdout으로 출력해 **대화 컨텍스트에 주입** | 주입 내용: 프로젝트 키, 세션 ID, 다음 할 일 상위 5개, 이 프로젝트의 다른 작업중 카드, 직전 세션 메모 |
-| `UserPromptSubmit` | `lastSeenAt` 갱신 | heartbeat |
-| `PreToolUse` (서브에이전트 도구) | 하위 세션 생성. 프롬프트에 `[LDG-16]` 같은 카드 ID가 있으면 그 카드에 연결 | 도구 이름은 버전에 따라 다를 수 있음 |
-| `PostToolUse` (Edit/Write/Bash 등) | `lastSeenAt` 갱신, 변경 파일을 현재 작업중 카드 이벤트로 | `git commit` 감지 시 commit 이벤트 |
-| `SubagentStop` | 하위 세션 종료, 연결 해제 | |
-| `Stop` | `lastSeenAt` 갱신 | 턴 종료일 뿐 세션 종료 아님 |
-| `SessionEnd` | 세션 종료, 모든 연결 해제 | |
+2026-09-28 확인: https://code.claude.com/docs/en/hooks (문서 기준, 실제 입력은 로깅 모드로 **실측 필요**).
+
+### 공통 입력 필드 (문서)
+
+`session_id`, `transcript_path`, `cwd`, `hook_event_name`, (이벤트에 따라) `permission_mode`, `prompt_id`, `effort`.
+서브에이전트 안에서 난 훅에는 `agent_id`(서브에이전트 실행 고유 ID)와 `agent_type`(예: `Explore`, 사용자 에이전트 `name`)이 더 붙는다.
+문서는 `agent_id`로 「메인 스레드 호출과 서브에이전트 호출을 구분하라」고 한다. 즉 **서브에이전트 훅의 `session_id`는 부모 세션과 같은 값**으로 읽힌다(문서 예시 기준, **실측 필요**).
+그래서 서브에이전트 하위 세션의 `Session.id`는 `agent_id`를 쓴다.
+
+### 매핑
+
+| 훅 | 입력(문서) | 서버 동작 | 비고 |
+|---|---|---|---|
+| `SessionStart` | `source`(startup/resume/clear/compact/fork), `model?` | `cwd`로 프로젝트 조회 → 세션 생성(이미 있으면 다시 살림). 응답 본문을 stdout으로 출력해 **대화 컨텍스트에 주입** | 주입 내용: 프로젝트 키, 세션 ID, 다음 할 일 상위 5개, 이 프로젝트의 다른 작업중 카드, 직전 세션 메모. command 훅만 지원 |
+| `UserPromptSubmit` | `prompt` | `lastSeenAt` 갱신 | heartbeat |
+| `PreToolUse` (`Agent`) | `tool_name`=`Agent`, `tool_input.prompt/description/subagent_type`, `tool_use_id` | 부모 세션 heartbeat. 프롬프트의 `[LDG-16]` 같은 카드 ID와 `subagent_type`을 **대기 목록**에 올린다 | 서브에이전트 도구 이름은 `Agent`(옛 이름 `Task`도 matcher에 남겨 둔다) |
+| `SubagentStart` | `agent_id`, `agent_type` | 하위 세션 생성(`id`=`agent_id`, `agentName`=`agent_type`, 부모=`session_id` 세션). 대기 목록에서 같은 `agent_type`의 가장 오래된 항목을 꺼내 카드가 있으면 연결 | `PreToolUse`와 `SubagentStart`를 잇는 키가 문서에 없다 → 순서·종류로 짝짓는다(**실측 필요**) |
+| `PostToolUse` (Edit/Write/Bash 등) | `tool_name`, `tool_input`, `tool_response` | `lastSeenAt` 갱신(서브에이전트면 그 하위 세션도), 변경 파일을 현재 작업중 카드 이벤트로. `Bash`의 `git commit` 성공 출력(`[브랜치 해시] 메시지`)에서 commit 이벤트 | `Edit`: `file_path`, `old_string/new_string`로 줄 수 추정. `Write`: `file_path`, `content`. `Bash`: `tool_response.stdout`. `tool_response.bashEditDiff.changedFiles`(선택)로 Bash가 바꾼 파일 |
+| `SubagentStop` | `agent_id`, `agent_type`, `last_assistant_message` | 하위 세션 종료, 연결 해제 | 앱 내부 에이전트(`agent_type` 빈 값)에도 불린다 → 모르는 `agent_id`면 무시 |
+| `Stop` | `stop_hook_active`, `last_assistant_message` | `lastSeenAt` 갱신 | 턴 종료일 뿐 세션 종료 아님 |
+| `SessionEnd` | `reason`(clear/resume/logout/prompt_input_exit/other) | 세션 종료, 모든 연결 해제(하위 세션 포함) | 기본 타임아웃 1.5초 |
 
 등록되지 않은 폴더의 세션은 무시한다 (단, `SessionStart` 컨텍스트로 "이 폴더는 Waypoint에 없음, `/tracker init` 가능"을 한 줄 알린다). 하위 폴더에서 연 세션은 가장 가까운 상위 `rootPath` 프로젝트로 매칭한다.
+
+### 실측 필요 (로컬에서 로깅 모드로 확인)
+
+- 서브에이전트 훅의 `session_id`가 정말 부모와 같은지, `agent_id` 형식.
+- `PreToolUse(Agent)` → `SubagentStart` 순서가 항상 지켜지는지, 백그라운드 서브에이전트(기본값)에서도 같은지.
+- `SessionStart(source: resume/clear/fork)`의 `session_id`가 이전 세션과 같은지 새것인지.
+- `Edit`/`Write`의 `tool_response` 모양(줄 수를 더 정확히 셀 수 있는 필드가 있는지).
+- `MultiEdit` 도구가 아직 있는지(문서 도구 목록에는 없다).
+- `Tests/Fixtures/hooks/doc-*.json`은 문서 예시로 만든 픽스처다. 실측 픽스처는 `real-*.json`으로 따로 둔다.
 
 ## 6. 로컬 HTTP API (훅용)
 

@@ -49,3 +49,25 @@ public enum CardRules {
         return sawStalled ? .stalled : .none
     }
 }
+
+public enum SessionStateCache {
+    /// 끝나지 않은 세션의 저장 캐시(`stateRaw`)를 지금 판정으로 맞춘다. 바뀐 세션 수를 돌려준다.
+    /// 판정 자체는 늘 `SessionRules.state`로 다시 하므로, 캐시는 iPhone 동기화(M6)와 조회 편의용이다.
+    /// 저장(save)은 호출 쪽에서 한다.
+    @discardableResult
+    public static func refresh(
+        _ sessions: [Session],
+        now: Date,
+        stallTimeout: TimeInterval = SessionRules.defaultStallTimeout
+    ) -> Int {
+        var changed = 0
+        for session in sessions {
+            let state = SessionRules.state(of: session, now: now, stallTimeout: stallTimeout)
+            if session.cachedState != state {
+                session.cachedState = state
+                changed += 1
+            }
+        }
+        return changed
+    }
+}

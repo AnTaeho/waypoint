@@ -22,18 +22,18 @@ import Testing
         #expect(groups.map(\.project.key) == ["LDG", "WEB", "TRK"])
 
         let ldg = try #require(groups.first { $0.project.key == "LDG" })
-        #expect(ldg.rows.map(\.card.displayID) == ["LDG-14", "LDG-16"])
+        #expect(ldg.rows.map(\.card?.displayID) == ["LDG-14", "LDG-16"])
         #expect(ldg.rows.map(\.depth) == [0, 1])
         #expect(ldg.rows.allSatisfy { $0.workState == .live })
         #expect(ldg.rows[1].session.agentName == "test-writer")
         #expect(ldg.rows[0].session.id.hasPrefix("7f2a"))
         // 시안의 최근 파일. 같은 시각 이벤트가 있으면 실행마다 바뀌던 문제의 회귀 방지.
-        #expect(SessionFormat.recentFileName(card: ldg.rows[0].card, session: ldg.rows[0].session) == "ReceiptParser.swift")
+        #expect(SessionFormat.recentFileName(card: try #require(ldg.rows[0].card), session: ldg.rows[0].session) == "ReceiptParser.swift")
 
         let trk = try #require(groups.first { $0.project.key == "TRK" })
         #expect(trk.rows.count == 1)
         #expect(trk.rows.first?.workState == .stalled)
-        #expect(trk.rows.first?.card.displayID == "TRK-3")
+        #expect(trk.rows.first?.card?.displayID == "TRK-3")
     }
 
     @Test func projectTableMatchesDesign() throws {

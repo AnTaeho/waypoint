@@ -96,8 +96,8 @@ enum Theme {
         static let liveBorder: CGFloat = 1.5
         static let liveShadowRadius: CGFloat = 5
         static let liveShadowY: CGFloat = 2
-        /// 보드 한 칸의 최소 폭. 창이 좁으면 보드를 가로로 넘긴다.
-        static let boardColumnMinWidth: CGFloat = 200
+        /// 보드 한 칸의 최소 폭. 1280pt 창에 사이드바·인스펙터가 열려도 네 칸이 다 들어가는 값. 더 좁으면 보드를 가로로 넘긴다.
+        static let boardColumnMinWidth: CGFloat = 165
         static let checkbox: CGFloat = 16
         /// 카드 상세 본문 최대 폭
         static let detailBodyMaxWidth: CGFloat = 720

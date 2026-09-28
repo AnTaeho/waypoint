@@ -33,3 +33,36 @@
 | 09-28 | 「완료로 옮기기」는 상태 배지 줄 오른쪽 `.bordered` 버튼, 완료·보관 카드에서는 숨김 | 시안의 「Claude에서 이어서 작업」 자리. 동작은 `CardLifecycle.move(.done)` + 저장 | 툴바 버튼 | `CardDetailHeader` |
 | 09-28 | 연결된 카드 = 상위·하위만(보관 제외). 「파생」은 모델에 없어 뺐다 | HANDOFF 지시 | — | — |
 | 09-28 | 「지금 연결된 세션」에서 세션 종류는 「Claude Code」/「서브에이전트」로 보임 | 시안 문구이고 HANDOFF가 「세션 종류」를 보이라고 했다. 만든 쪽 용어 목록(훅·MCP·스킬·세션 요약)에 없다 | 「세션」 하나로 통일 | `ConnectedSessionBox`, `BoardSessionBox` |
+| 09-28 | (M2) 서브에이전트 하위 세션의 `Session.id` = 훅의 `agent_id` | 문서상 서브에이전트 안의 훅은 `session_id`가 부모와 같고 `agent_id`로 구분한다. 실측 필요 | `session_id`가 다르면 그것을 쓰기 | `HookProcessor.subagentStart` |
+| 09-28 | (M2) 하위 세션은 `SubagentStart`에서 만들고, 카드 ID는 그 직전 `PreToolUse(Agent)` 프롬프트의 `[LDG-16]`에서 가져와 **같은 에이전트 종류의 가장 오래된 대기 항목**과 짝짓는다(10분 지나면 버림, 다른 종류와는 짝짓지 않음) | 문서에 두 이벤트를 잇는 키가 없다. 틀린 카드에 붙이는 것보다 안 붙이는 쪽이 보수적 | `PreToolUse`에서 바로 하위 세션을 만들기(그러면 `agent_id`를 모름) | `HookProcessor.takePending` |
+| 09-28 | (M2) 프롬프트에 카드 ID가 없는 서브에이전트는 어떤 카드에도 붙이지 않는다. 다만 그 서브에이전트의 파일 변경은 부모 세션의 작업중 카드에 남긴다 | 카드 연결은 명시적일 때만. 파일 기록은 잃지 않게 | 부모 카드에 자동 연결 | `postToolUse`의 `cards.isEmpty, sub != nil` 분기 |
+| 09-28 | (M2) `SessionStart` 없이 다른 훅이 먼저 와도(훅을 세션 중간에 등록한 경우) 등록 폴더면 세션을 만든다. 끝난 세션은 **끝난 시각 뒤의** 훅이 올 때만 다시 살리고(resume), 그 이전 시각의 늦은 기록은 무시 | outbox로 늦게 들어온 기록이 끝난 세션을 되살리지 않게 | SessionStart에서만 생성 | `HookProcessor.mainSession` |
+| 09-28 | (M2) 카드가 없는 세션의 파일 변경·커밋은 카드 없이 프로젝트 이벤트로 남긴다 | 기록을 버리지 않는다. 화면에는 아직 안 보인다 | 버리기 | `postToolUse`의 `targets` |
+| 09-28 | (M2) 줄 수: Edit=`new_string`/`old_string` 줄 수, Write=`content` 줄 수(지운 줄 0), Bash=`bashEditDiff.changedFiles`(줄 수 0). 커밋은 Bash 명령에 `git commit`이 있고 출력 첫 줄이 `[브랜치 해시] 메시지`일 때 | 문서에 있는 필드만 쓴다. 실제 `tool_response`에 더 정확한 필드가 있으면 실측 후 바꾼다 | git 명령 직접 실행(훅 경로에서 느려짐) | `HookParsing` |
+| 09-28 | (M2) git 브랜치는 `.git/HEAD`만 읽어 얻는다(git을 실행하지 않음) | 서버 응답을 느리게 하지 않게. 커밋 출력의 브랜치로도 갱신 | `git rev-parse` 실행 | `GitInfo.branch` |
+| 09-28 | (M2) outbox는 먼저 `outbox.processing-<ms>-<uuid>.jsonl`로 이름을 바꿔 떼어 낸 뒤 처리하고 지운다. 서버가 열린 직후 한 번 더 흡수 | 흡수 중 스크립트가 쓰는 줄을 잃지 않고, 도중에 앱이 죽어도 다음 실행에서 이어 처리 | 읽고 파일 비우기(그사이 쓴 줄 유실 위험) | `Outbox.drain`, `AppServices.start` |
+| 09-28 | (M2) 샘플 모드에서는 서버를 열지 않고 outbox도 흡수하지 않는다 | 메모리 저장소에 흡수하면 outbox가 비워지면서 실제 기록을 잃는다 | — | `WaypointApp.init` |
+| 09-28 | (M2) 훅 스크립트 curl에 `--noproxy '*'`, `--connect-timeout 1` 추가. 로깅 모드 파일은 `hook-log/<YYYY-MM-DD>.jsonl`, 줄 형식은 outbox와 같다. 테스트용 `WAYPOINT_SUPPORT_DIR` 환경 변수 추가 | 셸에 `http_proxy`가 있으면 127.0.0.1 요청이 프록시로 가서 앱에 닿지 않는 것을 이 컨테이너에서 실제로 확인했다 | — | `integration/hooks/waypoint-hook.sh` |
+| 09-28 | (M2) 메뉴 막대: 프로젝트별 「가계부 앱 · 작업 2 · 멈춤 1」(카드와 상관없이 메인 세션 수), 받지 못할 때 한 줄, 「Waypoint 열기」, 「종료」. 아이콘 SF Symbol `signpost.right` | 카드 없는 세션도 보이는 곳이 필요했다(대시보드에도 카드 없는 세션 줄을 넣었다, 아래). 사실만 짧게 | — | `MenuBarContent` |
+| 09-28 | (M2) 세션 상태 캐시(`stateRaw`)를 60초마다 맞춘다 | 화면 판정은 이미 `TimelineView`가 한다. 캐시는 M6 동기화용 | 타이머 없이 두기 | `AppServices.refreshInterval` |
+| 09-28 | (M2) 서버는 루프백(127.0.0.1)에만 묶고, 요청 하나를 받는 데 5초·본문 1 MiB로 제한 | 외부 접속 차단, 멈춘 연결 정리 | — | `LocalServer`, `HTTPRequestParser` |
+| 09-28 | (M2, 로컬에서 결정) 대시보드 작업중 표에 **카드 없는 세션 줄**을 넣는다(막힌 것의 (a)). 끝나지 않은 메인 세션에 열린 카드 연결이 없으면 한 줄: 카드 칸 비움, 제목 자리 「카드 없음」(흐리게), 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`, 누를 곳 없음. 카드가 붙으면 카드 줄로 바뀐다. 카드 없는 서브에이전트는 줄을 만들지 않는다. 카드 없는 부모 줄이 생기므로 카드 붙은 서브에이전트는 그 아래 들여쓴다. 검색 중에는 카드 없는 줄이 빠진다. `SessionStart` 컨텍스트의 「다른 세션에서 작업중」에는 넣지 않는다 | M2 완료 조건 「세션 2개가 live로 보이고 종료하면 사라진다」를 카드(M3) 없이 채운다 | (b) 메뉴 막대만, (c) M3 뒤 확인 | `DashboardQuery.rows`의 `links.isEmpty` 분기 삭제, `DashboardRow.card`를 다시 필수로 |
+| 09-28 | (M2) 사이드바 개수·프로젝트 표 「작업중」도 카드 없는 메인 세션을 센다(작업중 = live 카드 + 카드 없는 live 메인 세션, 멈춤도 같게) | 대시보드 제목 「작업 N개」가 카드 없는 줄을 세는데 사이드바가 0이면 두 숫자가 어긋난다. 메뉴 막대도 이미 카드와 상관없이 세션을 센다 | 카드만 세기(기존) | `DashboardQuery.summary`의 세션 반복 삭제 |
+| 09-28 | (최적화) `Project.lastEventAt`(옵셔널) 추가. `Event.record`가 앞으로만 갱신하고, 프로젝트 요약의 「마지막 활동」은 이벤트 전체 대신 이 값을 쓴다. 메뉴 막대는 끝나지 않은 세션만 `@Query`로 읽는다 | M2부터 파일 수정마다 이벤트가 쌓이는데, 사이드바·대시보드가 30초마다 프로젝트의 이벤트 전부를 읽고 있었다. 결과는 같다 | 이벤트 조회에 fetchLimit·정렬을 걸기(요약 함수가 context를 받도록 바꿔야 함) | `DashboardQuery.summary`에서 `project.events` 합치기로 되돌리고 필드 삭제 |
+
+## 로컬 확인 (2026-09-28, macOS 26 + Xcode)
+
+- `main`을 합친 뒤 `xcodegen generate` → `swift test`, macOS·iOS 앱 빌드 모두 경고·오류 0으로 통과했다. 클라우드에서 쓴 코드에 고칠 컴파일 오류는 없었다.
+- `NWConnection` Sendable 경고는 나지 않았다. 콜백마다 `MainActor.assumeIsolated`로 감싸고 리스너·연결을 `.main` 큐에서 돌려서다.
+- 병렬 테스트에서 가끔 signal 11: 같은 스키마로 컨테이너를 동시에 열 때 Core Data 트리거 SQL 생성에서 죽었다. `WaypointStore.makeContainer`에 락을 걸었다.
+
+## 막힌 것
+
+- 새 옵셔널 필드 `Project.lastEventAt`는 SwiftData 자동 경량 마이그레이션으로 붙는다고 보고 있다(미검증). 이미 있는 저장소는 이 값이 비어 있어, 다음 이벤트가 올 때까지 「마지막 활동」이 세션·카드 기준으로만 보인다.
+- **실측 필요 항목**은 `docs/SPEC.md` 5장 「실측 필요」에 모았다.
+
+## 제안(하지 않음)
+
+- `DashboardQuery.rows`와 `summary`는 여전히 프로젝트의 **끝난 세션까지** 모두 훑는다. 세션은 이벤트보다 훨씬 천천히 쌓여 지금은 두었다. 느려지면 끝나지 않은 세션만 `@Query`로 받아 넘기도록 바꾼다.
+
+- 외부 Swift 패키지는 추가하지 않았다. MCP(M3)에서 공식 Swift SDK를 쓸지는 그때 판단.
