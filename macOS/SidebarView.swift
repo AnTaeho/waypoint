@@ -6,6 +6,11 @@ struct SidebarView: View {
     @Binding var selection: SidebarSelection?
     @Query(filter: #Predicate<Project> { $0.archivedAt == nil }, sort: \Project.name)
     private var projects: [Project]
+    @Query(filter: #Predicate<Project> { $0.archivedAt != nil }, sort: \Project.name)
+    private var archived: [Project]
+    @State private var showsArchived = false
+    @State private var deleting: Project?
+    @Environment(\.modelContext) private var context
 
     var body: some View {
         List(selection: $selection) {
@@ -22,9 +27,30 @@ struct SidebarView: View {
                         SidebarProjectRow(project: project, now: timeline.date)
                     }
                     .tag(SidebarSelection.project(project.persistentModelID))
+                    .contextMenu {
+                        Button("보관") { archive(project) }
+                        Divider()
+                        Button("삭제…", role: .destructive) { deleting = project }
+                    }
                 }
             } header: {
                 Text("프로젝트").font(Theme.tableHeader)
+            }
+
+            if !archived.isEmpty {
+                Section(isExpanded: $showsArchived) {
+                    ForEach(archived) { project in
+                        SidebarArchivedRow(project: project)
+                            .tag(SidebarSelection.project(project.persistentModelID))
+                            .contextMenu {
+                                Button("보관 해제") { try? ProjectRegistry.unarchive(project, context: context) }
+                                Divider()
+                                Button("삭제…", role: .destructive) { deleting = project }
+                            }
+                    }
+                } header: {
+                    Text("보관됨 \(archived.count)").font(Theme.tableHeader)
+                }
             }
         }
         .listStyle(.sidebar)
@@ -33,6 +59,16 @@ struct SidebarView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.sidebar)
+        .projectDeleteAlert($deleting) { project in
+            // 지운 프로젝트를 본문이 다시 읽지 않게 선택부터 옮긴다.
+            if selection == .project(project.persistentModelID) { selection = .dashboard }
+            try? ProjectRegistry.delete(project, context: context)
+        }
+    }
+
+    private func archive(_ project: Project) {
+        if selection == .project(project.persistentModelID) { selection = .dashboard }
+        try? ProjectRegistry.archive(project, at: Date(), context: context)
     }
 }
 
@@ -47,10 +83,7 @@ private struct SidebarProjectRow: View {
     var body: some View {
         let summary = DashboardQuery.summary(for: project, now: now)
         HStack(spacing: Theme.Spacing.s) {
-            Text(project.key)
-                .font(Theme.monoSmall)
-                .foregroundStyle(isProminent ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.textMuted))
-                .frame(width: Theme.Size.sidebarKeyWidth, alignment: .leading)
+            SidebarKey(key: project.key)
             Text(project.name)
                 .font(Theme.body)
                 .lineLimit(1)

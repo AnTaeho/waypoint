@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import SwiftData
@@ -9,6 +10,16 @@ import WaypointKit
 @Observable
 final class AppServices {
     private(set) var serverState: LocalServer.State = .stopped
+    /// 방금 등록한 프로젝트. 메인 창이 받아서 사이드바에서 고르고 비운다.
+    var pendingSelection: PersistentIdentifier?
+
+    /// `project_init` 초안(메모리에만)
+    @ObservationIgnored let drafts = ProjectDraftQueue()
+    /// 메인 창 열기. 메인 창이 처음 뜰 때 `openWindow`를 넣어 둔다(창을 모두 닫은 뒤에도 쓰려고).
+    @ObservationIgnored var openMainWindow: (() -> Void)?
+    /// 떠 있는 메인 창 수
+    @ObservationIgnored var mainWindowCount = 0
+    @ObservationIgnored private var initWindow: InitWindowController?
 
     @ObservationIgnored private let container: ModelContainer
     @ObservationIgnored private var processor: HookProcessor?
@@ -30,7 +41,15 @@ final class AppServices {
         self.processor = processor
         drainOutbox()
 
-        let mcp = MCPServer(context: container.mainContext)
+        let initWindow = InitWindowController(queue: drafts, container: container) { [weak self] project in
+            self?.showRegistered(project)
+        }
+        self.initWindow = initWindow
+        // 도구 응답이 창 생성을 기다리지 않게 다음 차례로 미룬다.
+        drafts.onSubmit = { _ in
+            Task { @MainActor in initWindow.show() }
+        }
+        let mcp = MCPServer(context: container.mainContext, drafts: drafts)
         let server = LocalServer { request in
             if MCPRouter.matches(request.path) {
                 return MCPRouter.respond(to: request) { mcp.handle($0) }
@@ -57,6 +76,18 @@ final class AppServices {
         refreshStates()
         timer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshStates() }
+        }
+    }
+
+    /// 등록한 프로젝트를 메인 창 사이드바에서 고른다. 메인 창이 없으면 연다.
+    private func showRegistered(_ project: Project) {
+        pendingSelection = project.persistentModelID
+        if mainWindowCount == 0 {
+            openMainWindow?()
+        } else if let main = NSApplication.shared.windows.first(where: {
+            $0.isVisible && $0.canBecomeMain && initWindow?.owns($0) != true
+        }) {
+            main.makeKeyAndOrderFront(nil)
         }
     }
 

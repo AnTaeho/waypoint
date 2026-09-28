@@ -189,6 +189,31 @@ enum Theme {
         static let addedLine = doneBg
     }
 
+    /// 새 프로젝트 등록 창
+    enum Init {
+        static let windowWidth: CGFloat = 760
+        static let windowHeight: CGFloat = 640
+        static let padding: CGFloat = 30
+        /// 구역 사이
+        static let gap: CGFloat = 20
+        /// 이름표와 입력 칸 사이
+        static let labelGap: CGFloat = 6
+        static let keyWidth: CGFloat = 110
+        static let fieldHeight: CGFloat = 36
+        static let fieldPadding: CGFloat = 12
+        static let field = rounded(14)
+        static let label = rounded(12)
+        /// 경로·스택 줄의 이름표 열
+        static let rowLabelWidth: CGFloat = 44
+        static let chipH: CGFloat = 9
+        static let chipV: CGFloat = 3
+        static let chipGap: CGFloat = 6
+        static let stackInputWidth: CGFloat = 110
+        /// 지침 문서·초기 카드 상자
+        static let boxPadding: CGFloat = 14
+        static let boxRowGap: CGFloat = 9
+    }
+
     enum Columns {
         static let activeCard: CGFloat = 90
         static let activeFile: ClosedRange<CGFloat> = 120...200
