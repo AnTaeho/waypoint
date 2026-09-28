@@ -94,6 +94,11 @@
 | 09-28 | (M5) 삭제 알림 문구는 「카드 N개와 기록이 함께 삭제됩니다.」(카드가 없으면 「기록이 함께 삭제됩니다.」). 로컬 파일 이야기는 넣지 않았다 | 동작 규칙 설명 문구를 화면에 넣지 않는다 | 파일은 남는다는 문장 | `SidebarProjectParts.swift` |
 | 09-28 | (M4 잔여) 버전 기록 시각은 늘 초까지(「15:12:16」) | 같은 분에만 초를 붙이면 목록 안에서 형식이 섞인다 | 같은 분일 때만 | `TimeFormat.timestamp(seconds:)` |
 | 09-28 | (M4 잔여) 충돌에서 「로컬 파일로」「앱 내용으로」 어느 쪽이든 읽기로 돌아간다 | 둘 다 고르고 나면 저장 안 한 편집이 없다 | 「로컬 파일로」만 | `GuideConflictView.resolved` |
+| 09-28 | (인스턴스 분리) 평소용(Release, `dev.antaeho.waypoint`, 47821, `Waypoint/`)과 개발용 Waypoint Dev(Debug, `dev.antaeho.waypoint.dev`, 47822, `Waypoint-Dev/`)로 나눈다. 번들 ID 끝이 `.dev`면 개발용(`AppInstance`), `WAYPOINT_PORT`·`WAYPOINT_SUPPORT_DIR`가 먼저. `PRODUCT_NAME`은 그대로 둬 Debug 빌드 경로가 같다 | 개발하며 앱을 껐다 켜고 실측하느라 다른 저장소 추적이 끊기고 실측 프로젝트(PRB·NOTE)가 실제 기록에 섞였다 | 실행 인자로 인스턴스 고르기(같은 번들 ID라 동시 실행·로그인 항목이 섞인다) | `project.yml`의 `configs: Debug:` 삭제 후 `xcodegen generate` |
+| 09-28 | (인스턴스 분리) Dev 표시는 메뉴 막대 `hammer`·「Waypoint Dev 열기」·사이드바 맨 위 「Dev」(`Theme.Dev`). 표시 이름 `Waypoint Dev`는 Info.plist에만 있고 앱 메뉴 이름은 두 빌드 모두 「Waypoint」 | 둘이 함께 떠 있을 때 메뉴 막대와 창에서 가려 보면 된다 | `PRODUCT_NAME`을 바꿔 앱 메뉴까지 바꾸기(빌드 경로가 바뀐다) | `DevBadge`, `WaypointApp`의 `MenuBarExtra` |
+| 09-28 | (인스턴스 분리) 평소용 설치는 `scripts/install-local.sh`. 로그인 항목은 System Events `make login item`(없을 때만) | 앱 코드 없이 스크립트에서 끝나고, 이 기기에서 System Events 접근이 이미 허용돼 있다. SMAppService는 앱 안에 등록 경로(화면·설정)를 더해야 한다 | `SMAppService.mainApp.register()`, LaunchAgent plist | `osascript -e 'tell application "System Events" to delete login item "Waypoint"'` |
+| 09-28 | (인스턴스 분리) 실측 폴더는 `scripts/dev-probe-setup.sh`로 폴더 안 `.claude/settings.local.json`(Dev 훅)과 `.mcp.json`(`waypoint` → 47822)만 쓴다. 전역 설정은 평소용 그대로 | 전역 설정을 인스턴스마다 바꾸면 평소 추적이 끊긴다. MCP는 프로젝트 범위가 사용자 범위보다 먼저(문서·실측). 로컬 범위는 `~/.claude.json`에 적혀 쓰지 않았다 | 실측 때만 전역 설정을 바꾸기 | `dev-probe-setup.sh --remove <폴더>` |
+| 09-28 | (인스턴스 분리) 평소용에서 실측 프로젝트 PRB·NOTE를 앱의 「삭제…」로 지웠다(폴더는 그대로). PRB는 Dev에 새로 등록 | 실측 폴더는 전역 훅도 받으므로 평소용이 모르는 폴더여야 기록이 섞이지 않는다 | 평소용에서 보관(그러면 `SessionStart`의 「없음」 한 줄도 안 나온다. 기록은 남는다) | 전환 전 백업 저장소로 교체 |
 
 ## 로컬 확인 (2026-09-28, macOS 26 + Xcode)
 

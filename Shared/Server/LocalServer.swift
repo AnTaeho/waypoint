@@ -6,7 +6,8 @@ import Network
 /// 모든 콜백은 메인 큐에서 돌고, 요청 처리(`handler`)도 메인 액터에서 부른다.
 @MainActor
 public final class LocalServer {
-    public static let defaultPort: UInt16 = 47821
+    /// 평소용 포트. 인스턴스별 포트는 `AppInstance.port()`.
+    public static let defaultPort: UInt16 = AppInstance.stable.defaultPort
 
     public enum State: Equatable, Sendable {
         case stopped

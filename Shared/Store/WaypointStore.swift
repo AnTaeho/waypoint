@@ -14,19 +14,21 @@ public enum WaypointStore {
 
     /// 저장 폴더를 바꾸는 환경 변수. 훅 스크립트(`waypoint-hook.sh`)와 같은 이름이라 한 값으로 저장소·outbox를 함께 옮긴다.
     /// 확인·디버그용으로 실제 저장소를 건드리지 않고 앱을 띄울 때 쓴다.
-    public static let supportDirectoryEnvironmentKey = "WAYPOINT_SUPPORT_DIR"
+    public static let supportDirectoryEnvironmentKey = AppInstance.supportDirectoryEnvironmentKey
 
-    /// ~/Library/Application Support/Waypoint(환경 변수 `WAYPOINT_SUPPORT_DIR`가 있으면 그 폴더). `create`면 폴더가 없을 때 만든다.
+    /// 평소용은 ~/Library/Application Support/Waypoint, 개발용은 …/Waypoint-Dev(`AppInstance`).
+    /// 환경 변수 `WAYPOINT_SUPPORT_DIR`가 있으면 그 폴더. `create`면 폴더가 없을 때 만든다.
     public static func supportDirectory(create: Bool = true) throws -> URL {
-        let dir: URL
-        if let custom = ProcessInfo.processInfo.environment[supportDirectoryEnvironmentKey], !custom.isEmpty {
-            dir = URL(fileURLWithPath: (custom as NSString).expandingTildeInPath, isDirectory: true)
+        let environment = ProcessInfo.processInfo.environment
+        let base: URL
+        if let custom = environment[supportDirectoryEnvironmentKey], !custom.isEmpty {
+            base = URL(fileURLWithPath: "/")  // 환경 변수가 있으면 쓰지 않는다
         } else {
-            let base = try FileManager.default.url(
+            base = try FileManager.default.url(
                 for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: create
             )
-            dir = base.appendingPathComponent("Waypoint", isDirectory: true)
         }
+        let dir = AppInstance.current.supportDirectory(base: base, environment: environment)
         if create {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }

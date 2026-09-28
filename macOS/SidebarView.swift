@@ -54,6 +54,9 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            DevBadge()
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             UsageGaugeView()
         }

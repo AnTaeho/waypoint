@@ -10,6 +10,8 @@ import WaypointKit
 @Observable
 final class AppServices {
     private(set) var serverState: LocalServer.State = .stopped
+    /// 서버 포트. 평소용 47821, 개발용 47822(`AppInstance`), 환경 변수 `WAYPOINT_PORT`가 먼저.
+    let port = AppInstance.current.port()
     /// 방금 등록한 프로젝트. 메인 창이 받아서 사이드바에서 고르고 비운다.
     var pendingSelection: PersistentIdentifier?
 
@@ -50,7 +52,7 @@ final class AppServices {
             Task { @MainActor in initWindow.show() }
         }
         let mcp = MCPServer(context: container.mainContext, drafts: drafts)
-        let server = LocalServer { request in
+        let server = LocalServer(port: port) { request in
             if MCPRouter.matches(request.path) {
                 return MCPRouter.respond(to: request) { mcp.handle($0) }
             }

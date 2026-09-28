@@ -43,7 +43,11 @@ struct WaypointApp: App {
 
         #if os(macOS)
         // 메뉴 막대에 상주해 창을 닫아도 서버가 돈다.
-        MenuBarExtra("Waypoint", systemImage: "signpost.right") {
+        // 개발용은 이름·아이콘을 달리해 평소용과 함께 떠 있어도 가려 보게 한다.
+        MenuBarExtra(
+            AppInstance.current.isDev ? "Waypoint Dev" : "Waypoint",
+            systemImage: AppInstance.current.isDev ? Theme.Dev.menuBarSymbol : "signpost.right"
+        ) {
             MenuBarContent(services: services)
                 .modelContainer(container)
                 .environment(usage)

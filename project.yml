@@ -41,3 +41,9 @@ targets:
         ENABLE_HARDENED_RUNTIME: NO
         CODE_SIGN_STYLE: Automatic
         SWIFT_STRICT_CONCURRENCY: complete
+      # Debug는 개발용 Waypoint Dev: 번들 ID가 달라 평소용(Release)과 함께 떠 있을 수 있고,
+      # 앱이 이 ID로 포트(47822)·저장 폴더(Waypoint-Dev)를 고른다(`AppInstance`).
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: dev.antaeho.waypoint.dev
+          INFOPLIST_KEY_CFBundleDisplayName: Waypoint Dev

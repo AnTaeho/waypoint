@@ -21,6 +21,7 @@
 		39A9696D87266887CD68F06F /* GuideEmptyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94EBAFA75014DA1B1767C2DE /* GuideEmptyView.swift */; platformFilters = (macos, ); };
 		39D19E54F546D79E86A631EB /* ActiveWorkRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513714242E8675B19C5134DA /* ActiveWorkRowView.swift */; platformFilters = (macos, ); };
 		3A87FFFFB3F47A87FD8DF0D9 /* GuideMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B2D45D42FB21487B5942FA /* GuideMonitor.swift */; platformFilters = (macos, ); };
+		40B86660844BB42A2680C750 /* DevBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6504A0D8B93119704EA413E /* DevBadge.swift */; };
 		40B9BBAE36C499828E03B0CF /* WaypointKit in Frameworks */ = {isa = PBXBuildFile; productRef = 40BCBD52B88D9C65C146385E /* WaypointKit */; };
 		417ADEC51642A897722BF325 /* CardDetailHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BF6E481CC8CB742C64E4F3A /* CardDetailHeader.swift */; platformFilters = (macos, ); };
 		4286870FC1F3EFFDE22CFC42 /* CardInspectorLists.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3B60D09C1EDAC5EC81AA0E /* CardInspectorLists.swift */; platformFilters = (macos, ); };
@@ -120,6 +121,7 @@
 		D1DBD11B33E77A4580CC8FF2 /* TableHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableHeader.swift; sourceTree = "<group>"; };
 		DA82393508D897437A7F5856 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		E11E635A50DB29E130075B38 /* UsageGaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageGaugeView.swift; sourceTree = "<group>"; };
+		E6504A0D8B93119704EA413E /* DevBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevBadge.swift; sourceTree = "<group>"; };
 		EDF1E559044FBEEDD8FBB180 /* InitSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitSheetView.swift; sourceTree = "<group>"; };
 		F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
 		F7B2D45D42FB21487B5942FA /* GuideMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideMonitor.swift; sourceTree = "<group>"; };
@@ -206,6 +208,7 @@
 		44C4D493A61ABEE311DCBB83 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				E6504A0D8B93119704EA413E /* DevBadge.swift */,
 				B9DAD89B809522AC369D3FCB /* LiveDot.swift */,
 				D1DBD11B33E77A4580CC8FF2 /* TableHeader.swift */,
 			);
@@ -409,6 +412,7 @@
 				483766829586C4679EAE620E /* CardInspectorSections.swift in Sources */,
 				DE0AB3A437643C60E16F0D6F /* DashboardSearch.swift in Sources */,
 				9257097A562C6AC262C6FCD6 /* DashboardView.swift in Sources */,
+				40B86660844BB42A2680C750 /* DevBadge.swift in Sources */,
 				96E1CBB3E7DA3EA349350AEA /* FontRegistry.swift in Sources */,
 				791BC9EBA655D7FA9A07B763 /* GuideAddMenu.swift in Sources */,
 				157129890D1A3B79ABF3BB1A /* GuideConflictView.swift in Sources */,
@@ -460,7 +464,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Waypoint;
+				INFOPLIST_KEY_CFBundleDisplayName = "Waypoint Dev";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -471,7 +475,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.antaeho.waypoint;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.antaeho.waypoint.dev;
 				PRODUCT_NAME = Waypoint;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
