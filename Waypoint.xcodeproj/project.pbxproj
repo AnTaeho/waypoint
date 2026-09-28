@@ -33,6 +33,7 @@
 		4C601A00D505476E11D1D7A7 /* ActiveWorkTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA032F9625A0461F3B07231C /* ActiveWorkTable.swift */; platformFilters = (macos, ); };
 		4DAAB619BA15440C409EC1FC /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF3CC91475AFCB54D6E49BE /* Theme.swift */; };
 		64DA885EA5000630F5FE0452 /* ProjectBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3905FDAF71CEBAF40695A08 /* ProjectBoardView.swift */; platformFilters = (macos, ); };
+		678C65EC66445DBD7A7F916E /* BoardSessionTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BA220A766EFABD5B33123B /* BoardSessionTileView.swift */; platformFilters = (macos, ); };
 		6BF8F5047D1E0882C2152162 /* InitChecklists.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55C4D1900BA2387763F86D8 /* InitChecklists.swift */; platformFilters = (macos, ); };
 		786DE851725A294441A17554 /* MarkdownBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7589B21E222DC5DBB867A617 /* MarkdownBlockView.swift */; platformFilters = (macos, ); };
 		791BC9EBA655D7FA9A07B763 /* GuideAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9707BBA1A140671895B23A3 /* GuideAddMenu.swift */; platformFilters = (macos, ); };
@@ -138,6 +139,7 @@
 		F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
 		F7B2D45D42FB21487B5942FA /* GuideMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideMonitor.swift; sourceTree = "<group>"; };
 		F9707BBA1A140671895B23A3 /* GuideAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideAddMenu.swift; sourceTree = "<group>"; };
+		F9BA220A766EFABD5B33123B /* BoardSessionTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardSessionTileView.swift; sourceTree = "<group>"; };
 		FA032F9625A0461F3B07231C /* ActiveWorkTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkTable.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -233,6 +235,7 @@
 				0F03EBCDF71261B2E51201D1 /* BoardCardView.swift */,
 				83B5E7102286FAE2A09F9FD6 /* BoardColumnView.swift */,
 				03F4EC7A40B6A8FAE8629FA1 /* BoardSessionBox.swift */,
+				F9BA220A766EFABD5B33123B /* BoardSessionTileView.swift */,
 				B3905FDAF71CEBAF40695A08 /* ProjectBoardView.swift */,
 			);
 			path = Board;
@@ -423,6 +426,7 @@
 				AE8010717EC3BCB93185B8C3 /* BoardCardView.swift in Sources */,
 				EC5A09AE5A861570A3ACEC27 /* BoardColumnView.swift in Sources */,
 				A6AFC6300AD9C9F662C6BCE0 /* BoardSessionBox.swift in Sources */,
+				678C65EC66445DBD7A7F916E /* BoardSessionTileView.swift in Sources */,
 				918DC6BAC3856EA398646C6E /* CardCriteriaView.swift in Sources */,
 				417ADEC51642A897722BF325 /* CardDetailHeader.swift in Sources */,
 				8DDDF628EB44D6378567C942 /* CardDetailView.swift in Sources */,

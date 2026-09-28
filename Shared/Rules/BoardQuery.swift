@@ -27,6 +27,18 @@ public struct BoardItem: Identifiable {
     public var id: UUID { card.id }
 }
 
+/// 작업중 칸의 카드 없는 세션 타일: 이 프로젝트의 끝나지 않은 메인 세션 중 카드가 붙지 않은 것.
+/// 대시보드의 카드 없는 줄(`DashboardRow.card == nil`)과 같은 세션이다. 끌거나 누를 수 없다.
+public struct BoardSessionTile: Identifiable {
+    public let session: Session
+    /// live 또는 stalled
+    public let workState: CardWorkState
+    /// 끝나지 않은 서브에이전트 수
+    public let runningSubagents: Int
+
+    public var id: String { session.id }
+}
+
 /// 카드 한 장의 누적 작업 집계.
 public struct CardWorkStats: Equatable, Sendable {
     /// 이 카드에 붙었던 서로 다른 메인 세션 수
@@ -60,6 +72,24 @@ public enum BoardQuery {
             .active: nested(cards.filter { $0.status == .active }),
             .done: done.map { BoardItem(card: $0, depth: 0) },
         ]
+    }
+
+    /// 작업중 칸의 카드 없는 세션 타일. 대시보드 작업중 줄과 같은 기준(`DashboardQuery.rows`)이고 순서도 같다(세션 시작순).
+    /// 보관된 프로젝트는 대시보드처럼 비운다.
+    public static func sessionTiles(
+        for project: Project,
+        now: Date,
+        stallTimeout: TimeInterval = SessionRules.defaultStallTimeout
+    ) -> [BoardSessionTile] {
+        guard project.archivedAt == nil else { return [] }
+        return DashboardQuery.rows(for: project, now: now, stallTimeout: stallTimeout)
+            .filter { $0.card == nil && $0.session.kind == .main }
+            .map { row in
+                let running = (row.session.children ?? []).filter {
+                    $0.kind == .subagent && SessionRules.state(of: $0, now: now, stallTimeout: stallTimeout) != .ended
+                }
+                return BoardSessionTile(session: row.session, workState: row.workState, runningSubagents: running.count)
+            }
     }
 
     /// 부모가 같은 목록에 있으면 부모 아래에 붙인다. 한 단계만 들여 쓴다.
