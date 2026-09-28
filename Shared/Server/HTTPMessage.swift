@@ -68,18 +68,27 @@ public struct HTTPResponse: Sendable, Equatable {
     public let status: Int
     public let contentType: String?
     public let body: Data
+    /// 그 밖의 머리(예: `Mcp-Session-Id`). 이름 순으로 싣는다.
+    public let headers: [String: String]
 
-    public init(status: Int, contentType: String? = nil, body: Data = Data()) {
+    public init(status: Int, contentType: String? = nil, body: Data = Data(), headers: [String: String] = [:]) {
         self.status = status
         self.contentType = contentType
         self.body = body
+        self.headers = headers
     }
 
     public static func text(_ string: String) -> HTTPResponse {
         HTTPResponse(status: 200, contentType: "text/plain; charset=utf-8", body: Data(string.utf8))
     }
 
+    public static func json(_ data: Data, status: Int = 200, headers: [String: String] = [:]) -> HTTPResponse {
+        HTTPResponse(status: status, contentType: "application/json", body: data, headers: headers)
+    }
+
     public static let noContent = HTTPResponse(status: 204)
+    public static let accepted = HTTPResponse(status: 202)
+    public static let forbidden = HTTPResponse(status: 403)
     public static let badRequest = HTTPResponse(status: 400)
     public static let notFound = HTTPResponse(status: 404)
     public static let methodNotAllowed = HTTPResponse(status: 405)
@@ -87,8 +96,10 @@ public struct HTTPResponse: Sendable, Equatable {
     public var reason: String {
         switch status {
         case 200: "OK"
+        case 202: "Accepted"
         case 204: "No Content"
         case 400: "Bad Request"
+        case 403: "Forbidden"
         case 404: "Not Found"
         case 405: "Method Not Allowed"
         default: "Error"
@@ -98,6 +109,7 @@ public struct HTTPResponse: Sendable, Equatable {
     public func serialized() -> Data {
         var head = "HTTP/1.1 \(status) \(reason)\r\n"
         if let contentType { head += "Content-Type: \(contentType)\r\n" }
+        for (name, value) in headers.sorted(by: { $0.key < $1.key }) { head += "\(name): \(value)\r\n" }
         // 204에는 본문·길이를 싣지 않는다.
         if status != 204 { head += "Content-Length: \(body.count)\r\n" }
         head += "Connection: close\r\n\r\n"

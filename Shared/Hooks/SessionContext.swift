@@ -4,12 +4,16 @@ import Foundation
 public enum SessionContext {
 
     public static let nextLimit = 5
-    public static let noteLimit = 3
 
     /// 등록되지 않은 폴더에서 연 세션에 주는 한 줄.
     public static let unregistered = "Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음."
 
-    /// 프로젝트 키, 세션 ID, 다음 할 일 상위 5개, 이 프로젝트의 다른 작업중 카드, 직전 세션 메모.
+    /// 블록 마지막 줄. 스킬이 이 블록을 보고 켜지게 한다.
+    public static let skillHint = "작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 tracker 스킬을 따른다."
+
+    /// `Waypoint:`로 시작하는 블록: 프로젝트 키·이름, `sessionId`, 다음 할 일 상위 5개,
+    /// 이 프로젝트의 다른 작업중 카드, 직전 세션 메모(가장 최근에 `card_handoff`한 카드 하나).
+    /// 형식은 `integration/skills/tracker/SKILL.md`와 맞춘다.
     public static func text(
         project: Project,
         session: Session,
@@ -18,8 +22,8 @@ public enum SessionContext {
     ) -> String {
         let cards = (project.cards ?? []).filter { $0.status != .archived }
         var lines = [
-            "Waypoint 프로젝트: \(project.key) (\(project.name))",
-            "Waypoint 세션 ID: \(session.id)",
+            "Waypoint: \(project.key) (\(project.name))",
+            "sessionId: \(session.id)",
         ]
 
         let next = cards.filter { $0.status == .next }.sorted { $0.number < $1.number }.prefix(nextLimit)
@@ -40,14 +44,26 @@ public enum SessionContext {
             }
         }
 
-        let notes = cards
-            .filter { !($0.nextSessionNote ?? "").isEmpty }
-            .sorted { $0.updatedAt > $1.updatedAt }
-            .prefix(noteLimit)
-        if !notes.isEmpty {
-            lines.append("직전 세션 메모:")
-            lines += notes.map { "- \($0.displayID): \($0.nextSessionNote ?? "")" }
+        if let card = latestHandoff(in: cards), let note = card.nextSessionNote {
+            lines.append("직전 세션 메모 (\(card.displayID) \(card.title)):")
+            lines += note.split(separator: "\n", omittingEmptySubsequences: true).map { "  \($0)" }
         }
+        lines.append(skillHint)
         return lines.joined(separator: "\n")
+    }
+
+    /// 다음 세션 메모가 있는 끝나지 않은 카드 중 가장 최근에 메모를 남긴 것.
+    /// 메모 시각은 `handoff` 기록(`note` 이벤트)으로 보고, 없으면(앱에서 쓴 메모 등) `updatedAt`.
+    static func latestHandoff(in cards: [Card]) -> Card? {
+        cards
+            .filter { $0.status != .done && !($0.nextSessionNote ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { card -> (card: Card, at: Date) in
+                let handoffs = (card.events ?? []).filter {
+                    $0.type == .note && $0.payloadValues["kind"]?.stringValue == MCPTools.handoffNoteKind
+                }
+                return (card, handoffs.map(\.at).max() ?? card.updatedAt)
+            }
+            .max { $0.at < $1.at }?
+            .card
     }
 }

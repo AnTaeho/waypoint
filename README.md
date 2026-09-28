@@ -20,9 +20,26 @@ Claude Code 세션을 프로젝트 단위로 추적하는 개인용 Apple 앱(ma
 | `docs/MILESTONES.md` | 구현 순서와 각 단계의 완료 조건 |
 | `docs/DESIGN.md` | 디자인 토큰, 화면 목록, 시안 파일 읽는 법 |
 | `design/*.dc.html` | 시안 화면 마크업 (레이아웃·색·문구 참고용, 단독 렌더링 안 됨) |
-| `integration/skills/tracker/SKILL.md` | 사용자의 모든 프로젝트에서 쓸 tracker 스킬 초안 |
+| `integration/skills/tracker/SKILL.md` | 사용자의 모든 프로젝트에서 쓸 tracker 스킬 |
 | `integration/hooks/` | Claude Code 훅 설정 예시와 훅 스크립트 |
 | `integration/statusline/` | 상태줄 입력의 사용량을 `usage.json`으로 남기는 중계 스크립트와 테스트 |
+
+## 설치 (MCP·스킬)
+
+앱이 켜져 있으면 `http://127.0.0.1:47821/mcp`에 MCP 서버가 열린다. 한 번만 등록한다.
+
+```sh
+# MCP 서버(사용자 범위, ~/.claude.json에 적힌다)
+claude mcp add --transport http --scope user waypoint http://127.0.0.1:47821/mcp
+claude mcp get waypoint      # Status: ✔ Connected (앱이 켜져 있을 때)
+
+# tracker 스킬
+mkdir -p ~/.claude/skills/tracker
+cp integration/skills/tracker/SKILL.md ~/.claude/skills/tracker/
+```
+
+훅 설치는 `integration/hooks/settings.example.json`. 도구 이름은 `mcp__waypoint__card_start` 꼴이라, 권한을 미리 주려면 `mcp__waypoint__*`.
+되돌리기: `claude mcp remove waypoint -s user`, `rm -r ~/.claude/skills/tracker`.
 
 ## 핵심 원칙 (한 줄 요약)
 

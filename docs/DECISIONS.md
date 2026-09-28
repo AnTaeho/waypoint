@@ -60,6 +60,15 @@
 | 09-28 | (SessionEnd 누락 대비, 로컬에서 결정) 앱이 끝낸 세션의 `endedAt`은 검사 시각, `lastSeenAt`은 옮기지 않는다 | 검사 시각으로 끝내야 그 뒤의 진짜 resume은 되살리고 그 이전 늦은 outbox 기록은 무시하는 기존 규칙이 그대로 맞는다. 마지막 활동은 훅이 온 시각만 뜻하게 둔다 | `endedAt = lastSeenAt`(끝난 뒤 늦은 기록으로 부활할 틈이 생김) | `HookProcessor.sweep`의 `finish(… activity: false)` |
 | 09-28 | (SessionEnd 누락 대비, 일회성) 이전 실측에서 남은 PRB 세션 3개(`5d31…`, `7374…`, `b37a…`)는 앱을 끈 채 scratchpad 도구로 `finish(reason: "inactive-24h")`를 불러 끝냈다. 앱 기능에는 넣지 않았다 | PID가 없어 24시간 규칙 대상인데, 그동안 사용자 화면에 멈춤으로 남지 않게 | 24시간 기다리기 | — |
 | 09-28 | (M2 실측) `doc-*.json` 픽스처는 고치지 않았다 | 실측과 모순되는 필드가 없었다(실측에만 있는 필드가 더 있을 뿐). 실제 입력은 `real-*.json` 17개로 따로 둔다 | — | — |
+| 09-28 | (M3) MCP는 초기화 방식(2025-11-25·06-18·03-26)만 받고, 모르는 `MCP-Protocol-Version` 머리에는 본문 없는 400 | Claude Code 2.1.283 실측: 새 방식(2026-07-28) `server/discover`로 먼저 떠보고, 본문 없는 400이면 `initialize`로 내려온다. 새 방식을 같이 지원하려면 `server/discover`·요청별 `_meta`·머리 검증(-32020/-32022)이 더 필요하다 | 두 방식 모두 지원(dual-era) | `MCPRouter.supportedVersions`와 버전 머리 검사 |
+| 09-28 | (M3) `Mcp-Session-Id`는 `initialize` 응답에 주기만 하고 이후 검사하지 않는다 | 서버가 세션별 상태를 두지 않는다. 검사하면 앱을 다시 켤 때마다 실행 중인 Claude Code 세션이 404를 받고 다시 초기화해야 한다 | 모르는 ID에 404 | `MCPRouter.respond`에 검사 추가 |
+| 09-28 | (M3) 도구 실패(카드 없음, active 요청 등)는 JSON-RPC 오류가 아니라 `isError: true` 결과로, 그 호출의 변경은 되돌린다. 모르는 도구 이름만 `-32602` | MCP 문서의 도구 실행 오류 방식. Claude가 이유를 읽고 고쳐 부를 수 있다 | 전부 JSON-RPC 오류 | `MCPServer.callTool` |
+| 09-28 | (M3) `card_start`는 서브에이전트 세션에도 같은 전환 규칙(그 세션의 다른 카드 연결을 먼저 푼다)을 쓴다. 끝난 세션·다른 프로젝트 세션은 오류. done 카드도 시작할 수 있다(`statusBeforeActive = done`이라 끝나면 done으로 돌아간다) | 세션 하나는 주제 하나라는 규칙을 한 곳에서. done 카드를 다시 여는 일은 사용자 요청일 때뿐이고, 기존 `attach`·`detach` 규칙과 맞는다 | done 카드 시작 거부 | `MCPTools.cardStart` |
+| 09-28 | (M3) `card_create` 기본 status: kind idea면 idea, 그 밖은 next | 「나중에」 류를 kind만 idea로 보내도 아이디어 칸에 가게 | 늘 next | `MCPTools.cardCreate` |
+| 09-28 | (M3) `card_list` 기본은 done·archived를 뺀다 | 스킬이 시작할 카드를 찾을 때 완료 카드가 섞이지 않게. `status: done`으로 따로 볼 수 있다 | 전부 | `MCPTools.cardList` |
+| 09-28 | (M3) 주입 블록의 직전 세션 메모는 카드 하나: 가장 최근에 `card_handoff`한(handoff 기록 시각, 없으면 `updatedAt`) done·archived가 아닌 카드. 마지막 줄에 tracker 스킬 안내를 붙인다 | 「직전 세션」은 하나다. `updatedAt`은 다른 수정에도 움직여 옛 메모가 앞설 수 있다. 안내 줄은 스킬이 이 블록에서 켜지게 돕는다(실측에서 `-p` 세션이 곧바로 `Skill(tracker)`를 불렀다) | 메모 3개(이전 형식) | `SessionContext.latestHandoff`, `skillHint` |
+| 09-28 | (M3) handoff는 `note` 이벤트 `{kind: "handoff", text}`로 남긴다 | 카드 기록에 메모 문장이 그대로 보이고(`CardHistoryFormat`은 모르는 kind를 본문 그대로 보인다), 주입 블록이 메모 시각을 찾는다 | 새 이벤트 종류 | `MCPTools.handoffNoteKind` |
+| 09-28 | (M3) 커밋은 「MCP 엔드포인트와 도구」를 한 커밋으로 묶었다 | `MCPServer`가 도구 레지스트리를 품고 있어 나누면 중간 커밋이 빌드되지 않는다 | 빌드 안 되는 중간 커밋 | — |
 
 ## 로컬 확인 (2026-09-28, macOS 26 + Xcode)
 
@@ -83,4 +92,4 @@
 
 - `DashboardQuery.rows`와 `summary`는 여전히 프로젝트의 **끝난 세션까지** 모두 훑는다. 세션은 이벤트보다 훨씬 천천히 쌓여 지금은 두었다. 느려지면 끝나지 않은 세션만 `@Query`로 받아 넘기도록 바꾼다.
 
-- 외부 Swift 패키지는 추가하지 않았다. MCP(M3)에서 공식 Swift SDK를 쓸지는 그때 판단.
+- 외부 Swift 패키지는 추가하지 않았다. MCP(M3)도 공식 Swift SDK 없이 필요한 부분만 직접 구현했다.

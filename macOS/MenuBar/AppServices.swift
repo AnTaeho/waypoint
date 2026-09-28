@@ -3,7 +3,7 @@ import Observation
 import SwiftData
 import WaypointKit
 
-/// 창과 상관없이 앱이 살아 있는 동안 도는 것: outbox 흡수, 로컬 서버, 세션 정리·상태 캐시 갱신 타이머.
+/// 창과 상관없이 앱이 살아 있는 동안 도는 것: outbox 흡수, 로컬 서버(훅·MCP), 세션 정리·상태 캐시 갱신 타이머.
 /// 메뉴 막대 상주(`MenuBarExtra`)라 창을 닫아도 계속 돈다.
 @MainActor
 @Observable
@@ -29,8 +29,12 @@ final class AppServices {
         self.processor = processor
         drainOutbox()
 
+        let mcp = MCPServer(context: container.mainContext)
         let server = LocalServer { request in
-            HookRouter.respond(to: request) { event, body, claudePid in
+            if MCPRouter.matches(request.path) {
+                return MCPRouter.respond(to: request) { mcp.handle($0) }
+            }
+            return HookRouter.respond(to: request) { event, body, claudePid in
                 processor.handle(event: event, json: body, at: Date(), claudePid: claudePid)
             }
         }
