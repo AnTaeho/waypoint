@@ -36,18 +36,20 @@ public final class HookProcessor {
         self.gitBranch = gitBranch
     }
 
-    /// 훅 본문(JSON)을 처리하고 저장한다. SessionStart면 주입할 텍스트를, 아니면 nil.
+    /// 훅 본문(JSON)을 처리하고 저장한다. 대화에 주입할 텍스트가 있으면 그것을, 아니면 nil.
+    /// 주입 텍스트: `SessionStart`는 늘(빈 문자열일 수 있다), `UserPromptSubmit`은 블록을 받지 못한 세션에 한 번(`lateContext`).
     /// 읽을 수 없는 본문은 무시한다(nil). `claudePid`는 훅을 부른 Claude Code 프로세스(머리·outbox 필드).
+    /// `delivers`가 false면(outbox 흡수 — 이미 지난 훅) 텍스트를 만들지 않고 블록을 줬다고 적지도 않는다.
     @discardableResult
-    public func handle(event: String?, json: Data, at date: Date, claudePid: Int? = nil) -> String? {
+    public func handle(event: String?, json: Data, at date: Date, claudePid: Int? = nil, delivers: Bool = true) -> String? {
         guard var input = HookInput(event: event, json: json) else { return nil }
         input.claudePid = claudePid
-        return handle(input, at: date)
+        return handle(input, at: date, delivers: delivers)
     }
 
     @discardableResult
-    public func handle(_ input: HookInput, at date: Date) -> String? {
-        let result = process(input, at: date)
+    public func handle(_ input: HookInput, at date: Date, delivers: Bool = true) -> String? {
+        let result = process(input, at: date, delivers: delivers)
         do {
             try context.save()
         } catch {
@@ -56,11 +58,15 @@ public final class HookProcessor {
         return result
     }
 
-    func process(_ input: HookInput, at date: Date) -> String? {
+    func process(_ input: HookInput, at date: Date, delivers: Bool = true) -> String? {
         switch input.event {
         case "SessionStart":
-            return sessionStart(input, at: date)
-        case "UserPromptSubmit", "Stop":
+            let text = sessionStart(input, at: date, delivers: delivers)
+            return delivers ? text : nil
+        case "UserPromptSubmit":
+            heartbeat(input, at: date)
+            return delivers ? lateContext(input, at: date) : nil
+        case "Stop":
             heartbeat(input, at: date)
         case "PreToolUse":
             preToolUse(input, at: date)

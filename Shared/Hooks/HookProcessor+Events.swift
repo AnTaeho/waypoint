@@ -5,14 +5,29 @@ import SwiftData
 extension HookProcessor {
 
     /// 등록 안 된 폴더는 안내 한 줄, 보관된 프로젝트 폴더는 빈 본문(아무것도 주입하지 않는다).
-    func sessionStart(_ input: HookInput, at date: Date) -> String {
+    /// 블록을 실제로 건넬 때(`delivers`)만 세션에 블록을 준 프로젝트 키를 적는다.
+    func sessionStart(_ input: HookInput, at date: Date, delivers: Bool) -> String {
         guard let session = mainSession(input, at: date, create: true), let project = session.project
         else { return isArchivedFolder(input) ? "" : SessionContext.unregistered }
         touch(session, at: date)
+        if delivers { session.contextProjectKey = project.key }
         return SessionContext.text(project: project, session: session, now: date, stallTimeout: stallTimeout)
     }
 
-    /// UserPromptSubmit·Stop: 활동 시각만. 서브에이전트 안이면 그 하위 세션도.
+    /// 늦은 주입: 메인 세션이 지금 프로젝트의 블록을 아직 받지 못했으면(등록 전에 시작, 다른 폴더에서 옮겨 옴,
+    /// 다른 프로젝트의 블록만 받음) `SessionStart`와 같은 블록을 한 번 준다. 서브에이전트 훅·끝난 세션·
+    /// 미등록·보관 폴더는 nil. `heartbeat` 뒤에 부른다(세션이 없으면 거기서 만들어진다).
+    func lateContext(_ input: HookInput, at date: Date) -> String? {
+        guard input.agentID == nil,
+              let session = fetchSession(input.sessionID), session.kind == .main, session.endedAt == nil,
+              let project = session.project, project.archivedAt == nil,
+              session.contextProjectKey != project.key
+        else { return nil }
+        session.contextProjectKey = project.key
+        return SessionContext.text(project: project, session: session, now: date, stallTimeout: stallTimeout)
+    }
+
+    /// UserPromptSubmit·Stop: 활동 시각만. 서브에이전트 안이면 그 하위 세션도. (UserPromptSubmit의 늦은 주입은 `lateContext`.)
     func heartbeat(_ input: HookInput, at date: Date) {
         guard let session = mainSession(input, at: date, create: true) else { return }
         touch(session, at: date)

@@ -4,8 +4,10 @@ import Foundation
 public enum HookRouter {
     public static let prefix = "/hooks/"
 
-    /// 컨텍스트 본문을 돌려주는 이벤트(`200 text/plain`). 나머지는 `204`.
+    /// 컨텍스트 본문을 늘 돌려주는 이벤트(`200 text/plain`, 빈 본문일 수 있다).
     public static let contextEvents: Set<String> = ["SessionStart"]
+    /// 주입할 것이 있을 때만 `200 text/plain`, 없으면 `204`인 이벤트(늦은 주입, SPEC 5장).
+    public static let lateContextEvents: Set<String> = ["UserPromptSubmit"]
 
     /// 경로에서 이벤트 이름을 꺼낸다. 영문자·숫자만 허용.
     public static func eventName(from path: String) -> String? {
@@ -23,13 +25,16 @@ public enum HookRouter {
         HookParsing.pid(request.headers[claudePidHeader])
     }
 
-    /// - Parameter handle: (이벤트 이름, 본문 JSON, Claude Code PID) → 컨텍스트 이벤트면 주입할 텍스트(없으면 nil)
+    /// - Parameter handle: (이벤트 이름, 본문 JSON, Claude Code PID) → 주입할 텍스트(없으면 nil)
     public static func respond(to request: HTTPRequest, handle: (String, Data, Int?) -> String?) -> HTTPResponse {
         guard let event = eventName(from: request.path) else { return .notFound }
         guard request.method == "POST" else { return .methodNotAllowed }
         let context = handle(event, request.body, claudePid(from: request))
         if contextEvents.contains(event) {
             return .text(context ?? "")
+        }
+        if lateContextEvents.contains(event), let context, !context.isEmpty {
+            return .text(context)
         }
         return .noContent
     }

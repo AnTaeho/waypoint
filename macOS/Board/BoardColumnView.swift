@@ -2,10 +2,13 @@ import SwiftUI
 import WaypointKit
 
 /// 보드 한 칸: 머리(표시·이름·개수)와 카드 목록. 받는 칸이면 카드를 끌어 놓을 수 있다.
+/// 작업중 칸은 카드 아래에 카드 없는 세션 타일을 둔다(개수에 함께 센다 — 사이드바·프로젝트 표의 작업중 수와 같은 기준).
 struct BoardColumnView: View {
     let column: BoardColumn
     let items: [BoardItem]
     let now: Date
+    /// 작업중 칸의 카드 없는 세션. 다른 칸은 비어 있다.
+    var tiles: [BoardSessionTile] = []
     /// 끌어 놓은 카드 UUID 문자열 → 옮겼으면 true
     let onDrop: (String) -> Bool
 
@@ -24,6 +27,9 @@ struct BoardColumnView: View {
                         .buttonStyle(.plain)
                         .padding(.leading, item.depth > 0 ? Theme.Spacing.indent : 0)
                         .draggable(item.card.id.uuidString)
+                    }
+                    ForEach(tiles) { tile in
+                        BoardSessionTileView(tile: tile, now: now)
                     }
                     if column == .idea, items.count > Theme.Board.ideaPreviewCount {
                         moreButton
@@ -56,7 +62,7 @@ struct BoardColumnView: View {
                 .lineLimit(1)
                 .layoutPriority(1)
             Spacer(minLength: 0)
-            Text("\(items.count)")
+            Text("\(items.count + tiles.count)")
                 .font(Theme.captionLarge)
                 .foregroundStyle(column == .active ? Theme.liveText : Theme.textMuted)
                 .monospacedDigit()
@@ -72,7 +78,7 @@ struct BoardColumnView: View {
         case .next:
             FilledDot(color: Theme.next)
         case .active:
-            if items.isEmpty { FilledDot(color: Theme.live) } else { LiveDot() }
+            if items.isEmpty && tiles.isEmpty { FilledDot(color: Theme.live) } else { LiveDot() }
         case .done:
             Image(systemName: "checkmark").font(Theme.bodyStrong).foregroundStyle(Theme.done)
         }

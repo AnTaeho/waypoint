@@ -17,6 +17,7 @@ struct ProjectBoardView: View {
 
     private func content(now: Date) -> some View {
         let columns = BoardQuery.columns(for: project, now: now)
+        let tiles = BoardQuery.sessionTiles(for: project, now: now)
         // GeometryReader로 감싸 보드의 최소 폭이 분할 뷰로 번지지 않게 한다(사이드바·인스펙터가 눌려 잘리는 문제).
         return GeometryReader { proxy in
             let boardWidth = max(proxy.size.width - Theme.Spacing.pageH * 2, minimumBoardWidth)
@@ -30,6 +31,7 @@ struct ProjectBoardView: View {
                                 column: column,
                                 items: columns[column] ?? [],
                                 now: now,
+                                tiles: column == .active ? tiles : [],
                                 onDrop: { id in drop(id, on: column) }
                             )
                         }

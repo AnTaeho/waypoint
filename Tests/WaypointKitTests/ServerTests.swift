@@ -72,6 +72,16 @@ import Testing
         #expect(r == .noContent)
     }
 
+    /// 늦은 주입: UserPromptSubmit은 텍스트가 있을 때만 200, 없거나 비면 204.
+    @Test func userPromptSubmitReturnsTextOnlyWhenPresent() {
+        let with = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _ in "Waypoint: LDG (가계부 앱)" }
+        #expect(with == .text("Waypoint: LDG (가계부 앱)"))
+        let none = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _ in nil }
+        #expect(none == .noContent)
+        let empty = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _ in "" }
+        #expect(empty == .noContent)
+    }
+
     @Test func claudePidHeader() throws {
         // 머리 이름은 파서가 소문자로 바꾼다
         let raw = "POST /hooks/Stop HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Waypoint-Claude-PID: 5287\r\nContent-Length: 2\r\n\r\n{}"
