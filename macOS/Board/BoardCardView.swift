@@ -20,6 +20,7 @@ struct BoardCardView: View {
                 Text(card.displayID)
                     .font(Theme.monoCaption)
                     .foregroundStyle(Theme.textMuted)
+                    .fixedSize()
                 Spacer(minLength: 0)
                 if let link, let session = link.session,
                    let time = CardFormat.workTime(
