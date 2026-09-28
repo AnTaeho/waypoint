@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import WaypointKit
 
@@ -92,5 +93,29 @@ import Testing
 
     @Test func crlf() {
         #expect(parse("# A\r\n본문\r\n") == [.heading(level: 1, text: "A"), .paragraph("본문")])
+    }
+}
+
+@Suite struct GuideFormatTests {
+    @Test func statePriority() {
+        #expect(GuideFormat.state(conflict: true, missing: true, hasDraft: true) == .conflict)
+        #expect(GuideFormat.state(conflict: false, missing: true, hasDraft: true) == .missing)
+        #expect(GuideFormat.state(conflict: false, missing: false, hasDraft: true) == .draft)
+        #expect(GuideFormat.state(conflict: false, missing: false, hasDraft: false) == .synced)
+    }
+
+    @Test func statusText() {
+        #expect(GuideFormat.statusText(.synced, lastSyncedAt: t0, now: t0 + minutes(2)) == "동기화됨 · 2분 전")
+        #expect(GuideFormat.statusText(.draft, lastSyncedAt: t0, now: t0) == "저장 안 함")
+    }
+
+    @Test func size() {
+        #expect(GuideFormat.size(of: "# A\n본문\n## B\n") == "섹션 2개 · 3줄")
+        #expect(GuideFormat.size(of: "a\nb") == "2줄")
+    }
+
+    @Test func displayPath() {
+        #expect(GuideFormat.displayPath("/Users/me/w/CLAUDE.md", home: "/Users/me") == "~/w/CLAUDE.md")
+        #expect(GuideFormat.displayPath("/Users/meme/x", home: "/Users/me") == "/Users/meme/x")
     }
 }

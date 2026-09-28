@@ -3,7 +3,7 @@ import Observation
 import SwiftData
 import WaypointKit
 
-/// 창과 상관없이 앱이 살아 있는 동안 도는 것: outbox 흡수, 로컬 서버(훅·MCP), 세션 정리·상태 캐시 갱신 타이머.
+/// 창과 상관없이 앱이 살아 있는 동안 도는 것: outbox 흡수, 로컬 서버(훅·MCP), 세션 정리·상태 캐시 갱신 타이머, 지침 문서 감시.
 /// 메뉴 막대 상주(`MenuBarExtra`)라 창을 닫아도 계속 돈다.
 @MainActor
 @Observable
@@ -14,6 +14,7 @@ final class AppServices {
     @ObservationIgnored private var processor: HookProcessor?
     @ObservationIgnored private var server: LocalServer?
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var guides: GuideMonitor?
 
     /// `SessionEnd` 없이 끝난 세션 정리와 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
     static let refreshInterval: TimeInterval = 60
@@ -46,6 +47,11 @@ final class AppServices {
         }
         self.server = server
         server.start()
+
+        // 지침 문서: 시작할 때 모두 확인하고 로컬 변경을 감시한다.
+        let guides = GuideMonitor(context: container.mainContext)
+        self.guides = guides
+        guides.start()
 
         // 첫 outbox 흡수 뒤 한 번, 그 뒤 60초마다
         refreshStates()
