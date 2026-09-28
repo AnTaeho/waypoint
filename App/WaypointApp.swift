@@ -13,6 +13,8 @@ struct WaypointApp: App {
     #if os(macOS)
     /// 로컬 서버·outbox 흡수·상태 타이머. 샘플 모드에서는 열지 않는다(메모리 저장소에 실제 기록이 섞이고 outbox를 비워 잃지 않게).
     let services: AppServices?
+    /// 사용량 파일 읽기. 파일만 읽으므로 샘플 모드에서도 돈다.
+    let usage = UsageMonitor()
     #endif
 
     init() {
@@ -21,6 +23,7 @@ struct WaypointApp: App {
         #if os(macOS)
         services = Self.usesSampleData ? nil : AppServices(container: container)
         services?.start()
+        usage.start()
         #endif
     }
 
@@ -28,6 +31,9 @@ struct WaypointApp: App {
         WindowGroup(id: Self.mainWindowID) {
             RootView()
                 .tint(Theme.liveText)
+                #if os(macOS)
+                .environment(usage)
+                #endif
         }
         .modelContainer(container)
         #if os(macOS)
@@ -39,6 +45,7 @@ struct WaypointApp: App {
         MenuBarExtra("Waypoint", systemImage: "signpost.right") {
             MenuBarContent(services: services)
                 .modelContainer(container)
+                .environment(usage)
         }
         #endif
     }

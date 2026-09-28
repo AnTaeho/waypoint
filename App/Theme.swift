@@ -25,6 +25,8 @@ enum Theme {
     static let ideaBorder = Color(hex: 0x9C9A92)
     /// 작업중 카드 그림자(`live` 10%)
     static let liveShadow = Color(hex: 0xD97757, opacity: 0.10)
+    /// 사용량 막대 바탕. `divider`(8%)는 사이드바 배경에서 묻혀 조금 진하게.
+    static let gaugeTrack = Color(hex: 0x1F1E1D, opacity: 0.12)
 
     // MARK: 폰트
 
@@ -126,6 +128,20 @@ enum Theme {
         static let windowHeight: CGFloat = 820
         static let windowMinWidth: CGFloat = 900
         static let windowMinHeight: CGFloat = 560
+        /// 사이드바 사용량 막대 높이
+        static let gaugeBar: CGFloat = 4
+        /// 사용량 게이지 이름표(「5시간」「7일」) 열
+        static let gaugeLabelWidth: CGFloat = 34
+        /// 사용량 게이지 숫자(「100%」) 열
+        static let gaugeValueWidth: CGFloat = 34
+    }
+
+    /// 사이드바 사용량 게이지
+    enum Usage {
+        /// 이 값(%) 이상이면 막대·숫자를 `liveText`로 진하게
+        static let highPercent = 80
+        /// 기록이 오래됐을 때 게이지 불투명도
+        static let staleOpacity: Double = 0.45
     }
 
     /// 표 열 너비. 제목·이름 열은 남는 폭을 모두 쓰고, 경로 열은 범위 안에서 줄어든다. 좁으면 `TableWidth`가 열을 숨긴다.

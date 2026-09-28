@@ -34,12 +34,14 @@
 		B547543B28047D674BE2E18F /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786633AF6FAB07F8719504A1 /* SidebarView.swift */; platformFilters = (macos, ); };
 		BB4B19ECB8780F419DFA3ACE /* TableHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1DBD11B33E77A4580CC8FF2 /* TableHeader.swift */; };
 		CA376468607C6C2C8159BE47 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA82393508D897437A7F5856 /* RootView.swift */; platformFilters = (macos, ); };
+		CAE9446A3A4BE6ED82FA2DCA /* UsageGaugeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11E635A50DB29E130075B38 /* UsageGaugeView.swift */; platformFilters = (macos, ); };
 		D10A29C3803ADF8D5E2CD201 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5EFA63C55AFCFD2F3957B6CE /* OFL.txt */; };
 		D3DD134762B554E9BB91285B /* RecentEventsInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B848F2A827633BD98960A5 /* RecentEventsInspector.swift */; platformFilters = (macos, ); };
 		DE0AB3A437643C60E16F0D6F /* DashboardSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5451E3F0EEC533B30989C6CB /* DashboardSearch.swift */; platformFilters = (macos, ); };
 		E6454537E01518C095097133 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CA506015F36BD8C792F971D /* RootView.swift */; platformFilters = (ios, ); };
 		EB1BAD26D6D1B3B7B8E383E5 /* WaypointApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4806246D0F1AC28DE90C507A /* WaypointApp.swift */; };
 		EBDB3B16B11964D78738CFFC /* TableWidth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F36AB1BF7B1426264EAF3E /* TableWidth.swift */; platformFilters = (macos, ); };
+		EC091F8610FAEAAACA92C238 /* UsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */; platformFilters = (macos, ); };
 		EC5A09AE5A861570A3ACEC27 /* BoardColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83B5E7102286FAE2A09F9FD6 /* BoardColumnView.swift */; platformFilters = (macos, ); };
 		EF122A5B35EE03AF9D3A7179 /* CardHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 882355B5AEEAAD1B56A6093B /* CardHistoryView.swift */; platformFilters = (macos, ); };
 		FC6C73EC6FDF95584A01134B /* MenuBarContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */; platformFilters = (macos, ); };
@@ -63,6 +65,7 @@
 		5451E3F0EEC533B30989C6CB /* DashboardSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSearch.swift; sourceTree = "<group>"; };
 		5A86041D8ABF749C806E93C1 /* CardCriteriaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardCriteriaView.swift; sourceTree = "<group>"; };
 		5EFA63C55AFCFD2F3957B6CE /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = OFL.txt; sourceTree = "<group>"; };
+		63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitor.swift; sourceTree = "<group>"; };
 		648F1BD947F2221E3616CC24 /* SidebarSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSelection.swift; sourceTree = "<group>"; };
 		7579DAE684178D0E8821A0EE /* NanumSquareRoundB.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundB.ttf; sourceTree = "<group>"; };
 		786633AF6FAB07F8719504A1 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -81,6 +84,7 @@
 		D1C3491F0AD321EA7D4856FD /* ProjectTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTable.swift; sourceTree = "<group>"; };
 		D1DBD11B33E77A4580CC8FF2 /* TableHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableHeader.swift; sourceTree = "<group>"; };
 		DA82393508D897437A7F5856 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		E11E635A50DB29E130075B38 /* UsageGaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageGaugeView.swift; sourceTree = "<group>"; };
 		F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
 		FA032F9625A0461F3B07231C /* ActiveWorkTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkTable.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -133,6 +137,7 @@
 				07F427DBEB282E23B44EFB60 /* Card */,
 				4A706F8106B2327F69946D7C /* Dashboard */,
 				9AD13A9C19AE151779A25A60 /* MenuBar */,
+				D375A5968A791C220749573E /* Usage */,
 			);
 			path = macOS;
 			sourceTree = "<group>";
@@ -215,6 +220,15 @@
 				2CA506015F36BD8C792F971D /* RootView.swift */,
 			);
 			path = iOS;
+			sourceTree = "<group>";
+		};
+		D375A5968A791C220749573E /* Usage */ = {
+			isa = PBXGroup;
+			children = (
+				E11E635A50DB29E130075B38 /* UsageGaugeView.swift */,
+				63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */,
+			);
+			path = Usage;
 			sourceTree = "<group>";
 		};
 		E6D07D279A9539D3CB3AC7C2 = {
@@ -336,6 +350,8 @@
 				BB4B19ECB8780F419DFA3ACE /* TableHeader.swift in Sources */,
 				EBDB3B16B11964D78738CFFC /* TableWidth.swift in Sources */,
 				4DAAB619BA15440C409EC1FC /* Theme.swift in Sources */,
+				CAE9446A3A4BE6ED82FA2DCA /* UsageGaugeView.swift in Sources */,
+				EC091F8610FAEAAACA92C238 /* UsageMonitor.swift in Sources */,
 				EB1BAD26D6D1B3B7B8E383E5 /* WaypointApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
