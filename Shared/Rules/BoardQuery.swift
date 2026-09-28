@@ -44,7 +44,7 @@ public enum BoardQuery {
     /// - 아이디어: 만든 시각 최신순
     /// - 다음: 카드 번호순
     /// - 작업중: 연결된 시각순, 같은 칸에 부모가 있는 하위 카드는 부모 바로 아래(depth 1)
-    /// - 완료: `now - doneWindow` 이후 완료된 것만, 완료 시각 최신순
+    /// - 완료: `now - doneWindow`보다 뒤에 완료된 것만(딱 7일 전은 뺀다), 완료 시각 최신순
     public static func columns(for project: Project, now: Date) -> [BoardColumn: [BoardItem]] {
         let cards = project.cards ?? []
         let ideas = cards.filter { $0.status == .idea }
@@ -52,7 +52,7 @@ public enum BoardQuery {
         let next = cards.filter { $0.status == .next }
             .sorted { $0.number < $1.number }
         let since = now.addingTimeInterval(-doneWindow)
-        let done = cards.filter { $0.status == .done && ($0.doneAt ?? .distantPast) >= since }
+        let done = cards.filter { $0.status == .done && ($0.doneAt ?? .distantPast) > since }
             .sorted { ($0.doneAt ?? .distantPast, $0.number) > ($1.doneAt ?? .distantPast, $1.number) }
         return [
             .idea: ideas.map { BoardItem(card: $0, depth: 0) },

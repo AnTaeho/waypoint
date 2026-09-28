@@ -27,6 +27,8 @@ import Testing
         #expect(ldg.rows.allSatisfy { $0.workState == .live })
         #expect(ldg.rows[1].session.agentName == "test-writer")
         #expect(ldg.rows[0].session.id.hasPrefix("7f2a"))
+        // 시안의 최근 파일. 같은 시각 이벤트가 있으면 실행마다 바뀌던 문제의 회귀 방지.
+        #expect(SessionFormat.recentFileName(card: ldg.rows[0].card, session: ldg.rows[0].session) == "ReceiptParser.swift")
 
         let trk = try #require(groups.first { $0.project.key == "TRK" })
         #expect(trk.rows.count == 1)

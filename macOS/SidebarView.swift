@@ -34,13 +34,17 @@ struct SidebarView: View {
 private struct SidebarProjectRow: View {
     let project: Project
     let now: Date
+    /// 선택된 줄(파란 배경)에서는 고정 색 대신 계층 색을 써서 글자가 묻히지 않게 한다.
+    @Environment(\.backgroundProminence) private var prominence
+
+    private var isProminent: Bool { prominence == .increased }
 
     var body: some View {
         let summary = DashboardQuery.summary(for: project, now: now)
         HStack(spacing: Theme.Spacing.s) {
             Text(project.key)
                 .font(Theme.monoSmall)
-                .foregroundStyle(Theme.textMuted)
+                .foregroundStyle(isProminent ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.textMuted))
                 .frame(width: Theme.Size.sidebarKeyWidth, alignment: .leading)
             Text(project.name)
                 .lineLimit(1)
@@ -58,7 +62,7 @@ private struct SidebarProjectRow: View {
             dot()
             Text("\(n)")
                 .font(Theme.caption)
-                .foregroundStyle(Theme.liveText)
+                .foregroundStyle(isProminent ? AnyShapeStyle(.primary) : AnyShapeStyle(Theme.liveText))
                 .monospacedDigit()
         }
     }

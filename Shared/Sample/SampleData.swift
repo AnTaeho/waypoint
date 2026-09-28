@@ -187,8 +187,9 @@ private struct Seeder {
         let main = session(p, "7f2a9c41-3e8b-4d06-b5a2-9c7e1f4d8b60", started: 38, lastSeen: 0, branch: "feat/ocr-mapping")
         attach(c14, main, at: 38)
         card(p, "거래 내역 CSV 내보내기", .idea, kind: .idea, created: 18, origin: .claude, by: main)
+        fileChanged(c14, main, "Ledger/Models/Transaction.swift", added: 6, removed: 1, at: 14)
+        // 같은 시각이면 최근 파일이 실행마다 바뀌므로 시안의 최근 파일(ReceiptParser)을 1분 늦게 둔다.
         fileChanged(c14, main, "Ledger/OCR/ReceiptParser.swift", added: 84, removed: 12, at: 13)
-        fileChanged(c14, main, "Ledger/Models/Transaction.swift", added: 6, removed: 1, at: 13)
         c14.updatedAt = ago(13)
 
         let sub = session(p, "3b6d8f0a-2c4e-4a79-8e1b-5d7f9a2c4e68", started: 12, lastSeen: 1,
