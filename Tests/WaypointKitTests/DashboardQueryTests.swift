@@ -22,15 +22,83 @@ import Testing
         #expect(rows.allSatisfy { $0.workState == .live })
     }
 
+    /// 부모 세션 줄이 없으면(부모가 끝남) 서브에이전트 줄이 맨 위 단계에 선다.
+    /// 끝나지 않은 부모는 카드가 없어도 줄이 생기므로, 줄 없는 부모를 만들려면 끝내야 한다.
     @Test func orphanSubagentIsTopLevel() throws {
         let (_c, ctx) = try makeContext(); _ = _c
         let p = makeProject(ctx)
         let main = makeSession(ctx, p, id: "main")
         let sub = makeSession(ctx, p, id: "sub", parent: main)
         CardLifecycle.attach(p.makeCard(in: ctx, title: "a", at: t0), sub, at: t0, in: ctx)
+        main.endedAt = t0
         let rows = DashboardQuery.rows(for: p, now: t0)
-        #expect(rows.count == 1)
+        #expect(rows.map(\.session.id) == ["sub"])
         #expect(rows.first?.depth == 0)
+    }
+
+    @Test func cardlessMainSessionGetsRow() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let now = t0 + minutes(30)
+        let live = makeSession(ctx, p, id: "live", startedAt: t0, lastSeenAt: now)
+        _ = makeSession(ctx, p, id: "stalled", startedAt: t0 + minutes(1), lastSeenAt: t0 + minutes(1))
+        let ended = makeSession(ctx, p, id: "ended", startedAt: t0 + minutes(2), lastSeenAt: now)
+        ended.endedAt = now
+        // 카드 없는 서브에이전트는 줄이 되지 않는다(부모 줄로 충분)
+        _ = makeSession(ctx, p, id: "sub", startedAt: t0 + minutes(3), lastSeenAt: now, parent: live)
+
+        let rows = DashboardQuery.rows(for: p, now: now)
+        #expect(rows.map(\.session.id) == ["live", "stalled"])
+        #expect(rows.allSatisfy { $0.card == nil && $0.depth == 0 })
+        #expect(rows.map(\.workState) == [.live, .stalled])
+        #expect(Set(rows.map(\.id)).count == 2)
+    }
+
+    @Test func cardlessRowTurnsIntoCardRowWithoutDuplicate() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let s = makeSession(ctx, p, id: "main")
+        #expect(DashboardQuery.rows(for: p, now: t0).map(\.card) == [nil])
+
+        let card = p.makeCard(in: ctx, title: "a", status: .next, at: t0)
+        CardLifecycle.attach(card, s, at: t0 + 1, in: ctx)
+        let rows = DashboardQuery.rows(for: p, now: t0 + 1)
+        #expect(rows.count == 1)
+        #expect(rows.first?.card === card)
+
+        // 연결이 끝나면 다시 카드 없는 줄
+        CardLifecycle.detach(card, s, at: t0 + 2, in: ctx)
+        #expect(DashboardQuery.rows(for: p, now: t0 + 2).map(\.card) == [nil])
+    }
+
+    @Test func subagentCardRowNestsUnderCardlessParent() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let main = makeSession(ctx, p, id: "main")
+        let sub = makeSession(ctx, p, id: "sub", startedAt: t0 + 1, parent: main)
+        CardLifecycle.attach(p.makeCard(in: ctx, title: "a", at: t0), sub, at: t0 + 1, in: ctx)
+        let rows = DashboardQuery.rows(for: p, now: t0 + 1)
+        #expect(rows.map(\.session.id) == ["main", "sub"])
+        #expect(rows.map(\.depth) == [0, 1])
+        #expect(rows.first?.card == nil)
+    }
+
+    @Test func cardlessRecentFileComesFromSessionAndItsSubagents() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let main = makeSession(ctx, p, id: "main")
+        let sub = makeSession(ctx, p, id: "sub", parent: main)
+        let other = makeSession(ctx, p, id: "other")
+        func changed(_ s: Session, _ path: String, at: Date, card: Card? = nil) {
+            Event.record(.fileChanged, in: ctx, project: p, card: card, session: s, at: at, payload: ["path": .string(path)])
+        }
+        #expect(SessionFormat.recentFileName(session: main) == nil)
+        changed(main, "Sources/A.swift", at: t0 + 1)
+        changed(sub, "Tests/B.swift", at: t0 + 2)
+        changed(other, "C.swift", at: t0 + 3)
+        changed(main, "D.swift", at: t0 + 4, card: p.makeCard(in: ctx, title: "x", at: t0)) // 카드 기록은 제외
+        #expect(SessionFormat.recentFileName(session: main) == "B.swift")
+        #expect(SessionFormat.recentFileName(session: other) == "C.swift")
     }
 
     @Test func includesStalledExcludesEnded() throws {
@@ -85,5 +153,24 @@ import Testing
         #expect(s.nextCount == 1)
         #expect(s.ideaCount == 2)
         #expect(s.lastActivityAt == now)
+    }
+
+    /// 사이드바·프로젝트 표 개수도 대시보드 줄과 같은 기준: 카드 없이 도는 메인 세션을 센다(서브에이전트·끝난 세션은 빼고).
+    @Test func summaryCountsCardlessMainSessions() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let now = t0 + minutes(30)
+        let a = makeSession(ctx, p, id: "a", lastSeenAt: now)
+        _ = makeSession(ctx, p, id: "b", lastSeenAt: now)
+        _ = makeSession(ctx, p, id: "c", lastSeenAt: t0)
+        makeSession(ctx, p, id: "d", lastSeenAt: now).endedAt = now
+        _ = makeSession(ctx, p, id: "sub", lastSeenAt: now, parent: a)
+        let s = DashboardQuery.summary(for: p, now: now)
+        #expect(s.liveCount == 2)
+        #expect(s.stalledCount == 1)
+
+        // 카드가 붙으면 카드로 한 번만 센다
+        CardLifecycle.attach(p.makeCard(in: ctx, title: "x", status: .next, at: t0), a, at: now, in: ctx)
+        #expect(DashboardQuery.summary(for: p, now: now).liveCount == 2)
     }
 }

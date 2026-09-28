@@ -70,7 +70,7 @@ import Testing
         #expect(c16.openCardSessions.first?.session === sub)
 
         let rows = DashboardQuery.rows(for: h.project, now: t0 + 20)
-        #expect(rows.map(\.card.number) == [c14.number, 16])
+        #expect(rows.map(\.card?.number) == [c14.number, 16])
         #expect(rows.map(\.depth) == [0, 1])
 
         try h.send("doc-PostToolUse-Write-subagent", at: t0 + 20)

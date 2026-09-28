@@ -1,7 +1,7 @@
 import SwiftUI
 import WaypointKit
 
-/// 작업중 표: 열 머리 + 프로젝트별 묶음. 줄을 누르면 카드 상세로 간다.
+/// 작업중 표: 열 머리 + 프로젝트별 묶음. 카드 줄을 누르면 카드 상세로 간다(카드 없는 세션 줄은 누를 곳이 없다).
 struct ActiveWorkTable: View {
     let sections: [ActiveWorkSection]
     let now: Date
@@ -24,10 +24,14 @@ struct ActiveWorkTable: View {
             ForEach(sections) { section in
                 TableGroupHeader(title: section.project.name)
                 ForEach(section.rows) { row in
-                    NavigationLink(value: row.card) {
+                    if let card = row.card {
+                        NavigationLink(value: card) {
+                            ActiveWorkRowView(row: row, now: now, columns: columns)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
                         ActiveWorkRowView(row: row, now: now, columns: columns)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

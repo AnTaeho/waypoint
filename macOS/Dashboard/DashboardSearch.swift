@@ -21,10 +21,12 @@ enum DashboardSearch {
             || card.displayID.localizedCaseInsensitiveContains(query)
     }
 
-    /// 작업중 표: 맞는 카드의 줄만 남기고 빈 묶음은 뺀다.
+    /// 작업중 표: 맞는 카드의 줄만 남기고 빈 묶음은 뺀다. 카드 없는 세션 줄은 검색 중에는 빠진다.
     static func sections(_ groups: [DashboardGroup], query: String?) -> [ActiveWorkSection] {
         groups.compactMap { group in
-            let rows = query.map { q in group.rows.filter { matches($0.card, q) } } ?? group.rows
+            let rows = query.map { q in
+                group.rows.filter { row in row.card.map { matches($0, q) } ?? false }
+            } ?? group.rows
             return rows.isEmpty ? nil : ActiveWorkSection(project: group.project, rows: rows)
         }
     }

@@ -43,19 +43,21 @@
 | 09-28 | (M2) outbox는 먼저 `outbox.processing-<ms>-<uuid>.jsonl`로 이름을 바꿔 떼어 낸 뒤 처리하고 지운다. 서버가 열린 직후 한 번 더 흡수 | 흡수 중 스크립트가 쓰는 줄을 잃지 않고, 도중에 앱이 죽어도 다음 실행에서 이어 처리 | 읽고 파일 비우기(그사이 쓴 줄 유실 위험) | `Outbox.drain`, `AppServices.start` |
 | 09-28 | (M2) 샘플 모드에서는 서버를 열지 않고 outbox도 흡수하지 않는다 | 메모리 저장소에 흡수하면 outbox가 비워지면서 실제 기록을 잃는다 | — | `WaypointApp.init` |
 | 09-28 | (M2) 훅 스크립트 curl에 `--noproxy '*'`, `--connect-timeout 1` 추가. 로깅 모드 파일은 `hook-log/<YYYY-MM-DD>.jsonl`, 줄 형식은 outbox와 같다. 테스트용 `WAYPOINT_SUPPORT_DIR` 환경 변수 추가 | 셸에 `http_proxy`가 있으면 127.0.0.1 요청이 프록시로 가서 앱에 닿지 않는 것을 이 컨테이너에서 실제로 확인했다 | — | `integration/hooks/waypoint-hook.sh` |
-| 09-28 | (M2) 메뉴 막대: 프로젝트별 「가계부 앱 · 작업 2 · 멈춤 1」(카드와 상관없이 메인 세션 수), 받지 못할 때 한 줄, 「Waypoint 열기」, 「종료」. 아이콘 SF Symbol `signpost.right` | 카드 없는 세션도 보이는 곳이 필요했다(아래 「막힌 것」). 사실만 짧게 | — | `MenuBarContent` |
+| 09-28 | (M2) 메뉴 막대: 프로젝트별 「가계부 앱 · 작업 2 · 멈춤 1」(카드와 상관없이 메인 세션 수), 받지 못할 때 한 줄, 「Waypoint 열기」, 「종료」. 아이콘 SF Symbol `signpost.right` | 카드 없는 세션도 보이는 곳이 필요했다(대시보드에도 카드 없는 세션 줄을 넣었다, 아래). 사실만 짧게 | — | `MenuBarContent` |
 | 09-28 | (M2) 세션 상태 캐시(`stateRaw`)를 60초마다 맞춘다 | 화면 판정은 이미 `TimelineView`가 한다. 캐시는 M6 동기화용 | 타이머 없이 두기 | `AppServices.refreshInterval` |
 | 09-28 | (M2) 서버는 루프백(127.0.0.1)에만 묶고, 요청 하나를 받는 데 5초·본문 1 MiB로 제한 | 외부 접속 차단, 멈춘 연결 정리 | — | `LocalServer`, `HTTPRequestParser` |
+| 09-28 | (M2, 로컬에서 결정) 대시보드 작업중 표에 **카드 없는 세션 줄**을 넣는다(막힌 것의 (a)). 끝나지 않은 메인 세션에 열린 카드 연결이 없으면 한 줄: 카드 칸 비움, 제목 자리 「카드 없음」(흐리게), 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`, 누를 곳 없음. 카드가 붙으면 카드 줄로 바뀐다. 카드 없는 서브에이전트는 줄을 만들지 않는다. 카드 없는 부모 줄이 생기므로 카드 붙은 서브에이전트는 그 아래 들여쓴다. 검색 중에는 카드 없는 줄이 빠진다. `SessionStart` 컨텍스트의 「다른 세션에서 작업중」에는 넣지 않는다 | M2 완료 조건 「세션 2개가 live로 보이고 종료하면 사라진다」를 카드(M3) 없이 채운다 | (b) 메뉴 막대만, (c) M3 뒤 확인 | `DashboardQuery.rows`의 `links.isEmpty` 분기 삭제, `DashboardRow.card`를 다시 필수로 |
+| 09-28 | (M2) 사이드바 개수·프로젝트 표 「작업중」도 카드 없는 메인 세션을 센다(작업중 = live 카드 + 카드 없는 live 메인 세션, 멈춤도 같게) | 대시보드 제목 「작업 N개」가 카드 없는 줄을 세는데 사이드바가 0이면 두 숫자가 어긋난다. 메뉴 막대도 이미 카드와 상관없이 세션을 센다 | 카드만 세기(기존) | `DashboardQuery.summary`의 세션 반복 삭제 |
 | 09-28 | (최적화) `Project.lastEventAt`(옵셔널) 추가. `Event.record`가 앞으로만 갱신하고, 프로젝트 요약의 「마지막 활동」은 이벤트 전체 대신 이 값을 쓴다. 메뉴 막대는 끝나지 않은 세션만 `@Query`로 읽는다 | M2부터 파일 수정마다 이벤트가 쌓이는데, 사이드바·대시보드가 30초마다 프로젝트의 이벤트 전부를 읽고 있었다. 결과는 같다 | 이벤트 조회에 fetchLimit·정렬을 걸기(요약 함수가 context를 받도록 바꿔야 함) | `DashboardQuery.summary`에서 `project.events` 합치기로 되돌리고 필드 삭제 |
+
+## 로컬 확인 (2026-09-28, macOS 26 + Xcode)
+
+- `main`을 합친 뒤 `xcodegen generate` → `swift test`, macOS·iOS 앱 빌드 모두 경고·오류 0으로 통과했다. 클라우드에서 쓴 코드에 고칠 컴파일 오류는 없었다.
+- `NWConnection` Sendable 경고는 나지 않았다. 콜백마다 `MainActor.assumeIsolated`로 감싸고 리스너·연결을 `.main` 큐에서 돌려서다.
+- 병렬 테스트에서 가끔 signal 11: 같은 스키마로 컨테이너를 동시에 열 때 Core Data 트리거 SQL 생성에서 죽었다. `WaypointStore.makeContainer`에 락을 걸었다.
 
 ## 막힌 것
 
-- **빌드·테스트 전부 미검증.** 위 「실행 환경」 참고. 검증된 것은 `integration/hooks/test-waypoint-hook.sh`(bash, 10개 항목 통과) 하나뿐이다.
-- **Xcode 프로젝트 파일 미갱신.** 새 앱 파일을 pbxproj에 넣지 않았다. 로컬에서 `xcodegen generate` 필요.
-- **M2 완료 조건 「대시보드에 세션 2개가 live로 보인다」**: 지금 대시보드 작업중 표는 (세션, 카드) 쌍만 보인다. 카드는 M3(MCP `card_start`)부터 붙으므로 M2만으로는 세션이 대시보드에 안 보인다.
-  메뉴 막대에는 카드 없는 세션 수가 보이게 했다. 대시보드에 카드 없는 세션 줄을 넣을지는 SPEC 4장 「대시보드 "작업중" 목록 = (세션, 카드) 쌍」을 바꾸는 일이라 **정하지 않고 남긴다.**
-  제안: (a) 카드 없는 세션을 「카드 없음」 줄로 표에 넣기, (b) M2 완료 조건을 「메뉴 막대에 세션 2개」로 읽기, (c) M3 뒤에 확인.
-- **Network.framework의 Swift 6 Sendable 경고 가능성.** `NWConnection`을 `@Sendable` 콜백에서 잡는다. SDK가 Sendable로 표시하지 않으면 경고·오류가 날 수 있다. 나면 `LocalServer`를 고친다.
 - 새 옵셔널 필드 `Project.lastEventAt`는 SwiftData 자동 경량 마이그레이션으로 붙는다고 보고 있다(미검증). 이미 있는 저장소는 이 값이 비어 있어, 다음 이벤트가 올 때까지 「마지막 활동」이 세션·카드 기준으로만 보인다.
 - **실측 필요 항목**은 `docs/SPEC.md` 5장 「실측 필요」에 모았다.
 

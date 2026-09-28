@@ -28,13 +28,15 @@ public enum SessionContext {
             lines += next.map { "- \($0.displayID) \($0.title)" }
         }
 
+        // 카드 없는 세션 줄은 알려 줄 작업이 없으므로 뺀다.
         let others = DashboardQuery.rows(for: project, now: now, stallTimeout: stallTimeout)
             .filter { $0.session !== session && $0.session.parent !== session }
+            .compactMap { row in row.card.map { (card: $0, row: row) } }
         if !others.isEmpty {
             lines.append("다른 세션에서 작업중:")
-            lines += others.map { row in
+            lines += others.map { card, row in
                 let stalled = row.workState == .stalled ? ", 멈춤" : ""
-                return "- \(row.card.displayID) \(row.card.title) (\(SessionFormat.label(for: row.session))\(stalled))"
+                return "- \(card.displayID) \(card.title) (\(SessionFormat.label(for: row.session))\(stalled))"
             }
         }
 
