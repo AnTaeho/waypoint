@@ -190,11 +190,20 @@ Claude Code PID 찾기(스크립트): 조상 프로세스를 4단계까지 올�
 - 샌드박스 앱이면 폴더 접근은 security-scoped bookmark로 유지.
 - 렌더링: 제목·목록·코드블록·표·인라인 코드를 지원하는 Markdown 뷰. 편집은 원문 텍스트 편집.
 
-## 9. 화면
+## 9. 사용량 게이지
+
+Claude 사용량(5시간·7일 한도의 사용 비율)을 사이드바 아래와 메뉴 막대 메뉴에 보인다. 앱은 파일만 읽고 API를 호출하지 않는다.
+
+- 출처: Claude Code가 상태줄 명령 stdin에 넘기는 JSON의 `rate_limits.five_hour` / `rate_limits.seven_day`(`used_percentage` 0–100, `resets_at` 유닉스 초). 사용자의 상태줄 명령 앞에 중계 스크립트 `integration/statusline/waypoint-statusline-tap.sh`를 끼운다. 스크립트는 입력에 `rate_limits` 객체가 있으면 저장 폴더에 `usage.json`을 원자적으로 쓰고(임시 파일 → `mv`, jq 필요), 같은 입력을 원래 명령에 넘겨 출력을 그대로 내보낸다. jq가 없거나 쓰기에 실패해도 상태줄 출력은 그대로 나온다. 추가 시간은 약 8 ms.
+- 파일: `~/Library/Application Support/Waypoint/usage.json`(`WAYPOINT_SUPPORT_DIR`로 바꿀 수 있음), 한 줄 `{"capturedAt":<unix 초>,"rateLimits":<rate_limits 원본>}`.
+- 설치: 스크립트를 `~/.claude/waypoint/`에 복사하고 `chmod +x`, `~/.claude/settings.json`의 `statusLine.command`를 `bash ~/.claude/waypoint/waypoint-statusline-tap.sh <원래 명령>`으로 바꾼다(예: `bash ~/.claude/waypoint/waypoint-statusline-tap.sh bash ~/.claude/awesome-statusline.sh`). 원래 명령은 인자 대신 환경 변수 `WAYPOINT_STATUSLINE_NEXT`(셸 명령 문자열)로 줘도 된다. 되돌리려면 `statusLine.command`를 원래 명령으로 돌린다.
+- 앱(macOS): 30초마다 파일 수정 시각을 보고 바뀌었을 때만 다시 읽는다(`UsageMonitor`). 파서는 숫자·숫자 문자열, 초·밀리초·ISO 8601 시각, 한쪽 창만 있는 경우를 받는다. 초기화 시각이 지난 창은 0%로 보인다. 30분보다 오래된 기록은 흐리게, 파일이 없으면 게이지를 숨긴다. iOS에는 없다.
+
+## 10. 화면
 
 `docs/DESIGN.md` 참조. 대시보드 / 프로젝트 보드 / 카드 상세 / 지침 문서 / 프로젝트 init 시트 / iPhone 작업중.
 
-## 10. 열린 질문 (구현 중 결정)
+## 11. 열린 질문 (구현 중 결정)
 
 - 앱 샌드박스 여부 (로컬 서버·파일 감시 편의 vs 배포 방식). 개인용이면 비샌드박스 + 직접 서명도 가능.
 - Swift MCP 서버 구현: 공식 Swift SDK 사용 가능 여부 확인, 안 되면 Streamable HTTP의 필요한 부분만 직접 구현.

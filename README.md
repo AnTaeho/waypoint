@@ -22,6 +22,7 @@ Claude Code 세션을 프로젝트 단위로 추적하는 개인용 Apple 앱(ma
 | `design/*.dc.html` | 시안 화면 마크업 (레이아웃·색·문구 참고용, 단독 렌더링 안 됨) |
 | `integration/skills/tracker/SKILL.md` | 사용자의 모든 프로젝트에서 쓸 tracker 스킬 초안 |
 | `integration/hooks/` | Claude Code 훅 설정 예시와 훅 스크립트 |
+| `integration/statusline/` | 상태줄 입력의 사용량을 `usage.json`으로 남기는 중계 스크립트와 테스트 |
 
 ## 핵심 원칙 (한 줄 요약)
 
