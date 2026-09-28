@@ -1,5 +1,5 @@
 #!/bin/bash
-# 평소용 Waypoint를 새 버전으로 바꾼다: Release 빌드 → 떠 있는 평소용 정상 종료 → /Applications 교체 → 실행 → 포트 확인 → 로그인 항목.
+# 평소용 Waypoint를 새 버전으로 바꾼다: Release 빌드(팀 서명) → 서명 확인 → 떠 있는 평소용 정상 종료 → /Applications 교체 → 실행 → 포트 확인 → 로그인 항목.
 # 여러 번 돌려도 안전하다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 강제 종료는 하지 않는다.
 #
 # 사용: scripts/install-local.sh
@@ -10,6 +10,7 @@ set -uo pipefail
 
 BUNDLE_ID="dev.antaeho.waypoint"
 PORT=47821
+CONTAINER="iCloud.dev.antaeho.waypoint"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED="$ROOT/.build/release"
 BUILT="$DERIVED/Build/Products/Release/Waypoint.app"
@@ -27,13 +28,14 @@ is_running() {
 
 listen_pid() { lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1; }
 
-# 1. 빌드
+# 1. 빌드. CloudKit·푸시 엔타이틀먼트는 프로파일이 있어야 해서 팀 서명(project.yml)으로 빌드한다.
+#    `-allowProvisioningUpdates`: 프로파일이 없거나 만료됐으면 Xcode 계정으로 새로 받는다.
 if [ "${WAYPOINT_SKIP_BUILD:-0}" != "1" ]; then
   step "Release 빌드"
   log="$DERIVED/install-build.log"
   mkdir -p "$DERIVED"
   if ! xcodebuild -project "$ROOT/Waypoint.xcodeproj" -scheme Waypoint -configuration Release \
-      -destination 'platform=macOS' -derivedDataPath "$DERIVED" CODE_SIGN_IDENTITY=- build > "$log" 2>&1; then
+      -destination 'platform=macOS' -derivedDataPath "$DERIVED" -allowProvisioningUpdates build > "$log" 2>&1; then
     grep -E "error:" "$log" | head -5 >&2
     fail "빌드 실패(전체 로그: $log)"
   fi
@@ -41,6 +43,10 @@ fi
 [ -d "$BUILT" ] || fail "빌드 결과가 없음: $BUILT"
 id="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$BUILT/Contents/Info.plist" 2>/dev/null)"
 [ "$id" = "$BUNDLE_ID" ] || fail "빌드 결과의 번들 ID가 $BUNDLE_ID 가 아님: $id"
+# 서명·엔타이틀먼트가 없으면 앱이 CloudKit 없이 뜨거나 실행이 거부된다. 평소용을 끄기 전에 확인한다.
+codesign --verify --strict "$BUILT" 2>/dev/null || fail "서명 확인 실패: $BUILT"
+codesign -d --entitlements :- "$BUILT" 2>/dev/null | grep -q "<string>$CONTAINER</string>" \
+  || fail "빌드 결과에 CloudKit 컨테이너 $CONTAINER 엔타이틀먼트가 없음"
 
 # 2. 떠 있는 평소용 정상 종료(같은 번들 ID면 옛 Debug 빌드도 여기서 꺼진다)
 if is_running; then
@@ -69,9 +75,9 @@ ditto "$BUILT" "$tmp" || fail "복사 실패: $BUILT → $tmp"
 rm -rf "$DEST" || fail "옛 앱을 지울 수 없음: $DEST"
 mv "$tmp" "$DEST" || fail "옮기기 실패: $tmp → $DEST"
 
-# 4. 실행(경로로 연다. 같은 번들 ID의 다른 빌드가 디스크에 남아 있을 수 있다)
+# 4. 실행(경로로 연다. 같은 번들 ID의 다른 빌드가 디스크에 남아 있을 수 있다). -g: 쓰던 앱의 초점을 뺏지 않게 뒤에서
 step "실행"
-open "$DEST" || fail "실행 실패: $DEST"
+open -g "$DEST" || fail "실행 실패: $DEST"
 pid=""
 for _ in $(seq 1 "$WAIT"); do
   pid="$(listen_pid)"

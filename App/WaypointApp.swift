@@ -16,6 +16,9 @@ struct WaypointApp: App {
     /// 사용량 파일 읽기. 파일만 읽으므로 샘플 모드에서도 돈다.
     let usage = UsageMonitor()
     #endif
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(PhoneAppDelegate.self) private var appDelegate
+    #endif
 
     init() {
         FontRegistry.registerBundledFonts()
@@ -65,7 +68,10 @@ struct WaypointApp: App {
                 try SampleData.seedIfEmpty(container.mainContext)
                 return container
             }
-            return try WaypointStore.makeContainer(url: WaypointStore.defaultStoreURL())
+            return try WaypointStore.makeContainer(
+                url: WaypointStore.defaultStoreURL(),
+                cloudKitContainer: AppInstance.current.cloudKitContainer()
+            )
         } catch {
             fatalError("Waypoint 저장소를 열 수 없음: \(error)")
         }

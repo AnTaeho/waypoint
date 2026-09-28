@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import WaypointKit
 
@@ -49,5 +50,32 @@ import Testing
         // 빈 값은 없는 것과 같다
         #expect(AppInstance.dev.supportDirectory(base: base, environment: ["WAYPOINT_SUPPORT_DIR": ""]).lastPathComponent
             == "Waypoint-Dev")
+    }
+
+    @Test func cloudKitContainer() {
+        #expect(AppInstance.stable.cloudKitContainer(environment: [:]) == "iCloud.dev.antaeho.waypoint")
+        #expect(AppInstance.dev.cloudKitContainer(environment: [:]) == "iCloud.dev.antaeho.waypoint.dev")
+        // 끄는 스위치
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": "0"]) == nil)
+        #expect(AppInstance.dev.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": " 0 "]) == nil)
+        // 0이 아닌 값은 켠 채로
+        for on in ["", "1", "yes"] {
+            #expect(AppInstance.dev.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": on]) != nil, "\(on)")
+        }
+        // 저장 폴더를 옮기면 끈다(빈 값은 없는 것과 같다)
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_SUPPORT_DIR": "/tmp/wp"]) == nil)
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_SUPPORT_DIR": ""]) != nil)
+    }
+
+    @Test func cloudKitDatabase() {
+        func identifier(_ container: String?) -> String? {
+            ModelConfiguration(
+                schema: WaypointStore.schema, isStoredInMemoryOnly: true,
+                cloudKitDatabase: WaypointStore.cloudKitDatabase(container)
+            ).cloudKitContainerIdentifier
+        }
+        #expect(identifier(nil) == nil)
+        #expect(identifier("") == nil)
+        #expect(identifier("iCloud.x") == "iCloud.x")
     }
 }

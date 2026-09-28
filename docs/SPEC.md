@@ -46,8 +46,21 @@ Claude Code 세션들 ──훅(command)──▶ waypoint-hook.sh ──HTTP─
 - **MCP 서버**는 앱 내장 Streamable HTTP 엔드포인트. 사용자 범위로 한 번 등록한다:
   `claude mcp add --transport http --scope user waypoint http://127.0.0.1:47821/mcp`
   (2026-09-28 Claude Code 2.1.283 `claude mcp add --help`로 확인. `~/.claude.json`의 사용자 범위에 적힌다)
-- iOS는 CloudKit 동기화로 같은 데이터를 본다. 로컬 서버는 macOS에만 있다.
+- iOS는 CloudKit 동기화로 같은 데이터를 본다. 로컬 서버는 macOS에만 있다. Mac은 서버·훅·MCP·지침 동기화를 그대로 두고 저장소만 CloudKit에 미러링한다. iOS에서 쓰는 것은 아이디어 분류(다음 할 일로 / 보관)뿐이다.
 - **인스턴스 두 개**: 평소용(Release, `dev.antaeho.waypoint`, 47821, `~/Library/Application Support/Waypoint/`)과 개발용 Waypoint Dev(Debug, `dev.antaeho.waypoint.dev`, 47822, `…/Waypoint-Dev/`). 번들 ID로 가르고(`AppInstance`), 환경 변수 `WAYPOINT_PORT`·`WAYPOINT_SUPPORT_DIR`가 있으면 그 값이 먼저다. 훅·MCP 전역 설정은 평소용만 가리키고, 실측 폴더만 프로젝트 설정으로 Dev에 잇는다(`docs/DEVELOPMENT.md`).
+
+### CloudKit 구성 (M6)
+
+- SwiftData `ModelConfiguration(cloudKitDatabase: .private(<컨테이너>))`. 개인 DB 하나, 공유 없음.
+- 컨테이너는 인스턴스마다 따로: 평소용 `iCloud.dev.antaeho.waypoint`, 개발용 `iCloud.dev.antaeho.waypoint.dev`(`AppInstance.cloudKitContainerIdentifier`). 엔타이틀먼트(`Config/Waypoint-{macOS,iOS}.entitlements`)는 build setting `WAYPOINT_CONTAINER`로 같은 값을 받는다.
+- 환경: 둘 다 CloudKit **Development**. 개발 서명(Apple Development) 빌드는 기본이 Development라 엔타이틀먼트에 환경을 적지 않는다. 개인 앱이라 Production 스키마 배포는 하지 않는다. Development 스키마는 앱이 처음 올린 레코드로 자동으로 생긴다.
+- 끄기: 환경 변수 `WAYPOINT_CLOUDKIT=0`, 또는 `WAYPOINT_SUPPORT_DIR`로 저장 폴더를 옮긴 실행(확인용 임시 저장소가 실제 컨테이너와 섞이지 않게). 샘플 모드(메모리 저장소)와 테스트(`makeContainer` 기본값)는 늘 로컬.
+- 서명: 팀 `2FCXA77MC5` 자동 서명. App ID·컨테이너·프로파일은 `xcodebuild -allowProvisioningUpdates`가 만든다. 푸시: iOS `aps-environment`, macOS `com.apple.developer.aps-environment`(development), iOS 백그라운드 모드 `remote-notification`.
+- iOS는 앱이 원격 알림을 직접 등록한다(`PhoneAppDelegate`). 등록하지 않으면 Mac 변경이 앱을 다시 열 때까지 오지 않았다(2026-09-28 실측). macOS는 미러링이 알림 수신을 스스로 연다.
+- iOS 화면은 CloudKit 가져오기가 끝날 때마다 새 `ModelContext`로 다시 읽는다. 메인 context는 새로 생긴 객체만 보이고 이미 읽은 객체(세션 `endedAt` 등)를 옛 값으로 둬, 끝난 세션이 작업중에 남았다(iOS 26 실측).
+- Mac은 가져오기가 끝나면 새 context로 카드를 읽어 메인 context에 이미 올라온 같은 카드에 늦은 값을 옮겨 적는다(`RemoteCardMerge`). 그대로 두면 메인 context가 옛 상태를 들고 있다가 그 카드를 저장할 때 iPhone에서 옮긴 상태를 되돌린다(실측). iPhone이 고치는 것은 카드뿐이다.
+- 세션 상태는 `lastSeenAt`으로 판정하므로 iPhone의 멈춤 판정은 동기화 지연만큼 늦을 수 있다.
+- 쓰기 양: 훅마다 이벤트·세션 갱신이 저장되고 미러링이 묶어서 올린다. 40초짜리 실측 세션 하나에 내보내기 5번(2026-09-28).
 
 ## 4. 데이터 모델 (SwiftData)
 
