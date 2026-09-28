@@ -214,6 +214,17 @@ enum Theme {
         static let boxRowGap: CGFloat = 9
     }
 
+    /// 개발용 인스턴스(Waypoint Dev) 표시
+    enum Dev {
+        static let badgeFont = rounded(11, .bold)
+        static let badgeText = Theme.next
+        static let badgeBg = Color(hex: 0x2A6FC4, opacity: 0.12)
+        static let badgePaddingH: CGFloat = 7
+        static let badgePaddingV: CGFloat = 2
+        /// 메뉴 막대 아이콘(평소용은 `signpost.right`)
+        static let menuBarSymbol = "hammer"
+    }
+
     enum Columns {
         static let activeCard: CGFloat = 90
         static let activeFile: ClosedRange<CGFloat> = 120...200
