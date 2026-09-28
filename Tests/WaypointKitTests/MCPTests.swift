@@ -121,7 +121,7 @@ func mcpRequest(_ body: String, method: String = "POST", headers: [String: Strin
         #expect(r.status == 200)
         let tools = try #require(try body(r)["result"]?["tools"]?.arrayValue)
         let names = tools.compactMap { $0["name"]?.stringValue }
-        #expect(names == ["project_resolve", "card_list", "card_get", "card_create", "card_start",
+        #expect(names == ["project_resolve", "project_init", "card_list", "card_get", "card_create", "card_start",
                           "card_update", "card_note", "card_handoff"])
         for tool in tools {
             #expect(tool["description"]?.stringValue?.isEmpty == false)
@@ -191,7 +191,7 @@ func mcpRequest(_ body: String, method: String = "POST", headers: [String: Strin
 
     @Test func unknownToolIsProtocolError() throws {
         let reply = try #require(h.server.handle(["jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                                                  "params": ["name": "project_init", "arguments": [:]]]))
+                                                  "params": ["name": "project_delete", "arguments": [:]]]))
         #expect(reply["error"]?["code"] == -32602)
     }
 

@@ -15,18 +15,26 @@ public final class MCPTools {
     public let home: String
     public let now: () -> Date
     public var stallTimeout: TimeInterval = SessionRules.defaultStallTimeout
+    /// `project_init` 초안을 두는 곳. 없으면 `project_init`은 실패한다.
+    public var drafts: ProjectDraftQueue?
+    let fileManager = FileManager.default
     /// `card_get`에 싣는 최근 기록 수
     public static let recentEventLimit = 20
 
-    public init(context: ModelContext, home: String = NSHomeDirectory(), now: @escaping () -> Date = Date.init) {
+    public init(
+        context: ModelContext, home: String = NSHomeDirectory(), drafts: ProjectDraftQueue? = nil,
+        now: @escaping () -> Date = Date.init
+    ) {
         self.context = context
         self.home = home
+        self.drafts = drafts
         self.now = now
     }
 
     public func call(_ name: String, _ args: JSONValue) throws -> JSONValue {
         switch name {
         case "project_resolve": return try projectResolve(args)
+        case "project_init": return try projectInit(args)
         case "card_list": return try cardList(args)
         case "card_get": return try cardGet(args)
         case "card_create": return try cardCreate(args)

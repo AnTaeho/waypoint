@@ -49,7 +49,7 @@ struct GuideInspector: View {
                     ForEach(versions, id: \.persistentModelID) { version in
                         Button { shown = version } label: {
                             HStack {
-                                Text(TimeFormat.timestamp(version.at, now: now))
+                                Text(TimeFormat.timestamp(version.at, now: now, seconds: true))
                                     .foregroundStyle(Theme.text)
                                 Spacer()
                                 Text(GuideFormat.sourceName(version.source))

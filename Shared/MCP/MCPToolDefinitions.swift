@@ -12,12 +12,41 @@ public struct MCPToolDefinition: Sendable {
 }
 
 extension MCPTools {
-    /// SPEC 7장 도구(`project_init`은 M5).
+    /// SPEC 7장 도구.
     public static let definitions: [MCPToolDefinition] = [
         MCPToolDefinition(
             name: "project_resolve",
             description: "폴더 경로로 Waypoint 프로젝트를 찾는다. 없으면 null.",
             inputSchema: schema(["cwd": string("폴더 절대 경로")], required: ["cwd"])
+        ),
+        MCPToolDefinition(
+            name: "project_init",
+            description: "폴더를 새 프로젝트로 등록하는 초안을 Waypoint 앱에 띄운다. 사용자가 앱에서 확인하고 등록하므로 결과는 pending. 이미 등록된 폴더면 오류.",
+            inputSchema: schema([
+                "cwd": string("등록할 폴더 절대 경로"),
+                "name": string("프로젝트 이름"),
+                "key": string("카드 키(영문 대문자 2–5자, 다른 프로젝트와 겹치지 않게). 없으면 앱이 추천"),
+                "summary": string("한두 문장 개요"),
+                "stack": ["type": "array", "items": ["type": "string"], "description": "주요 언어·프레임워크"],
+                "guideFiles": ["type": "array", "items": ["type": "string"],
+                               "description": "지침 문서 후보(cwd 기준 상대 경로, .md·.txt). 예: CLAUDE.md, docs/ARCHITECTURE.md"],
+                "seedCards": [
+                    "type": "array",
+                    "maxItems": JSONValue(seedCardLimit),
+                    "description": "초기 카드 후보(최대 8)",
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "title": ["type": "string"],
+                            "status": ["type": "string", "enum": ["next", "idea"], "description": "기본 next"],
+                            "kind": ["type": "string", "enum": ["task", "idea", "bug"]],
+                            "body": ["type": "string", "description": "짧은 본문(markdown)"],
+                        ],
+                        "required": ["title"],
+                        "additionalProperties": false,
+                    ],
+                ],
+            ], required: ["cwd", "name"])
         ),
         MCPToolDefinition(
             name: "card_list",

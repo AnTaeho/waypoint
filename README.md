@@ -41,6 +41,13 @@ cp integration/skills/tracker/SKILL.md ~/.claude/skills/tracker/
 훅 설치는 `integration/hooks/settings.example.json`. 도구 이름은 `mcp__waypoint__card_start` 꼴이라, 권한을 미리 주려면 `mcp__waypoint__*`.
 되돌리기: `claude mcp remove waypoint -s user`, `rm -r ~/.claude/skills/tracker`.
 
+## 프로젝트 등록 (`/tracker init`)
+
+등록할 폴더에서 Claude Code를 열고 `/tracker init`. Claude가 README·CLAUDE.md·docs·최근 커밋·TODO를 훑어 `project_init`을 부르면 앱에 「새 프로젝트 등록」 창이 뜬다. 이름·키·개요·스택을 고치고 지침 문서와 초기 카드를 골라 「등록」하면 그 폴더의 세션이 다음 훅부터 기록된다(지난 대화는 가져오지 않는다).
+
+- 키: 영문 대문자 2–5자, 보관된 것까지 포함해 다른 프로젝트와 겹치지 않게.
+- 정리: 사이드바에서 프로젝트를 오른쪽 클릭 → 「보관」(숨기고 그 폴더의 기록을 멈춘다, 사이드바 맨 아래 「보관됨」에서 되돌린다) 또는 「삭제…」(카드·기록·지침 문서 등록을 지운다. 로컬 파일은 그대로).
+
 ## 핵심 원칙 (한 줄 요약)
 
 - 세션이 아니라 **프로젝트** 기준으로 "작업중"을 보여준다.

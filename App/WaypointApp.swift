@@ -33,6 +33,7 @@ struct WaypointApp: App {
                 .tint(Theme.liveText)
                 #if os(macOS)
                 .environment(usage)
+                .environment(services)
                 #endif
         }
         .modelContainer(container)

@@ -13,6 +13,9 @@ struct RootView: View {
     @State private var guideDocID: PersistentIdentifier?
     @State private var showsInspector = true
     @State private var searchText = ""
+    /// 샘플 모드에서는 nil
+    @Environment(AppServices.self) private var services: AppServices?
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -80,6 +83,16 @@ struct RootView: View {
         .onChange(of: projectMode) {
             path = []
         }
+        .onChange(of: services?.pendingSelection, initial: true) { _, id in
+            guard let id else { return }
+            selection = .project(id)
+            services?.pendingSelection = nil
+        }
+        .onAppear {
+            services?.mainWindowCount += 1
+            services?.openMainWindow = { [openWindow] in openWindow(id: WaypointApp.mainWindowID) }
+        }
+        .onDisappear { services?.mainWindowCount -= 1 }
     }
 
     private var inspectorTitle: String {

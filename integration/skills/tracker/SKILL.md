@@ -24,7 +24,7 @@ sessionId: 5e1f0c2a-…
 ```
 
 - 프로젝트 키(`PRB`)는 도구의 `project`에, `sessionId`는 `card_start`·`card_create`의 `sessionId`에 그대로 넣는다.
-- 블록이 없거나 `Waypoint: 이 폴더는 Waypoint에 없음`이면 등록되지 않은 폴더다. 아무것도 기록하지 않는다.
+- 블록이 없거나 `Waypoint: 이 폴더는 Waypoint에 없음`이면 등록되지 않은 폴더다. `/tracker init` 말고는 아무것도 기록하지 않는다.
 - 직전 세션 메모가 있으면 그 카드부터 이어갈지 사용자 요청과 맞춰 본다.
 
 ## 도구
@@ -41,6 +41,7 @@ MCP 서버 `waypoint`. Claude Code에서의 이름은 `mcp__waypoint__<도구>`.
 | `card_note(id, text)` | 결정·막힌 점 한 줄 |
 | `card_handoff(id, nextSessionNote)` | 다음 세션 메모 |
 | `project_resolve(cwd)` | 폴더 → 프로젝트(주입 블록이 없을 때 확인용) |
+| `project_init(cwd, name, key?, summary?, stack?, guideFiles?, seedCards?)` | `/tracker init`에서만. 앱에 등록 확인 창을 띄운다 |
 
 카드 ID는 `PRB-1` 꼴이다.
 
@@ -74,7 +75,25 @@ MCP 서버 `waypoint`. Claude Code에서의 이름은 `mcp__waypoint__<도구>`.
 
 ## /tracker init
 
-아직 앱에서 지원하지 않는다(M5). 사용자가 청하면 "Waypoint 앱에서 프로젝트 등록은 아직 지원하지 않아요."라고 한 줄로 알리고 멈춘다.
+사용자가 `/tracker init`을 청하면 지금 폴더를 Waypoint 프로젝트로 등록하는 초안을 앱에 띄운다. 등록은 사용자가 앱에서 확인하고 한다.
+
+1. 이미 등록된 폴더인지 본다. 주입 블록이 `Waypoint: <키> (…)`로 시작하면 이미 등록된 폴더다. 블록이 없으면 `project_resolve(cwd)`. 등록되어 있으면 `이 폴더는 이미 Waypoint에 <키>로 등록되어 있어요.` 한 줄로 알리고 끝낸다.
+2. 저장소를 훑는다. 읽기만 하고 아무것도 고치지 않는다.
+   - `README*`, `CLAUDE.md`, `.claude/CLAUDE.md`, `docs/` 아래 문서(많으면 이름과 첫 부분만)
+   - `git log --oneline -20`
+   - `TODO`·`FIXME` 검색(개수와 대표 몇 줄)
+3. `project_init`을 한 번 부른다.
+   - `cwd`: 지금 폴더 절대 경로
+   - `name`: 사람이 부르는 짧은 이름(README 제목 등)
+   - `key`: 영문 대문자 2–5자, 이름에서 딴 것(예: `ledger` → `LDG`). 다른 프로젝트와 겹치면 결과의 `warnings`에 나오고, 사용자가 앱에서 고친다.
+   - `summary`: 무엇을 하는 프로젝트인지 한두 문장
+   - `stack`: 주요 언어·프레임워크 몇 개
+   - `guideFiles`: 지침 문서 후보(cwd 기준 상대 경로). `CLAUDE.md`, `.claude/CLAUDE.md`, `docs/`의 설계·규칙 문서처럼 작업 지침이 되는 `.md`. README는 지침이 담겨 있을 때만.
+   - `seedCards`: 초기 카드 후보 최대 8개. 할 일이 분명한 것(최근 커밋에서 이어지는 일, 문서의 남은 일)은 `status: next`, TODO·FIXME나 막연한 것은 `status: idea`(버그면 `kind: bug`). 제목은 짧게, 근거는 `body` 한 줄.
+4. 결과가 `status: pending`이면 `Waypoint 앱에서 확인하고 등록해 주세요.` 한 줄만 말하고 멈춘다. 사용자의 등록을 기다리거나 다시 확인하지 않는다. `missingGuideFiles`가 있으면 그 줄 뒤에 없는 파일 이름을 한 줄 덧붙인다.
+5. 오류(`isError`)면 이유를 한 줄로 전한다. 「이미 등록된 폴더」·「보관된 프로젝트」면 그대로 알리고 끝낸다.
+
+init에서는 카드를 `card_create`로 만들지 않는다. 초기 카드는 `seedCards`로만 넘긴다.
 
 ## 하지 말 것
 

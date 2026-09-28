@@ -14,7 +14,7 @@ struct GuideVersionSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
             HStack(spacing: Theme.Spacing.s) {
-                Text(TimeFormat.timestamp(version.at, now: Date()))
+                Text(TimeFormat.timestamp(version.at, now: Date(), seconds: true))
                     .font(Theme.sectionLarge)
                 Text(GuideFormat.sourceName(version.source))
                     .font(Theme.body)

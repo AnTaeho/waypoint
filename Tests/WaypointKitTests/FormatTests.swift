@@ -46,6 +46,14 @@ import Testing
         #expect(TimeFormat.relative(at(12, 24, 12, 0, year: 2025), now: now, calendar: calendar) == "2025년 12월 24일")
     }
 
+    @Test func timestampWithSeconds() {
+        let a = at(9, 28, 9, 12) + 16
+        #expect(TimeFormat.timestamp(a, now: now, calendar: calendar) == "09:12")
+        #expect(TimeFormat.timestamp(a, now: now, seconds: true, calendar: calendar) == "09:12:16")
+        #expect(TimeFormat.timestamp(a + 5, now: now, seconds: true, calendar: calendar) == "09:12:21")
+        #expect(TimeFormat.timestamp(at(9, 27, 23, 5) + 3, now: now, seconds: true, calendar: calendar) == "어제 23:05:03")
+    }
+
     @Test func minutesWinAcrossMidnight() {
         let justAfterMidnight = at(9, 28, 0, 10)
         #expect(TimeFormat.relative(at(9, 27, 23, 50), now: justAfterMidnight, calendar: calendar) == "20분 전")

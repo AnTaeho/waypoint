@@ -6,6 +6,8 @@ import WaypointKit
 struct GuideConflictView: View {
     let doc: GuideDoc
     let local: String
+    /// 한쪽을 골라 충돌이 풀렸을 때(읽기로 돌아간다)
+    let resolved: () -> Void
 
     @Environment(\.modelContext) private var context
     @State private var error: String?
@@ -49,13 +51,17 @@ struct GuideConflictView: View {
     }
 
     private func keepLocal() {
-        do { try GuideLibrary.keepLocal(doc, at: Date(), context: context) }
-        catch { self.error = error.localizedDescription }
+        do {
+            try GuideLibrary.keepLocal(doc, at: Date(), context: context)
+            resolved()
+        } catch { self.error = error.localizedDescription }
     }
 
     private func keepApp() {
-        do { try GuideLibrary.keepApp(doc, at: Date(), context: context) }
-        catch { self.error = error.localizedDescription }
+        do {
+            try GuideLibrary.keepApp(doc, at: Date(), context: context)
+            resolved()
+        } catch { self.error = error.localizedDescription }
     }
 }
 

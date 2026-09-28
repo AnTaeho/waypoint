@@ -36,7 +36,7 @@ struct GuideView: View {
 
     @ViewBuilder private func content(_ doc: GuideDoc) -> some View {
         if let local = doc.conflictContent {
-            GuideConflictView(doc: doc, local: local)
+            GuideConflictView(doc: doc, local: local) { mode = .read }
         } else {
             switch mode {
             case .read: GuideReader(content: doc.content)
