@@ -2,7 +2,7 @@ import SwiftUI
 import WaypointKit
 
 /// 작업중 표 한 줄. live는 흰 바탕·펄스 점·경과, stalled는 속 빈 점·「멈춤 N분」.
-/// 카드 없는 세션 줄은 카드 칸을 비우고 제목 자리에 「카드 없음」을 흐리게 둔다.
+/// 카드 없는 세션 줄은 카드 칸을 비우고 제목 자리에 그 세션의 마지막 요청 문장(없으면 「카드 없음」)을 흐리게 둔다.
 struct ActiveWorkRowView: View {
     let row: DashboardRow
     let now: Date
@@ -21,12 +21,13 @@ struct ActiveWorkRowView: View {
             .padding(.leading, row.depth > 0 ? Theme.Spacing.indent : 0)
             .frame(width: Theme.Columns.activeCard, alignment: .leading)
 
-            Text(row.card?.title ?? "카드 없음")
+            titleText
                 .font(row.card == nil ? Theme.body : Theme.bodyMedium)
                 .foregroundStyle(titleColor)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .help(row.card == nil ? row.session.lastPrompt ?? "" : "")
 
             if let file = columns.file {
                 Text(recentFile ?? "")
@@ -56,6 +57,11 @@ struct ActiveWorkRowView: View {
                 .fill(isLive ? Theme.surface : Color.clear)
         )
         .contentShape(Rectangle())
+    }
+
+    private var titleText: Text {
+        if let card = row.card { return Text(card.title) }
+        return Text(SessionFormat.noCardTitle(prompt: row.session.lastPrompt).text)
     }
 
     private var titleColor: Color {

@@ -64,7 +64,7 @@ public final class HookProcessor {
             let text = sessionStart(input, at: date, delivers: delivers)
             return delivers ? text : nil
         case "UserPromptSubmit":
-            heartbeat(input, at: date)
+            userPromptSubmit(input, at: date)
             return delivers ? lateContext(input, at: date) : nil
         case "Stop":
             heartbeat(input, at: date)

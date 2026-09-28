@@ -59,6 +59,8 @@ enum Theme {
     static let mono = Font.system(size: 12, design: .monospaced)
     static let monoSmall = Font.system(size: 10, weight: .medium, design: .monospaced)
     static let cardTitle = rounded(14, .bold)
+    /// 보드의 카드 없는 세션 타일 제목 자리(마지막 요청 문장·「카드 없음」). 카드 제목과 같은 크기, 보통 굵기.
+    static let sessionTileTitle = rounded(14)
     static let monoCaption = Font.system(size: 11, design: .monospaced)
     /// 카드 상세 제목. 나눔스퀘어라운드 B.
     static let detailTitle = rounded(28, .bold)
