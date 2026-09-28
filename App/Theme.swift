@@ -153,6 +153,42 @@ enum Theme {
         static let ideaPreviewCount = 3
     }
 
+    /// 지침 문서
+    enum Guide {
+        /// 제목 1·2·3단계(4단계부터는 3단계와 같게) 크기. 굵기는 B.
+        static let h1Size: CGFloat = 22
+        static let h2Size: CGFloat = 17
+        static let h3Size: CGFloat = 14.5
+        static let body = rounded(13.5)
+        static let bodySize: CGFloat = 13.5
+        static let code = Font.system(size: 12, design: .monospaced)
+        /// 편집기·비교 화면 원문
+        static let source = Font.system(size: 12.5, design: .monospaced)
+        /// 문단·목록 줄 간격
+        static let lineSpacing: CGFloat = 3
+        /// 인라인 코드는 본문보다 1pt 작게, 표 칸은 0.5pt 작게
+        static let inlineCodeShrink: CGFloat = 1
+        static let tableTextShrink: CGFloat = 0.5
+        /// 충돌 비교 한 줄의 위아래 여백
+        static let diffLinePadding: CGFloat = 1
+        static let tocWidth: CGFloat = 180
+        /// 이 폭보다 좁으면 목차를 숨긴다
+        static let tocMinBodyWidth: CGFloat = 620
+        static let readMaxWidth: CGFloat = 760
+        static let quoteBar: CGFloat = 3
+        static let tableCellMinWidth: CGFloat = 60
+        /// 문서 이름 칩 줄 높이
+        static let tabHeight: CGFloat = 26
+        /// 충돌 비교: 로컬에만 있는 줄 / 앱에만 있는 줄 배경
+        static let inspectorLabelWidth: CGFloat = 64
+        /// 문서 이름 옆 「동기화되지 않음」 점
+        static let stateDot: CGFloat = 5
+        static let versionSheetWidth: ClosedRange<CGFloat> = 560...640
+        static let versionSheetHeight: ClosedRange<CGFloat> = 420...560
+        static let removedLine = liveBg
+        static let addedLine = doneBg
+    }
+
     enum Columns {
         static let activeCard: CGFloat = 90
         static let activeFile: ClosedRange<CGFloat> = 120...200
