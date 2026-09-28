@@ -81,6 +81,11 @@ GuideDoc     id, project, relPath, content, contentHash(SHA-256), lastSyncedAt,
 GuideVersion doc, content, at, source: app | local
 ```
 
+- **키**: 영문 대문자 2–5자(`^[A-Z]{2,5}$`), 보관된 것까지 포함해 다른 프로젝트 키와 겹치지 않는다. 같은 폴더(`rootPath`를 `~` 펼치고 표준화해 비교)를 쓰는 프로젝트는 보관 포함 하나뿐. 규칙은 `ProjectKey`·`ProjectRegistry`(M5).
+- **추천 키**(`ProjectKey.suggest`, 키를 안 줬을 때·경고 문구의 예): 이름의 영문 단어가 둘 이상이면 머리글자 2–4자(`Waypoint Init Probe` → `WIP`), 그다음 첫 단어의 첫 글자 + 자음 둘(`ledger` → `LDG`), 첫 단어 앞 3자. 영문이 없으면 폴더 이름으로 같은 순서, 그래도 없으면 `PRJ`. 모두 쓰이면 후보 앞 4자 + `A`–`Z`.
+- **보관**(`archivedAt`): 사이드바·대시보드·메뉴 막대·최근 기록에서 숨기고 사이드바 맨 아래 「보관됨」 접힘 구역에만 보인다. 그 폴더의 훅은 기록하지 않는다(5장). 카드·기록은 그대로 두고 「보관 해제」로 되돌린다.
+- **삭제**: 확인 알림(이름, 카드 수) 뒤 프로젝트를 지우면 카드·세션·연결·이벤트·지침 문서(버전 포함)가 함께 지워진다(cascade). 로컬 파일은 건드리지 않는다.
+
 CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.unique)`를 쓰지 않고 키·ID 중복은 코드에서 막는다. 모든 속성은 기본값이 있거나 옵셔널, 관계는 옵셔널이고 역관계를 둔다. enum은 원시 문자열로 저장한다.
 
 ### 파생 규칙
@@ -140,6 +145,8 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - 다른 세션에서 작업중: 대시보드 작업중 줄 중 이 세션·이 세션의 서브에이전트가 아닌 카드 줄(카드 없는 세션 줄은 뺀다). 멈춘 세션은 `, 멈춤`.
 - 직전 세션 메모: 다음 세션 메모가 있고 done·archived가 아닌 카드 중 **가장 최근에 `card_handoff`한 카드 하나**(handoff 기록 시각, 없으면 `updatedAt`). 메모 줄은 두 칸 들여쓴다.
 - 등록되지 않은 폴더: 한 줄 `Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음.`
+
+**보관된 프로젝트 폴더**(가장 가까운 상위 `rootPath`가 보관된 프로젝트)는 등록되지 않은 폴더처럼 기록하지 않되, `SessionStart`에 안내 줄도 주지 않는다(빈 본문). 보관하기 전에 시작한 세션도 보관 뒤의 훅(heartbeat·파일 변경 등)은 기록하지 않는다. 단 `SessionEnd`·`SubagentStop`은 열린 세션을 닫는다(보관을 풀었을 때 끝난 세션이 작업중으로 남지 않게). 닫히지 않은 세션은 종료 판정이 닫는다. 보관을 풀면 다음 훅부터 다시 기록한다.
 
 등록되지 않은 폴더의 세션은 무시한다 (단, `SessionStart` 컨텍스트로 "이 폴더는 Waypoint에 없음, `/tracker init` 가능"을 한 줄 알린다). 하위 폴더에서 연 세션은 가장 가까운 상위 `rootPath` 프로젝트로 매칭한다.
 
@@ -216,7 +223,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | 도구 | 입력(필수 굵게) | 동작 |
 |---|---|---|
 | `project_resolve` | **`cwd`** | 폴더 → `{key, name, summary, rootPath}`, 없으면 `null`(오류 아님) |
-| `project_init` | — | **M5**(앱 확인 시트와 함께). 지금은 없다 |
+| `project_init` | **`cwd`**, **`name`**, `key`, `summary`, `stack`, `guideFiles`, `seedCards` | 앱에 등록 확인 창을 띄우고 바로 `pending`으로 답한다(아래 「project_init」) |
 | `card_list` | **`project`**, `status`, `query` | status를 안 주면 done·archived를 뺀다. 순서: active → next → idea → done → archived, 같은 상태는 번호순. `query`는 ID·제목·본문 부분 일치 |
 | `card_get` | **`id`** | 카드 + `body`, `origin`, `nextSessionNote`, `children`, 최근 기록 20개 |
 | `card_create` | **`project`**, **`title`**, `kind`, `status`, `body`, `parentId`, `criteria`, `sessionId` | origin=claude, `originSessionId`=`sessionId`. 기본 kind task, status next(kind idea면 idea). `active`는 거부(만든 뒤 `card_start`). `parentId`는 같은 프로젝트. `card.created` 기록 |
@@ -228,6 +235,27 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 `criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
 
 `sessionId`는 `SessionStart` 훅이 주입한 블록의 `sessionId:` 줄에서 Claude가 읽어 전달한다.
+
+### project_init
+
+`/tracker init`에서만 부른다. 도구는 사용자의 확인을 기다리지 않는다.
+
+- 검사(실패하면 `isError`, 초안을 만들지 않는다): `cwd`가 절대 경로이고 있는 폴더일 것. 이미 등록된 폴더(하위 폴더 포함, `project_resolve`와 같은 매칭)면 `이미 등록된 폴더: <키> (…)`. 같은 폴더를 보관된 프로젝트가 쓰면 `보관된 프로젝트 <키>…`(보관 해제 안내). `name`이 비었으면 오류. `seedCards`는 최대 8개, 항목은 `{title, status: next|idea(기본 next), kind?: task|idea|bug(기본 status가 idea면 idea, 아니면 task), body?}`.
+- `guideFiles`: 상대(cwd 기준)·절대 경로를 받아 cwd 아래 실제 `.md`·`.txt` 파일만 상대 경로로 남긴다(중복 제거, 심볼릭 링크는 풀어서 비교). 나머지는 결과 `missingGuideFiles`.
+- `key`: 대문자로 바꾼다. 규칙에 안 맞거나 다른 프로젝트가 쓰면 그대로 초안에 두고 결과 `warnings`에 알린다(추천 키 예시 포함) — 사용자가 창에서 고쳐야 등록된다. 안 주면 추천 키.
+- 통과하면 앱 메모리의 초안 목록에 넣는다(같은 폴더 초안이 있으면 그 자리에서 바꾼다. 저장소에는 넣지 않고 앱을 끄면 사라진다). 앱은 「새 프로젝트 등록」 창을 앞으로 띄운다.
+- 결과: `{status: "pending", message: "Waypoint 앱에서 확인하고 등록해 주세요.", draft: {rootPath, name, key, guideFiles, seedCards(개수)}, replacedDraft, missingGuideFiles?, warnings?}`.
+
+확인 창(`macOS/Init/`, 시안 `Init.dc.html` 본문 구조): 경로(모노), 이름·카드 키(입력하는 대로 대문자, 규칙 위반은 「A–Z 2–5자」, 중복은 「사용 중」을 필드 위에 보이고 「등록」을 막는다)·개요, 스택 칩(빼기·추가), 지침 문서·초기 카드 체크 목록(기본 전부 체크, 카드는 다음·아이디어 표시), 「취소」「등록」. 메인 창과 따로 뜨는 창이라 메인 창이 닫혀 있거나 메뉴 막대만 있어도 보인다. 초안이 여럿이면 먼저 온 것부터 하나씩, 창을 닫으면 지금 초안을 취소한다.
+
+등록(`ProjectRegistry.register`)은 한 번에 저장한다: 규칙 재검사(이름, 키, 폴더 존재·중복) → `Project`(`rootPath` 표준 절대 경로, `createdAt`) → 고른 지침 파일을 8장과 같은 등록(`GuideVersion(local)`, `guide.synced`) → 고른 카드(origin claude, `card.created` `{origin, status}`) → 저장. 중간에 실패하면(지침 파일이 그사이 사라짐 등) 아무것도 남기지 않고 창에 이유를 보인다. 등록 뒤 메인 창(없으면 연다) 사이드바에서 새 프로젝트를 고른다. 그 폴더에서 이미 돌던 세션은 다음 훅부터 잡힌다(지난 기록은 가져오지 않는다).
+
+### M5 완료 조건 실측 (2026-09-28, `~/workspace/waypoint-init-probe`, `claude -p`)
+
+- 새 폴더(README·CLAUDE.md·docs/NOTES.md·`TODO:` 두 줄·커밋 3개)에서 메인 창을 닫고 메뉴 막대만 둔 채 `claude -p "/tracker init"` 한 번(19초, 4턴): 한 번의 `Bash`로 문서·`git log`·TODO를 훑고 → `ToolSearch` → `project_init(cwd, name: notecli, key: NOTE, summary, stack 2, guideFiles [CLAUDE.md, docs/NOTES.md], seedCards 4)` → `Waypoint 앱에서 확인하고 등록해 주세요.` 한 줄로 끝났다.
+- 등록 창은 터미널이 앞에 있어도 떴다(앱 활성화는 macOS 14 협조 방식이라 포커스는 터미널에 남고 창만 앞에 보인다). 「등록」 뒤 메인 창이 새로 열려 `notecli`가 골라졌다. 저장소: 프로젝트 NOTE, `GuideDoc` 2개(버전 local), 카드 NOTE-1~4(origin claude, next 2·idea 2), `card.created` 4·`guide.synced` 2.
+- 같은 폴더의 `claude -p "hi"`: 주입 블록 `Waypoint: NOTE (notecli)` + 다음 할 일 NOTE-1·2, Claude가 그 두 카드를 먼저 물었다.
+- 보관하자 사이드바·대시보드에서 빠지고 「보관됨 1」에만 보였고, 그 폴더의 `SessionStart`는 `200` 빈 본문, 세션을 만들지 않았다. 보관 해제로 돌아왔다. 따로 등록한 프로젝트를 고른 채 「삭제…」 → 「‘삭제 실측’ 삭제 / 카드 3개와 기록이 함께 삭제됩니다.」 → 삭제: 대시보드로 옮겨졌고 남은 카드·문서·버전·이벤트 0, 로컬 파일은 그대로.
 
 ### 완료 조건 실측 (2026-09-28, `~/workspace/waypoint-probe`, `claude -p`)
 
@@ -250,8 +278,8 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 
 - 로컬 변경 감지: 등록 문서들의 부모 폴더를 FSEvents(파일 단위 이벤트)로 감시하고 0.4초 디바운스 뒤 모든 등록 문서를 다시 판정한다. 앱 시작 때와 감시 폴더가 바뀔 때(등록·해제)도 전부 판정한다 — 앱이 꺼진 동안의 변경은 시작할 때 반영된다.
 - 앱 편집: 원문 텍스트 편집. 저장하지 않은 편집은 `draft`로 남아 화면을 떠나도 유지된다(`content`와 같아지면 nil). 저장(⌘S)은 먼저 디스크 해시를 저장 해시와 비교해, 다르면 쓰지 않고 충돌로 멈춘다. 같거나 파일이 없으면 같은 폴더의 임시 파일에 쓰고 `rename`으로 바꿔 끼운 뒤(권한 유지), 같은 메인 스레드 블록에서 `content`·해시·`lastSyncedAt`을 갱신하고 `GuideVersion(app)`, `guide.synced`(app)를 남긴다.
-- 충돌 비교 화면: 왼쪽 「로컬 파일」, 오른쪽 「앱에서 편집한 내용」, 한쪽에만 있는 줄에 배경(줄 단위 LCS). 「로컬 파일로」는 draft를 버리고 지금 파일 내용을 반영(local), 「앱 내용으로」는 draft를 파일에 쓴다(app).
-- 버전 기록: 문서당 최근 50개만 남긴다(넘으면 오래된 것부터 삭제). 버전을 열어 원문을 보고 「이 버전으로 되돌리기」하면 그 내용을 앱 저장과 같은 규칙으로 쓴다(버전 app, 충돌 규칙 동일, 저장 안 한 편집은 그 내용으로 바뀐다).
+- 충돌 비교 화면: 왼쪽 「로컬 파일」, 오른쪽 「앱에서 편집한 내용」, 한쪽에만 있는 줄에 배경(줄 단위 LCS). 「로컬 파일로」는 draft를 버리고 지금 파일 내용을 반영(local), 「앱 내용으로」는 draft를 파일에 쓴다(app). 어느 쪽을 골라도 읽기 화면으로 돌아간다.
+- 버전 기록: 문서당 최근 50개만 남긴다(넘으면 오래된 것부터 삭제). 시각은 초까지(「15:12:16」) 보인다. 버전을 열어 원문을 보고 「이 버전으로 되돌리기」하면 그 내용을 앱 저장과 같은 규칙으로 쓴다(버전 app, 충돌 규칙 동일, 저장 안 한 편집은 그 내용으로 바뀐다).
 - 비샌드박스 앱이라 security-scoped bookmark는 쓰지 않는다(샌드박스로 바꾸면 필요).
 - 렌더링: 직접 만든 블록 파서(`MarkdownParser`) — 제목 `#`~`######`(화면은 3단계까지 구분), 문단(이어진 줄은 공백으로), 목록(`-`·`*`·`+`·`1.`·`1)`, 들여쓰기 단계, 체크박스), 울타리 코드 블록, 파이프 표(정렬 줄 필수), 인용, 구분선. 인라인(굵게·기울임·코드·링크)은 `AttributedString(markdown:, .inlineOnlyPreservingWhitespace)`. 목차는 제목 1~3단계.
 
