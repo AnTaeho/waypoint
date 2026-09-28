@@ -176,3 +176,34 @@ import Testing
         return card
     }
 }
+
+@Suite struct ArchivedProjectHookTests {
+    @Test func archivedFolderGetsNoContextAndNoSession() throws {
+        let h = try HookHarness()
+        h.project.archivedAt = t0
+        try h.context.save()
+        let text = try h.send("doc-SessionStart", at: t0 + 60)
+        #expect(text == "")
+        _ = try h.send("doc-UserPromptSubmit", at: t0 + 90)
+        #expect(try h.context.fetchCount(FetchDescriptor<Session>()) == 0)
+        #expect(try h.context.fetchCount(FetchDescriptor<Event>()) == 0)
+    }
+
+    @Test func liveSessionStopsRecordingWhenArchived() throws {
+        let h = try HookHarness()
+        _ = try h.send("doc-SessionStart", at: t0)
+        let s = try #require(try h.session())
+        let eventCount = (h.project.events ?? []).count
+        h.project.archivedAt = t0 + 30
+        try h.context.save()
+        _ = try h.send("doc-UserPromptSubmit", at: t0 + 60)
+        #expect(s.lastSeenAt == t0)
+        #expect(try h.send("doc-SessionStart", at: t0 + 90) == "")
+        #expect((h.project.events ?? []).count == eventCount)
+        // 보관을 풀면 다시 기록한다
+        h.project.archivedAt = nil
+        try h.context.save()
+        _ = try h.send("doc-UserPromptSubmit", at: t0 + 120)
+        #expect(s.lastSeenAt == t0 + 120)
+    }
+}

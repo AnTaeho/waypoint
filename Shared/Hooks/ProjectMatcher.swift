@@ -1,6 +1,6 @@
 import Foundation
 
-/// `cwd` → 프로젝트. 가장 가까운(가장 긴) 상위 `rootPath`를 고른다. 보관된 프로젝트는 뺀다.
+/// `cwd` → 프로젝트. 가장 가까운(가장 긴) 상위 `rootPath`를 고른다. 보관된 프로젝트는 뺀다(`nearest`는 넣는다).
 public enum ProjectMatcher {
 
     /// `~`를 홈으로 펼치고 끝 `/`를 뗀 표준 경로.
@@ -24,10 +24,15 @@ public enum ProjectMatcher {
     }
 
     public static func project(for cwd: String, in projects: [Project], home: String = NSHomeDirectory()) -> Project? {
+        nearest(for: cwd, in: projects.filter { $0.archivedAt == nil }, home: home)
+    }
+
+    /// 보관된 프로젝트까지 넣어 가장 가까운 것. 보관된 폴더를 미등록 폴더와 구별할 때 쓴다.
+    public static func nearest(for cwd: String, in projects: [Project], home: String = NSHomeDirectory()) -> Project? {
         guard !cwd.isEmpty else { return nil }
         let target = normalize(cwd, home: home)
         return projects
-            .filter { $0.archivedAt == nil && !$0.rootPath.isEmpty }
+            .filter { !$0.rootPath.isEmpty }
             .map { (project: $0, root: normalize($0.rootPath, home: home)) }
             .filter { isInside(target, root: $0.root) }
             .max { $0.root.count < $1.root.count }?

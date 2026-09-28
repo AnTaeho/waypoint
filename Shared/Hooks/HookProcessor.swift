@@ -91,12 +91,21 @@ public final class HookProcessor {
         return ProjectMatcher.project(for: cwd, in: projects, home: home)
     }
 
+    /// 이 훅의 폴더(또는 이미 있는 세션)가 보관된 프로젝트에 속하는지.
+    func isArchivedFolder(_ input: HookInput) -> Bool {
+        if let project = fetchSession(input.sessionID)?.project { return project.archivedAt != nil }
+        let projects = (try? context.fetch(FetchDescriptor<Project>())) ?? []
+        return ProjectMatcher.nearest(for: input.cwd, in: projects, home: home)?.archivedAt != nil
+    }
+
     /// 메인 세션. 없으면 `create`일 때 cwd로 프로젝트를 찾아 만든다(등록 안 된 폴더면 nil).
     /// 끝난 세션은 그 뒤 시각의 훅이 오면(`create`일 때) 다시 살린다. 끝난 시각 이전의 늦은 기록이면 nil.
     /// 새로 만들거나 다시 살렸으면 `session.start`를 남긴다(SessionStart가 아니어도 — 훅을 세션 중간에 등록한 경우).
     /// 훅에 Claude Code PID가 있으면 세션에 적는다(`recordPid`).
+    /// 보관된 프로젝트의 세션은 없는 것처럼 본다(훅을 기록하지 않는다).
     func mainSession(_ input: HookInput, at date: Date, create: Bool) -> Session? {
         if let session = fetchSession(input.sessionID) {
+            guard session.project?.archivedAt == nil else { return nil }
             guard let endedAt = session.endedAt else {
                 recordPid(session, input, at: date)
                 return session

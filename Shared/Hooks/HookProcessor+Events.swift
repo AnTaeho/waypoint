@@ -4,9 +4,10 @@ import SwiftData
 /// 이벤트별 처리. 표는 SPEC 5장.
 extension HookProcessor {
 
+    /// 등록 안 된 폴더는 안내 한 줄, 보관된 프로젝트 폴더는 빈 본문(아무것도 주입하지 않는다).
     func sessionStart(_ input: HookInput, at date: Date) -> String {
         guard let session = mainSession(input, at: date, create: true), let project = session.project
-        else { return SessionContext.unregistered }
+        else { return isArchivedFolder(input) ? "" : SessionContext.unregistered }
         touch(session, at: date)
         return SessionContext.text(project: project, session: session, now: date, stallTimeout: stallTimeout)
     }
