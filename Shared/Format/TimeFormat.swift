@@ -46,4 +46,27 @@ public enum TimeFormat {
             return "\(parts.year ?? 0)년 \(month)월 \(day)일"
         }
     }
+
+    /// 날짜만: 「오늘」「어제」「9월 24일」「2025년 9월 24일」. 미래 날짜는 「오늘」.
+    public static func day(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
+        let days = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)
+        ).day ?? 0
+        if days <= 0 { return "오늘" }
+        if days == 1 { return "어제" }
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        let month = parts.month ?? 0, dayOfMonth = parts.day ?? 0
+        if calendar.component(.year, from: now) == parts.year {
+            return "\(month)월 \(dayOfMonth)일"
+        }
+        return "\(parts.year ?? 0)년 \(month)월 \(dayOfMonth)일"
+    }
+
+    /// 시각: 「14:22」(오늘) 「어제 14:22」 「9월 26일 22:40」 「2025년 9월 26일 22:40」.
+    public static func timestamp(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        let clock = String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+        let dayText = Self.day(date, now: now, calendar: calendar)
+        return dayText == "오늘" ? clock : "\(dayText) \(clock)"
+    }
 }
