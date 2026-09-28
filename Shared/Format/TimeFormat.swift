@@ -63,9 +63,12 @@ public enum TimeFormat {
     }
 
     /// 시각: 「14:22」(오늘) 「어제 14:22」 「9월 26일 22:40」 「2025년 9월 26일 22:40」.
-    public static func timestamp(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
-        let parts = calendar.dateComponents([.hour, .minute], from: date)
-        let clock = String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    /// `seconds`면 초까지(「14:22:05」) — 같은 분에 여러 개가 생기는 버전 기록용.
+    public static func timestamp(_ date: Date, now: Date, seconds: Bool = false, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.hour, .minute, .second], from: date)
+        let clock = seconds
+            ? String(format: "%02d:%02d:%02d", parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
+            : String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
         let dayText = Self.day(date, now: now, calendar: calendar)
         return dayText == "오늘" ? clock : "\(dayText) \(clock)"
     }
