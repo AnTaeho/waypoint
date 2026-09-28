@@ -19,6 +19,9 @@ public final class Session {
     /// 이 세션을 돌리는 Claude Code 프로세스 PID(훅 스크립트가 보낸 값). 메인 세션에만 기록한다.
     /// `SessionEnd`가 오지 않고 프로세스가 사라진 세션을 끝내는 데 쓴다(`SessionSweep`).
     public var claudePid: Int?
+    /// 이 세션의 대화에 `Waypoint:` 블록을 넣어 준 프로젝트 키(`SessionStart`나 늦은 `UserPromptSubmit` 주입).
+    /// nil이거나 지금 프로젝트 키와 다르면 다음 `UserPromptSubmit`에 블록을 한 번 준다(SPEC 5장 「늦은 주입」). 메인 세션만.
+    public var contextProjectKey: String?
     /// 저장 캐시. 판정은 항상 `SessionRules.state(of:now:)`로 다시 계산한다.
     public var stateRaw: String = SessionState.live.rawValue
 

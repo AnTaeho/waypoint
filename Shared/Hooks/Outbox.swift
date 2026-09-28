@@ -71,8 +71,9 @@ public enum Outbox {
 }
 
 extension HookProcessor {
-    /// outbox 한 줄을 처리한다. 시각은 훅이 받은 시각(`receivedAt`). SessionStart의 주입 텍스트는 버린다.
+    /// outbox 한 줄을 처리한다. 시각은 훅이 받은 시각(`receivedAt`).
+    /// 이미 지난 훅이라 대화에 넣을 수 없으므로 주입 텍스트를 만들지 않고, 블록을 줬다고 적지도 않는다.
     public func handle(_ entry: Outbox.Entry) {
-        handle(event: entry.event, json: entry.payload, at: entry.receivedAt, claudePid: entry.claudePid)
+        handle(event: entry.event, json: entry.payload, at: entry.receivedAt, claudePid: entry.claudePid, delivers: false)
     }
 }

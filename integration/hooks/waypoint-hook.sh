@@ -1,6 +1,7 @@
 #!/bin/bash
 # Waypoint 훅 브리지. Claude Code 훅 입력(JSON, stdin)을 로컬 앱으로 전달한다.
-# 원칙: 절대 세션을 막지 않는다. 항상 exit 0. stdout은 SessionStart에서만.
+# 원칙: 절대 세션을 막지 않는다. 항상 exit 0. stdout은 SessionStart, 그리고 블록을 받지 못한 세션의
+# UserPromptSubmit에서 한 번만(앱이 200 + 본문을 돌려줄 때. 둘 다 평문 stdout이 대화 컨텍스트에 들어간다).
 # 설치: ~/.claude/waypoint/waypoint-hook.sh 에 두고 chmod +x
 #
 # 사용: waypoint-hook.sh <EventName>   (stdin: 훅 입력 JSON)
@@ -58,10 +59,14 @@ main() {
   body="${response%$'\n'*}"
 
   if [ "$status" = "200" ] || [ "$status" = "204" ]; then
-    # SessionStart 응답 본문은 대화 컨텍스트로 주입된다
-    if [ "$event" = "SessionStart" ] && [ -n "$body" ] && [ "$body" != "$status" ]; then
-      printf '%s\n' "$body"
-    fi
+    # SessionStart·UserPromptSubmit 응답 본문은 대화 컨텍스트로 주입된다(UserPromptSubmit은 늦은 주입일 때만 200)
+    case "$event" in
+      SessionStart|UserPromptSubmit)
+        if [ "$status" = "200" ] && [ -n "$body" ] && [ "$body" != "$status" ]; then
+          printf '%s\n' "$body"
+        fi
+        ;;
+    esac
     return 0
   fi
 
