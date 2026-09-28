@@ -76,7 +76,8 @@ Event        id, project, card?, session?, at,
                    note | guide.synced,
              payload: JSON(Data)
 
-GuideDoc     id, project, relPath, content, contentHash, lastSyncedAt
+GuideDoc     id, project, relPath, content, contentHash(SHA-256), lastSyncedAt,
+             draft?, isMissing, conflictContent?     // 저장 안 한 편집, 파일 없음, 충돌 때 읽은 로컬 내용
 GuideVersion doc, content, at, source: app | local
 ```
 
@@ -236,12 +237,23 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 
 ## 8. 지침 문서 동기화
 
-- init 시 선택한 파일(예: `CLAUDE.md`, `docs/ARCHITECTURE.md`)을 `GuideDoc`으로 등록.
-- 로컬 변경: FSEvents로 감지 → 내용 반영, `GuideVersion(source: local)`.
-- 앱 편집 저장: 로컬 파일에 원자적 쓰기 → `GuideVersion(source: app)`.
-- 양쪽이 마지막 동기화 이후 모두 바뀐 경우: 자동 병합하지 않고 비교 화면(좌: 로컬, 우: 앱)에서 사용자가 선택.
-- 샌드박스 앱이면 폴더 접근은 security-scoped bookmark로 유지.
-- 렌더링: 제목·목록·코드블록·표·인라인 코드를 지원하는 Markdown 뷰. 편집은 원문 텍스트 편집.
+- 등록: 프로젝트 화면의 「지침 문서」에서 폴더 바로 아래·`docs/` 바로 아래의 `.md`와 `.claude/CLAUDE.md`를 후보로 보이고, 「파일 추가…」로 프로젝트 폴더 아래 `.md`·`.txt`를 고른다(폴더 밖은 거부, 심볼릭 링크는 풀어서 비교). 등록하면 파일 내용으로 `GuideDoc`, `GuideVersion(local)`, `guide.synced`(payload `relPath`, `source`). init(M5)도 같은 등록을 쓴다.
+- 등록 해제는 기록만 지운다(버전 포함). 파일은 그대로.
+- 판정은 내용 해시(SHA-256)만 본다. `GuideSync.decide(저장 내용·해시, draft, 이전 파일 없음, 디스크 상태)`:
+
+| 디스크 | draft | 결과 |
+|---|---|---|
+| 해시 == 저장 해시 | 무엇이든 | 아무것도 안 함(앱 자신의 쓰기 포함). 파일 없음 표시였으면 풀기만 |
+| 바뀜 | 없음, 또는 저장 내용과 같음, 또는 디스크 내용과 같음 | 로컬 내용 반영, draft 버림, `GuideVersion(local)`, `guide.synced`(local) |
+| 바뀜 | 저장 내용·디스크 내용과 모두 다름 | **충돌**: 자동 병합하지 않고 로컬 내용을 `conflictContent`에 들고 비교 화면 |
+| 없음 | 무엇이든 | 「파일 없음」 표시(등록 유지). 다시 생기면 위 표대로 |
+
+- 로컬 변경 감지: 등록 문서들의 부모 폴더를 FSEvents(파일 단위 이벤트)로 감시하고 0.4초 디바운스 뒤 모든 등록 문서를 다시 판정한다. 앱 시작 때와 감시 폴더가 바뀔 때(등록·해제)도 전부 판정한다 — 앱이 꺼진 동안의 변경은 시작할 때 반영된다.
+- 앱 편집: 원문 텍스트 편집. 저장하지 않은 편집은 `draft`로 남아 화면을 떠나도 유지된다(`content`와 같아지면 nil). 저장(⌘S)은 먼저 디스크 해시를 저장 해시와 비교해, 다르면 쓰지 않고 충돌로 멈춘다. 같거나 파일이 없으면 같은 폴더의 임시 파일에 쓰고 `rename`으로 바꿔 끼운 뒤(권한 유지), 같은 메인 스레드 블록에서 `content`·해시·`lastSyncedAt`을 갱신하고 `GuideVersion(app)`, `guide.synced`(app)를 남긴다.
+- 충돌 비교 화면: 왼쪽 「로컬 파일」, 오른쪽 「앱에서 편집한 내용」, 한쪽에만 있는 줄에 배경(줄 단위 LCS). 「로컬 파일로」는 draft를 버리고 지금 파일 내용을 반영(local), 「앱 내용으로」는 draft를 파일에 쓴다(app).
+- 버전 기록: 문서당 최근 50개만 남긴다(넘으면 오래된 것부터 삭제). 버전을 열어 원문을 보고 「이 버전으로 되돌리기」하면 그 내용을 앱 저장과 같은 규칙으로 쓴다(버전 app, 충돌 규칙 동일, 저장 안 한 편집은 그 내용으로 바뀐다).
+- 비샌드박스 앱이라 security-scoped bookmark는 쓰지 않는다(샌드박스로 바꾸면 필요).
+- 렌더링: 직접 만든 블록 파서(`MarkdownParser`) — 제목 `#`~`######`(화면은 3단계까지 구분), 문단(이어진 줄은 공백으로), 목록(`-`·`*`·`+`·`1.`·`1)`, 들여쓰기 단계, 체크박스), 울타리 코드 블록, 파이프 표(정렬 줄 필수), 인용, 구분선. 인라인(굵게·기울임·코드·링크)은 `AttributedString(markdown:, .inlineOnlyPreservingWhitespace)`. 목차는 제목 1~3단계.
 
 ## 9. 사용량 게이지
 
