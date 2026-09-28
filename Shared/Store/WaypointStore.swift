@@ -52,7 +52,11 @@ public enum WaypointStore {
     /// - Parameters:
     ///   - inMemory: true면 파일을 쓰지 않는다(url 무시).
     ///   - url: 저장 파일. nil이면 `defaultStoreURL()`.
-    public static func makeContainer(inMemory: Bool = false, url: URL? = nil) throws -> ModelContainer {
+    ///   - cloudKitContainer: 이 CloudKit 컨테이너의 개인 DB로 미러링한다. nil이면 로컬만(테스트·샘플 기본값).
+    ///     메모리 저장소에서는 무시한다.
+    public static func makeContainer(
+        inMemory: Bool = false, url: URL? = nil, cloudKitContainer: String? = nil
+    ) throws -> ModelContainer {
         let config: ModelConfiguration
         if inMemory {
             config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
@@ -61,10 +65,15 @@ public enum WaypointStore {
             try FileManager.default.createDirectory(
                 at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
-            config = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
+            config = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: cloudKitDatabase(cloudKitContainer))
         }
         creationLock.lock()
         defer { creationLock.unlock() }
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    static func cloudKitDatabase(_ container: String?) -> ModelConfiguration.CloudKitDatabase {
+        guard let container, !container.isEmpty else { return .none }
+        return .private(container)
     }
 }

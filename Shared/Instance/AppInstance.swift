@@ -12,6 +12,8 @@ public enum AppInstance: Sendable, Equatable {
     public static let portEnvironmentKey = "WAYPOINT_PORT"
     /// 저장 폴더를 바꾸는 환경 변수. 훅·상태줄 스크립트와 같은 이름.
     public static let supportDirectoryEnvironmentKey = "WAYPOINT_SUPPORT_DIR"
+    /// `0`이면 CloudKit 동기화를 끈다(테스트·확인용).
+    public static let cloudKitEnvironmentKey = "WAYPOINT_CLOUDKIT"
 
     /// 번들 ID가 없으면(명령행 도구·테스트) 평소용.
     public init(bundleIdentifier: String?) {
@@ -55,5 +57,25 @@ public enum AppInstance: Sendable, Equatable {
             return URL(fileURLWithPath: (custom as NSString).expandingTildeInPath, isDirectory: true)
         }
         return base.appendingPathComponent(supportFolderName, isDirectory: true)
+    }
+
+    /// CloudKit 컨테이너. 엔타이틀먼트(`Config/*.entitlements`, build setting `WAYPOINT_CONTAINER`)와 같은 값이어야 한다.
+    public var cloudKitContainerIdentifier: String {
+        switch self {
+        case .stable: "iCloud.dev.antaeho.waypoint"
+        case .dev: "iCloud.dev.antaeho.waypoint.dev"
+        }
+    }
+
+    /// 저장소를 미러링할 CloudKit 컨테이너. nil이면 동기화하지 않는다.
+    /// - `WAYPOINT_CLOUDKIT=0`이면 끈다.
+    /// - `WAYPOINT_SUPPORT_DIR`로 저장 폴더를 옮겼으면 끈다. 확인용 임시 저장소가 실제 컨테이너의 기록을 받아 오거나
+    ///   임시 기록을 올려 섞지 않게.
+    public func cloudKitContainer(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String? {
+        if environment[Self.cloudKitEnvironmentKey]?.trimmingCharacters(in: .whitespaces) == "0" { return nil }
+        if let custom = environment[Self.supportDirectoryEnvironmentKey], !custom.isEmpty { return nil }
+        return cloudKitContainerIdentifier
     }
 }

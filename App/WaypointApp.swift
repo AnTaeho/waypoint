@@ -65,7 +65,10 @@ struct WaypointApp: App {
                 try SampleData.seedIfEmpty(container.mainContext)
                 return container
             }
-            return try WaypointStore.makeContainer(url: WaypointStore.defaultStoreURL())
+            return try WaypointStore.makeContainer(
+                url: WaypointStore.defaultStoreURL(),
+                cloudKitContainer: AppInstance.current.cloudKitContainer()
+            )
         } catch {
             fatalError("Waypoint 저장소를 열 수 없음: \(error)")
         }
