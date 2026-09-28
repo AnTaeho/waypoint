@@ -1,48 +1,83 @@
 ---
 name: tracker
-description: Waypoint 프로젝트 트래커에 작업을 기록한다. 세션 시작 컨텍스트에 "Waypoint:" 블록이 있는 프로젝트에서 작업을 시작·전환·마무리할 때, 사용자가 나중에 할 일이나 아이디어를 말할 때, 또는 사용자가 /tracker init 으로 프로젝트 등록을 요청할 때 사용한다.
+description: Waypoint 카드 보드에 작업을 기록한다. 세션 시작 컨텍스트에 "Waypoint:"로 시작하는 블록이 있는 폴더에서 작업을 시작·전환·마무리할 때, 사용자가 "나중에", "언젠가", "이것도 있으면 좋겠다"처럼 지금 하지 않을 일을 말할 때, 서브에이전트에 일을 맡길 때, 세션을 마칠 때 사용한다. 사용자가 /tracker init을 청할 때도.
 ---
 
 # tracker
 
-Waypoint는 사용자의 개인 프로젝트 보드다. 너는 카드를 최신 상태로 유지하는 역할이다. 기록은 짧고 사실만. 사용자에게 기록 행위를 길게 설명하지 않는다 (한 줄 이하).
+Waypoint는 사용자의 개인 프로젝트 보드다. 너는 카드를 최신 상태로 유지한다. 기록은 짧고 사실만. 기록했다는 알림은 한 줄 이하.
 
-세션 시작 시 훅이 주입한 `Waypoint:` 블록에 프로젝트 키, `sessionId`, 다음 할 일, 다른 세션의 작업중 카드, 직전 메모가 있다. 이 블록이 없으면 등록되지 않은 폴더다. `/tracker init` 외에는 아무것도 기록하지 않는다.
+## 주입 블록
+
+세션을 시작할 때 훅이 이런 블록을 넣는다.
+
+```
+Waypoint: PRB (waypoint-probe)
+sessionId: 5e1f0c2a-…
+다음 할 일:
+- PRB-1 실측용 카드
+다른 세션에서 작업중:
+- PRB-4 파서 (sess·a1b2)
+직전 세션 메모 (PRB-1 실측용 카드):
+  파서까지 함. 남은 것: 테스트
+작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 tracker 스킬을 따른다.
+```
+
+- 프로젝트 키(`PRB`)는 도구의 `project`에, `sessionId`는 `card_start`·`card_create`의 `sessionId`에 그대로 넣는다.
+- 블록이 없거나 `Waypoint: 이 폴더는 Waypoint에 없음`이면 등록되지 않은 폴더다. 아무것도 기록하지 않는다.
+- 직전 세션 메모가 있으면 그 카드부터 이어갈지 사용자 요청과 맞춰 본다.
+
+## 도구
+
+MCP 서버 `waypoint`. Claude Code에서의 이름은 `mcp__waypoint__<도구>`.
+
+| 도구 | 쓰는 때 |
+|---|---|
+| `card_list(project, status?, query?)` | 요청에 맞는 카드 찾기. status를 안 주면 done·archived는 빠진다 |
+| `card_get(id)` | 카드 본문·완료 조건·최근 기록 |
+| `card_create(project, title, kind?, status?, body?, parentId?, criteria?, sessionId?)` | 새 카드. 기본 kind task, status next(kind idea면 idea) |
+| `card_start(id, sessionId)` | 이 세션을 카드에 붙여 작업중으로 |
+| `card_update(id, title?, body?, status?, criteria?)` | 수정. criteria는 전체를 새로 보낸다(`[{text, done}]`) |
+| `card_note(id, text)` | 결정·막힌 점 한 줄 |
+| `card_handoff(id, nextSessionNote)` | 다음 세션 메모 |
+| `project_resolve(cwd)` | 폴더 → 프로젝트(주입 블록이 없을 때 확인용) |
+
+카드 ID는 `PRB-1` 꼴이다.
 
 ## 작업을 시작할 때
 
-1. 사용자의 요청이 기존 카드에 해당하는지 `card_list`로 확인한다 (다음 할 일 → 아이디어 순).
-2. 맞는 카드가 있으면 `card_start(id, sessionId)`. 없고 작업이 몇 분 이상 걸릴 규모면 `card_create(status: next)` 후 `card_start`.
-3. 한 줄로 알린다: `LDG-17 작업중으로 표시했어요.`
-4. 다른 세션이 같은 카드를 작업중이면 시작 전에 사용자에게 알린다.
+1. 요청이 기존 카드에 해당하는지 본다. 주입 블록의 다음 할 일에 있으면 그 ID, 없으면 `card_list`(필요하면 `query`).
+2. 맞는 카드가 있으면 `card_start(id, sessionId)`. 없고 몇 분 이상 걸릴 일이면 `card_create`(status next) 뒤 `card_start`.
+3. `card_start` 결과의 `otherSessions`가 비어 있지 않으면 다른 세션이 같은 카드를 작업중이다. 시작 전에 사용자에게 한 줄로 알린다.
+4. 한 줄로 알린다: `PRB-1 작업중으로 표시했어요.`
 
 사소한 질문, 설명 요청, 한두 줄 수정에는 카드를 만들지 않는다.
 
 ## 작업 중에
 
-- 작업 주제가 바뀌면 새 카드로 전환한다 (이전 카드는 연결이 풀리며 원래 상태로 돌아감).
-- 사용자가 "나중에", "언젠가", "다음엔", "이것도 있으면 좋겠다"처럼 **지금 하지 않을 것**을 말하면 `card_create(kind: idea, status: idea)`로 남기고 한 줄로 알린다. 당장 할 게 확실한 후속 작업은 `status: next`.
-- 의미 있는 결정이나 막힌 지점은 `card_note`로 짧게.
-- 완료 조건을 달성하면 `card_update`로 체크한다.
+- 주제가 바뀌면 새 카드로 `card_start`한다. 이 세션에 붙어 있던 이전 카드는 서버가 연결을 풀고 원래 상태(next·idea 등)로 돌린다. 이전 카드를 done으로 만들지 않는다.
+- 사용자가 "나중에", "언젠가", "다음엔", "이것도 있으면 좋겠다"처럼 **지금 하지 않을 일**을 말하면 `card_create(kind: idea, status: idea, sessionId)`로 남기고 한 줄로 알린다: `PRB-5 아이디어로 남겼어요.` 지금 하던 작업은 계속한다. 당장 할 게 확실한 후속 작업은 `status: next`.
+- 의미 있는 결정이나 막힌 점은 `card_note`로 짧게.
+- 완료 조건을 달성하면 `card_update`로 criteria 전체를 체크 상태로 다시 보낸다.
+- `status: active`는 `card_update`로 줄 수 없다. 작업중은 `card_start`로만.
 
 ## 서브에이전트를 쓸 때
 
-1. 서브에이전트가 맡을 일을 하위 카드로 만든다: `card_create(parentId: 현재 카드)`.
-2. 서브에이전트 프롬프트 첫 줄에 카드 ID를 대괄호로 넣는다: `[LDG-16] 파서 단위 테스트 작성`. 훅이 이걸 보고 하위 세션을 카드에 연결한다.
+1. 맡길 일을 하위 카드로 만든다: `card_create(project, title, parentId: 지금 카드, sessionId)`.
+2. 서브에이전트 프롬프트 **첫 줄**을 대괄호 카드 ID로 시작한다: `[PRB-6] 파서 단위 테스트 작성`. 훅이 이 줄을 보고 서브에이전트를 그 카드에 붙여 작업중으로 표시한다. 서브에이전트에게 `card_start`를 시키지 않는다.
 
 ## 마무리할 때
 
-- 작업이 끝났다고 판단되면 사용자에게 완료 처리할지 묻고, 동의하면 `card_update(status: done)`.
-- 세션을 끝내거나 사용자가 자리를 뜨는 흐름이면 `card_handoff`로 다음 세션 메모를 남긴다: 어디까지 했는지, 남은 것, 다음에 먼저 볼 파일. 3줄 이내.
+- 작업이 끝났다고 판단되면 사용자에게 완료 처리할지 묻고, 동의하면 `card_update(status: done)`. 묻지 않고 done으로 만들지 않는다.
+- 세션을 끝내거나 사용자가 자리를 뜨는 흐름이면(또는 사용자가 마무리하자고 하면) 작업한 카드마다 `card_handoff`로 다음 세션 메모를 남긴다: 어디까지 했는지, 남은 것, 다음에 먼저 볼 파일. 3줄 이내.
+- 세션이 끝나면 카드 연결은 서버가 푼다. 따로 할 일은 없다.
 
 ## /tracker init
 
-1. README, CLAUDE.md, docs/, 최근 커밋 20개, TODO/FIXME를 훑는다. 이전 대화 기록은 가져오지 않는다.
-2. `project_init`에 이름, 키(2–5 대문자), 한두 문장 개요, 스택, 지침 파일 후보, 초기 카드 후보(최대 8개, 각각 next 또는 idea)를 넘긴다.
-3. "Waypoint 앱에서 확인하고 등록해 주세요."라고 안내하고 멈춘다.
+아직 앱에서 지원하지 않는다(M5). 사용자가 청하면 "Waypoint 앱에서 프로젝트 등록은 아직 지원하지 않아요."라고 한 줄로 알리고 멈춘다.
 
 ## 하지 말 것
 
 - 사용자가 요청하지 않은 지침 문서(CLAUDE.md 등) 수정.
 - 카드 본문에 코드나 긴 로그 붙이기.
-- 기록 때문에 사용자 작업 흐름을 끊는 질문 (완료 확인과 카드 충돌 알림만 예외).
+- 기록 때문에 사용자 작업 흐름을 끊는 질문(완료 확인과 카드 충돌 알림만 예외).
