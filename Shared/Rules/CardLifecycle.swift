@@ -67,9 +67,10 @@ public enum CardLifecycle {
         session.cachedState = .ended
     }
 
-    /// 사용자가 앱에서 카드를 옮긴다. active로는 못 옮긴다.
-    /// done 진입 시 doneAt 설정, done에서 나오면 doneAt nil. active에서 나오면 statusBeforeActive를 지운다.
-    /// 열린 세션 연결은 건드리지 않는다. 같은 상태로 옮기면 아무 일도 없다.
+    /// 카드 상태를 active가 아닌 것으로 바꾼다: 앱 드래그·「완료로 옮기기」·iPhone 분류·MCP `card_update`가 모두 여기로 온다.
+    /// active로는 못 옮긴다. done 진입 시 doneAt 설정, done에서 나오면 doneAt nil. active에서 나오면 statusBeforeActive를 지운다.
+    /// 카드의 열린 세션 연결(서브에이전트 포함)은 모두 닫는다(`closeOpenLinks`, 상태 복귀 없음).
+    /// 불변식: 열린 연결이 있으면 카드는 active다. 같은 상태로 옮기면 아무 일도 없다.
     public static func move(_ card: Card, to target: CardStatus, at date: Date, in context: ModelContext) throws {
         if target == .active { throw CardLifecycleError.cannotMoveToActive }
         let from = card.status
@@ -81,5 +82,52 @@ public enum CardLifecycle {
         card.updatedAt = date
         Event.record(.cardStatus, in: context, card: card, at: date,
                      payload: ["from": .string(from.rawValue), "to": .string(target.rawValue)])
+        closeOpenLinks(of: card, at: date, reason: reasonMoved, in: context)
+    }
+
+    /// `card.detached` payload의 `reason`: 카드를 active 밖으로 옮겨 연결을 닫았다.
+    public static let reasonMoved = "card-moved"
+    /// `card.detached` payload의 `reason`: 점검에서 active가 아닌 카드의 열린 연결을 찾아 닫았다.
+    public static let reasonStatusNotActive = "status-not-active"
+
+    /// 카드의 열린 연결을 모두 닫고 세션마다 `card.detached`(`sessionId`, `reason`)를 남긴다.
+    /// `detach`와 달리 카드 상태·`statusBeforeActive`·`updatedAt`은 건드리지 않는다(새 상태는 이미 정해졌다).
+    /// 닫은 연결 수.
+    @discardableResult
+    static func closeOpenLinks(of card: Card, at date: Date, reason: String, in context: ModelContext) -> Int {
+        let links = card.openCardSessions
+        guard !links.isEmpty else { return 0 }
+        var seen = Set<ObjectIdentifier>()
+        for link in links {
+            link.detachedAt = date
+            guard let session = link.session, seen.insert(ObjectIdentifier(session)).inserted else { continue }
+            Event.record(.cardDetached, in: context, card: card, session: session, at: date,
+                         payload: ["sessionId": .string(session.id), "reason": .string(reason)])
+        }
+        return links.count
+    }
+
+    /// 닫아야 할 어긋난 연결인지. 순수 판정: 열린 연결인데 카드가 active가 아니다.
+    /// (앞의 불변식이 생기기 전 데이터, 또는 iPhone에서 옮긴 카드를 CloudKit으로 받은 경우)
+    public static func isStrayLink(cardStatus: CardStatus, detachedAt: Date?) -> Bool {
+        detachedAt == nil && cardStatus != .active
+    }
+
+    /// 카드가 active가 아닌데 열린 연결을 모두 닫는다(`reason: status-not-active`). 앱 점검(시작 직후·60초마다·CloudKit 가져오기 뒤)에서 부른다.
+    /// 카드 상태·`updatedAt`은 그대로 둔다. 닫은 연결 수. 저장은 호출 쪽에서 한다.
+    @discardableResult
+    public static func closeStrayLinks(at date: Date, in context: ModelContext) -> Int {
+        let open = FetchDescriptor<CardSession>(predicate: #Predicate<CardSession> { $0.detachedAt == nil })
+        let links = (try? context.fetch(open)) ?? []
+        var cards: [Card] = []
+        var seen = Set<ObjectIdentifier>()
+        for link in links {
+            guard let card = link.card,
+                  isStrayLink(cardStatus: card.status, detachedAt: link.detachedAt),
+                  seen.insert(ObjectIdentifier(card)).inserted
+            else { continue }
+            cards.append(card)
+        }
+        return cards.reduce(0) { $0 + closeOpenLinks(of: $1, at: date, reason: reasonStatusNotActive, in: context) }
     }
 }

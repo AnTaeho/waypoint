@@ -99,9 +99,11 @@ final class AppServices {
         }
     }
 
+    /// 옮겨 온 카드가 active를 떠났으면 Mac 쪽 열린 연결도 바로 닫는다(연결은 `RemoteCardMerge`가 옮기지 않는다).
     private func refreshAfterImport() {
         let context = container.mainContext
         guard let merged = try? RemoteCardMerge.apply(from: ModelContext(container), to: context), merged > 0 else { return }
+        CardLifecycle.closeStrayLinks(at: Date(), in: context)
         try? context.save()
     }
 
@@ -125,14 +127,16 @@ final class AppServices {
         Outbox.drain(directory: directory) { processor.handle($0) }
     }
 
-    /// `SessionEnd`가 오지 않은 세션을 끝내고(`SessionSweep`), 남은 세션의 상태 캐시를 맞춘다.
+    /// `SessionEnd`가 오지 않은 세션을 끝내고(`SessionSweep`), active가 아닌 카드의 열린 연결을 닫고
+    /// (`CardLifecycle.closeStrayLinks`), 남은 세션의 상태 캐시를 맞춘다.
     private func refreshStates() {
         let now = Date()
         processor?.sweep(now: now, probe: SessionSweep.systemProbe)
         let context = container.mainContext
+        let closed = CardLifecycle.closeStrayLinks(at: now, in: context)
         let open = FetchDescriptor<Session>(predicate: #Predicate<Session> { $0.endedAt == nil })
         let sessions = (try? context.fetch(open)) ?? []
-        if SessionStateCache.refresh(sessions, now: now) > 0 {
+        if SessionStateCache.refresh(sessions, now: now) > 0 || closed > 0 {
             try? context.save()
         }
     }

@@ -77,11 +77,12 @@ import Testing
         let s = makeSession(ctx, p, id: "s1")
         CardLifecycle.attach(card, s, at: t0, in: ctx)
         try CardLifecycle.move(card, to: .done, at: t0 + 5, in: ctx)
-        #expect(card.openCardSessions.count == 1) // move는 연결을 건드리지 않는다
+        #expect(card.openCardSessions.isEmpty) // active를 떠나면 연결이 닫힌다
         #expect(card.statusBeforeActive == nil)
-        CardLifecycle.detach(card, s, at: t0 + 10, in: ctx)
+        CardLifecycle.detach(card, s, at: t0 + 10, in: ctx) // 이미 닫혀 아무 일 없음
         #expect(card.status == .done)
         #expect(card.doneAt == t0 + 5)
+        #expect(events(card, .cardDetached).count == 1)
     }
 
     @Test func ideaDetachReturnsToIdeaNotDone() throws {
