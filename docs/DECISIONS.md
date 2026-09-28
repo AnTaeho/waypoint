@@ -149,6 +149,8 @@
 | 09-28 | 세션의 프로젝트는 옮기지 않는다. 「다른 프로젝트로 옮긴 세션」은 `contextProjectKey != project.key` 비교로만 다룬다 | 세션을 옮기면 열린 카드 연결·서브에이전트·이벤트 소유가 함께 걸리고, 잠깐 `cd`한 것만으로 프로젝트가 뒤집힌다. 레코드는 두고 cwd 기준 다른 프로젝트 블록만 주면 `card_start`가 「세션과 카드의 프로젝트가 다름」으로 막힌다 | UserPromptSubmit의 cwd로 세션을 다른 프로젝트로 옮기기 | — |
 | 09-28 | outbox로 흡수한 훅(`SessionStart` 포함)은 주입 텍스트를 만들지 않고 `contextProjectKey`도 적지 않는다(`delivers: false`) | 이미 지난 훅이라 대화에 들어가지 않았다. 적어 두면 앱이 꺼진 채 시작한 세션이 블록을 영영 못 받는다 | 흡수 때도 키 적기 | `HookProcessor.handle(_ entry:)`의 `delivers: false` |
 | 09-28 | 보드 작업중 칸에 카드 없는 세션 타일(카드 아래), 칸 머리 개수는 카드 + 타일 | 대시보드 작업중 줄·사이드바·프로젝트 표 작업중 수가 이미 카드 없는 메인 세션을 센다. 보드만 빼면 같은 프로젝트의 숫자가 화면마다 다르다 | 카드 수만 | `BoardColumnView` 머리 `items.count` |
+| 09-28 | 카드 없는 세션 줄·타일의 제목 자리에 그 세션의 마지막 사용자 요청 문장(`Session.lastPrompt`, `UserPromptSubmit`의 `prompt`, 300자까지). **프라이버시**: 사용자가 Claude Code에 보낸 문장이 평소용 저장소와 개인 CloudKit(개인 iCloud 컨테이너)에 저장된다. 세션당 마지막 1개만, 300자까지, 세션을 지우면 함께 지워진다 | 타일이 「카드 없음 · sess·8f33 · layout.md」만 보여 무슨 작업인지 알 수 없었다. 앱은 LLM을 쓰지 않으므로 요약은 할 수 없고, 사용자 자신의 문장이 가장 알아보기 쉽다 | 첫 요청 문장(오래 이어진 세션은 지금 일과 멀다), 전사 파일 읽기(앱이 훅 밖의 파일을 읽게 된다) | `HookProcessor.userPromptSubmit`의 저장 줄 삭제, 화면은 `SessionFormat.noCardTitle` |
+| 09-28 | `lastPrompt`에서 빼는 것: 서브에이전트 훅, 빈 문장, `<`로 시작하는 자동 메시지(`<agent-message>`, `<task-notification>` 등). 붙여 넣은 글 `<pasted_content …>`는 사용자 입력이라 태그만 벗겨 남긴다. outbox로 늦게 온 옛 프롬프트는 `at >= lastSeenAt`일 때만(비어 있으면 늘) 바꾼다 | 서브에이전트 완료 알림도 `UserPromptSubmit`으로 와서(실측) 그대로 두면 사용자 문장을 덮는다. 전사에서 사용자가 붙여 넣은 글이 `<pasted_content`로 시작하는 것을 봤다 | 알려진 태그 목록만 빼기 | `HookParsing.userPrompt` |
 | 09-28 | 평소용 반영 순서: 훅 스크립트 교체 → 앱 설치 | 새 앱 + 옛 스크립트면 앱이 UserPromptSubmit에 블록(200)을 주고 키를 적는데 옛 스크립트는 찍지 않아 한 번뿐인 주입이 사라진다. 새 스크립트 + 옛 앱은 204라 무해하다 | 앱 먼저 | — |
 
 ### 관찰 (2026-09-28, Dev)

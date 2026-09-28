@@ -2,7 +2,7 @@ import SwiftUI
 import WaypointKit
 
 /// 작업중 카드 한 장. live는 클레이 테두리·펄스 점·경과, stalled는 속 빈 점·「멈춤 N분」.
-/// 카드 없는 세션은 제목 자리에 「카드 없음」을 흐리게 두고 누를 수 없다.
+/// 카드 없는 세션은 제목 자리에 그 세션의 마지막 요청 문장(없으면 「카드 없음」)을 흐리게 두고 누를 수 없다.
 struct PhoneWorkCard: View {
     let item: PhoneWorkItem
     let now: Date
@@ -30,11 +30,12 @@ struct PhoneWorkCard: View {
                 Spacer(minLength: Theme.Spacing.s)
                 elapsed
             }
-            Text(row.card?.title ?? "카드 없음")
+            Text(row.card?.title ?? SessionFormat.noCardTitle(prompt: row.session.lastPrompt).text)
                 .font(row.card == nil ? Theme.Phone.body : Theme.Phone.cardTitle)
                 .foregroundStyle(row.card == nil ? Theme.textMuted : Theme.text)
                 .lineSpacing(Theme.Phone.titleLineSpacing)
                 .multilineTextAlignment(.leading)
+                .lineLimit(row.card == nil ? 2 : nil)
             Text(sessionLine)
                 .font(Theme.Phone.meta)
                 .foregroundStyle(Theme.textSecondary)

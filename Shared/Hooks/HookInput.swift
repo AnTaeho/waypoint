@@ -13,6 +13,7 @@ public struct HookInput {
     public let source: String?
     /// SessionEnd: 끝난 이유
     public let reason: String?
+    /// UserPromptSubmit: 사용자 문장. 실측·문서는 `prompt`, 옛 문서 예시의 `prompt_text`도 받는다.
     public let prompt: String?
     public let toolName: String?
     public let toolInput: [String: Any]
@@ -43,7 +44,7 @@ public struct HookInput {
         self.agentType = object["agent_type"] as? String
         self.source = string("source")
         self.reason = string("reason")
-        self.prompt = object["prompt"] as? String
+        self.prompt = string("prompt") ?? string("prompt_text")
         self.toolName = string("tool_name")
         self.toolInput = object["tool_input"] as? [String: Any] ?? [:]
         self.toolResponse = object["tool_response"] as? [String: Any] ?? [:]
@@ -64,6 +65,24 @@ public enum HookParsing {
         }
         guard let value, value > 1, value <= Int(Int32.max) else { return nil }
         return value
+    }
+
+    /// `Session.lastPrompt`에 넣는 최대 길이(문자 단위).
+    public static let lastPromptLimit = 300
+
+    /// UserPromptSubmit에서 `Session.lastPrompt`로 남길 사용자 문장. 앞뒤 공백을 정리하고 300자까지.
+    /// nil: 서브에이전트 훅(`agent_id` 있음), 문장이 없거나 빈 경우, `<`로 시작하는 자동 메시지
+    /// (서브에이전트 완료 알림 `<agent-message from=…>`, `<task-notification>` 등 — 2.1.283 실측).
+    /// 사용자가 붙여 넣은 글(`<pasted_content id=…>…</pasted_content>`)은 태그만 벗겨 남긴다. 슬래시 명령은 그대로.
+    public static func userPrompt(_ input: HookInput) -> String? {
+        guard input.agentID == nil, let raw = input.prompt else { return nil }
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.hasPrefix("<pasted_content") {
+            text = text.replacing(/<\/?pasted_content[^>]*>/, with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !text.isEmpty, !text.hasPrefix("<") else { return nil }
+        return String(text.prefix(lastPromptLimit))
     }
 
     /// 서브에이전트를 띄우는 도구 이름(현재 `Agent`, 옛 이름 `Task`).

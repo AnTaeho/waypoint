@@ -14,6 +14,27 @@ public enum SessionFormat {
         label(kind: session.kind, id: session.id, agentName: session.agentName)
     }
 
+    /// 카드 없는 세션의 제목 자리에 요청 문장이 없을 때 쓰는 글.
+    public static let noCardTitle = "카드 없음"
+    /// 제목 자리에 넘기는 요청 문장 앞부분의 최대 길이(문자 단위). 화면은 줄 수로 다시 자른다.
+    public static let promptPreviewLimit = 160
+
+    /// 카드 없는 세션 제목 자리의 요청 문장: 줄바꿈·연속 공백을 공백 하나로 모아 한 줄로 만들고
+    /// 앞 160자(넘으면 끝에 「…」). 비었거나 공백뿐이면 nil(화면은 `noCardTitle`).
+    public static func promptPreview(_ prompt: String?) -> String? {
+        guard let prompt else { return nil }
+        let line = prompt.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        guard !line.isEmpty else { return nil }
+        guard line.count > promptPreviewLimit else { return line }
+        return String(line.prefix(promptPreviewLimit)) + "…"
+    }
+
+    /// 카드 없는 세션의 제목 자리 글과 그것이 요청 문장인지(false면 `noCardTitle` — 흐리게 보인다).
+    public static func noCardTitle(prompt: String?) -> (text: String, isPrompt: Bool) {
+        guard let preview = promptPreview(prompt) else { return (noCardTitle, false) }
+        return (preview, true)
+    }
+
     /// 이 카드·세션의 가장 최근 `file.changed` 경로의 파일 이름. 없으면 nil.
     public static func recentFileName(card: Card, session: Session) -> String? {
         let latest = (card.events ?? [])

@@ -1,8 +1,9 @@
 import SwiftUI
 import WaypointKit
 
-/// 작업중 칸의 카드 없는 세션 타일. 대시보드의 카드 없는 줄과 같은 정보(「카드 없음」·세션·최근 파일·경과)를
-/// 흰 바탕 `border` 1pt로 카드보다 한 단 낮게 보인다. 끌거나 누를 수 없다.
+/// 작업중 칸의 카드 없는 세션 타일. 제목 자리에 그 세션의 마지막 요청 문장(없으면 「카드 없음」),
+/// 그 아래 점·세션·경과, 최근 파일·서브에이전트 수. 흰 바탕 `border` 1pt로 카드보다 한 단 낮게 보인다.
+/// 끌거나 누를 수 없다.
 struct BoardSessionTileView: View {
     let tile: BoardSessionTile
     let now: Date
@@ -11,17 +12,24 @@ struct BoardSessionTileView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-            HStack(spacing: Theme.Spacing.s) {
-                WorkStateDot(state: tile.workState)
-                Text("카드 없음")
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.textMuted)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                elapsed
-                    .lineLimit(1)
+            title
+            // 좁은 칸에서 경과가 잘리지 않게, 한 줄에 안 들어가면 세션을 아래 줄로 내린다.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Theme.Spacing.s) {
+                    WorkStateDot(state: tile.workState)
+                    sessionLabel
+                    Spacer(minLength: Theme.Spacing.s)
+                    elapsed
+                }
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    HStack(spacing: Theme.Spacing.s) {
+                        WorkStateDot(state: tile.workState)
+                        elapsed
+                    }
+                    sessionLabel
+                }
             }
-            sessionBox
+            if hasDetail { detailBox }
         }
         .padding(Theme.Spacing.rowH)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -32,37 +40,54 @@ struct BoardSessionTileView: View {
         }
     }
 
-    private var sessionBox: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            HStack(spacing: Theme.Spacing.xs + 2) {
-                Image(systemName: "terminal")
-                    .font(Theme.caption)
-                    .foregroundStyle(Theme.text)
-                Text(SessionFormat.label(for: tile.session))
-                    .font(Theme.monoCaption)
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if tile.runningSubagents > 0 {
-                    HStack(spacing: Theme.Spacing.xs) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(Theme.caption)
-                        Text("\(tile.runningSubagents)")
-                            .font(Theme.captionLarge)
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(Theme.textMuted)
-                    .fixedSize()
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("서브에이전트 \(tile.runningSubagents)")
-                }
-            }
-            if let file = SessionFormat.recentFileName(session: tile.session) {
+    @ViewBuilder private var title: some View {
+        let title = SessionFormat.noCardTitle(prompt: tile.session.lastPrompt)
+        let text = Text(title.text)
+            .font(Theme.sessionTileTitle)
+            .foregroundStyle(title.isPrompt ? Theme.text : Theme.textMuted)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+        if title.isPrompt, let full = tile.session.lastPrompt {
+            text.help(full)
+        } else {
+            text
+        }
+    }
+
+    private var sessionLabel: some View {
+        Text(SessionFormat.label(for: tile.session))
+            .font(Theme.monoCaption)
+            .foregroundStyle(Theme.textSecondary)
+            .lineLimit(1)
+            .fixedSize()
+    }
+
+    private var recentFile: String? { SessionFormat.recentFileName(session: tile.session) }
+    private var hasDetail: Bool { recentFile != nil || tile.runningSubagents > 0 }
+
+    private var detailBox: some View {
+        HStack(spacing: Theme.Spacing.xs + 2) {
+            if let file = recentFile {
                 Text(file)
                     .font(Theme.monoCaption)
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+            }
+            Spacer(minLength: 0)
+            if tile.runningSubagents > 0 {
+                HStack(spacing: Theme.Spacing.xs) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(Theme.caption)
+                    Text("\(tile.runningSubagents)")
+                        .font(Theme.captionLarge)
+                        .monospacedDigit()
+                }
+                .foregroundStyle(Theme.textMuted)
+                .fixedSize()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("서브에이전트 \(tile.runningSubagents)")
             }
         }
         .padding(.horizontal, Theme.Spacing.s + 2)
@@ -72,14 +97,18 @@ struct BoardSessionTileView: View {
     }
 
     @ViewBuilder private var elapsed: some View {
-        if isLive {
-            Text(TimeFormat.elapsed(from: tile.session.startedAt, to: now))
-                .font(Theme.captionLargeMedium)
-                .foregroundStyle(Theme.liveText)
-        } else {
-            Text("멈춤 \(TimeFormat.elapsed(from: tile.session.lastSeenAt, to: now))")
-                .font(Theme.captionLarge)
-                .foregroundStyle(Theme.textMuted)
+        Group {
+            if isLive {
+                Text(TimeFormat.elapsed(from: tile.session.startedAt, to: now))
+                    .font(Theme.captionLargeMedium)
+                    .foregroundStyle(Theme.liveText)
+            } else {
+                Text("멈춤 \(TimeFormat.elapsed(from: tile.session.lastSeenAt, to: now))")
+                    .font(Theme.captionLarge)
+                    .foregroundStyle(Theme.textMuted)
+            }
         }
+        .lineLimit(1)
+        .fixedSize()
     }
 }

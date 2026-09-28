@@ -22,6 +22,10 @@ public final class Session {
     /// 이 세션의 대화에 `Waypoint:` 블록을 넣어 준 프로젝트 키(`SessionStart`나 늦은 `UserPromptSubmit` 주입).
     /// nil이거나 지금 프로젝트 키와 다르면 다음 `UserPromptSubmit`에 블록을 한 번 준다(SPEC 5장 「늦은 주입」). 메인 세션만.
     public var contextProjectKey: String?
+    /// 메인 세션의 마지막 사용자 요청 문장(`UserPromptSubmit`의 `prompt`, 앞뒤 공백 정리 후 300자까지).
+    /// 자동으로 들어온 메시지(`<agent-message …>` 등)와 서브에이전트 훅은 넣지 않는다(`HookParsing.userPrompt`).
+    /// 카드 없는 세션 줄·타일의 제목 자리에 쓴다.
+    public var lastPrompt: String?
     /// 저장 캐시. 판정은 항상 `SessionRules.state(of:now:)`로 다시 계산한다.
     public var stateRaw: String = SessionState.live.rawValue
 
