@@ -75,9 +75,9 @@ ditto "$BUILT" "$tmp" || fail "복사 실패: $BUILT → $tmp"
 rm -rf "$DEST" || fail "옛 앱을 지울 수 없음: $DEST"
 mv "$tmp" "$DEST" || fail "옮기기 실패: $tmp → $DEST"
 
-# 4. 실행(경로로 연다. 같은 번들 ID의 다른 빌드가 디스크에 남아 있을 수 있다)
+# 4. 실행(경로로 연다. 같은 번들 ID의 다른 빌드가 디스크에 남아 있을 수 있다). -g: 쓰던 앱의 초점을 뺏지 않게 뒤에서
 step "실행"
-open "$DEST" || fail "실행 실패: $DEST"
+open -g "$DEST" || fail "실행 실패: $DEST"
 pid=""
 for _ in $(seq 1 "$WAIT"); do
   pid="$(listen_pid)"
