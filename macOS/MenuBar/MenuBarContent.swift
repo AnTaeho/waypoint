@@ -31,9 +31,9 @@ struct MenuBarContent: View {
             Divider()
             Text(UsageFormat.menuLine(snapshot, now: now))
         }
-        if case .some(.failed) = services?.serverState {
+        if let services, case .failed = services.serverState {
             Divider()
-            Text("새 기록을 받지 못하는 중 (포트 \(String(LocalServer.defaultPort)) 사용 중)")
+            Text("새 기록을 받지 못하는 중 (포트 \(String(services.port)) 사용 중)")
         }
         Divider()
         Button("Waypoint 열기") {
