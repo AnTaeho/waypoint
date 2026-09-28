@@ -74,15 +74,13 @@ struct ActiveWorkRowView: View {
         return SessionFormat.recentFileName(card: card, session: row.session)
     }
 
-    @ViewBuilder private var elapsed: some View {
-        if isLive {
-            Text(TimeFormat.elapsed(from: row.session.startedAt, to: now))
-                .font(Theme.captionLargeMedium)
-                .foregroundStyle(Theme.liveText)
-        } else {
-            Text("멈춤 \(TimeFormat.elapsed(from: row.session.lastSeenAt, to: now))")
-                .font(Theme.captionLarge)
-                .foregroundStyle(Theme.textMuted)
-        }
+    /// 카드 줄은 연결 시각부터, 카드 없는 줄은 마지막 요청 시각부터(없으면 빈 글 — 열 폭은 그대로 둔다).
+    private var elapsed: some View {
+        Text(SessionFormat.rowElapsed(
+            state: row.workState, lastPromptAt: row.session.lastPromptAt, attachedAt: row.attachedAt,
+            lastSeenAt: row.session.lastSeenAt, now: now
+        ) ?? "")
+        .font(isLive ? Theme.captionLargeMedium : Theme.captionLarge)
+        .foregroundStyle(isLive ? Theme.liveText : Theme.textMuted)
     }
 }

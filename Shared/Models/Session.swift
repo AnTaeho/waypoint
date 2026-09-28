@@ -26,6 +26,9 @@ public final class Session {
     /// 자동으로 들어온 메시지(`<agent-message …>` 등)와 서브에이전트 훅은 넣지 않는다(`HookParsing.userPrompt`).
     /// 카드 없는 세션 줄·타일의 제목 자리에 쓴다.
     public var lastPrompt: String?
+    /// `lastPrompt`를 적은 훅 시각. 카드 없는 세션 줄·타일의 경과를 여기서 잰다(`SessionFormat.rowElapsed`).
+    /// `lastPrompt`와 늘 함께 바뀐다. 이 값이 생기기 전에 받은 요청은 nil로 남는다.
+    public var lastPromptAt: Date?
     /// 저장 캐시. 판정은 항상 `SessionRules.state(of:now:)`로 다시 계산한다.
     public var stateRaw: String = SessionState.live.rawValue
 

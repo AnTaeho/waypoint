@@ -82,6 +82,37 @@ import Testing
         #expect(try h.session()?.lastSeenAt == t0 + 120)
     }
 
+    /// 요청 시각(`lastPromptAt`)은 문장과 함께 적고, 문장을 두는 경우엔 시각도 둔다.
+    @Test func promptTimeMovesWithPrompt() throws {
+        let h = try HookHarness()
+        try send(h, "doc-SessionStart", at: t0)
+        #expect(try h.session()?.lastPromptAt == nil)
+        try send(h, at: t0 + 60)
+        #expect(try h.session()?.lastPromptAt == t0 + 60)
+        // Stop·자동 메시지·빈 문장·서브에이전트 훅은 시각을 옮기지 않는다
+        try send(h, "doc-Stop", at: t0 + 90)
+        try send(h, "real-UserPromptSubmit-agent-message", at: t0 + 120,
+                 override: ["session_id": HookHarness.sessionID, "cwd": "/Users/me/dev/ledger"])
+        try send(h, at: t0 + 150, override: ["prompt": "   "])
+        try send(h, at: t0 + 180, override: ["prompt": "서브에이전트 안", "agent_id": HookHarness.agentID])
+        #expect(try h.session()?.lastPromptAt == t0 + 60)
+        try send(h, at: t0 + 240, override: ["prompt": "다음"])
+        #expect(try h.session()?.lastPromptAt == t0 + 240)
+    }
+
+    /// outbox로 늦게 온 옛 프롬프트는 시각도 덮지 않고, 빈 값은 채운다(문장과 같은 규칙).
+    @Test func promptTimeFollowsOutboxOrderRule() throws {
+        let h = try HookHarness()
+        try send(h, at: t0 + 600, override: ["prompt": "지금 요청"])
+        try send(h, at: t0 + 60, delivers: false, override: ["prompt": "옛 요청"])
+        #expect(try h.session()?.lastPromptAt == t0 + 600)
+
+        let empty = try HookHarness()
+        try send(empty, "doc-Stop", at: t0 + 600)
+        try send(empty, at: t0 + 60, delivers: false, override: ["prompt": "늦게 온 요청"])
+        #expect(try empty.session()?.lastPromptAt == t0 + 60)
+    }
+
     @Test func skippedPromptsKeepPreviousValue() throws {
         let h = try HookHarness()
         try send(h, at: t0)
@@ -148,6 +179,39 @@ import Testing
         let entry = try #require(Outbox.parse(line: Substring(line)))
         h.processor.handle(entry)
         #expect(try h.session()?.lastPrompt == "LDG-14 이어서 하자")
+    }
+}
+
+/// 작업중 줄·타일 경과(`SessionFormat.rowElapsed`).
+@Suite struct RowElapsedTests {
+    let now = t0 + 5 * 3600
+
+    func elapsed(_ state: CardWorkState, prompt: Date? = nil, attached: Date? = nil,
+                 seen: Date? = nil) -> String? {
+        SessionFormat.rowElapsed(state: state, lastPromptAt: prompt, attachedAt: attached,
+                                 lastSeenAt: seen ?? now, now: now)
+    }
+
+    @Test func cardlessLiveCountsFromLastPrompt() {
+        #expect(elapsed(.live, prompt: now - 12 * 60) == "12분")
+        #expect(elapsed(.live, prompt: now - 20) == "방금")
+        // 요청 시각이 없으면 비운다(세션 시작 시각으로 대신하지 않는다)
+        #expect(elapsed(.live) == nil)
+    }
+
+    @Test func cardRowCountsFromAttachedAt() {
+        #expect(elapsed(.live, prompt: now - 12 * 60, attached: now - 38 * 60) == "38분")
+        #expect(elapsed(.live, attached: now - 3900) == "1시간 5분")
+    }
+
+    @Test func stalledCountsFromLastSeen() {
+        #expect(elapsed(.stalled, prompt: now - 3600, seen: now - 22 * 60) == "멈춤 22분")
+        #expect(elapsed(.stalled, seen: now - 22 * 60) == "멈춤 22분")
+        #expect(elapsed(.stalled, attached: now - 3600, seen: now - 22 * 60) == "멈춤 22분")
+    }
+
+    @Test func noneIsEmpty() {
+        #expect(elapsed(.none, prompt: now - 60, attached: now - 60) == nil)
     }
 }
 

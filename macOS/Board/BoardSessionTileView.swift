@@ -96,19 +96,17 @@ struct BoardSessionTileView: View {
         .background { RoundedRectangle(cornerRadius: Theme.Radius.box).fill(Theme.bg) }
     }
 
+    /// 마지막 요청 시각부터(없으면 비움). 멈춤이면 「멈춤 N분」.
     @ViewBuilder private var elapsed: some View {
-        Group {
-            if isLive {
-                Text(TimeFormat.elapsed(from: tile.session.startedAt, to: now))
-                    .font(Theme.captionLargeMedium)
-                    .foregroundStyle(Theme.liveText)
-            } else {
-                Text("멈춤 \(TimeFormat.elapsed(from: tile.session.lastSeenAt, to: now))")
-                    .font(Theme.captionLarge)
-                    .foregroundStyle(Theme.textMuted)
-            }
+        if let text = SessionFormat.rowElapsed(
+            state: tile.workState, lastPromptAt: tile.session.lastPromptAt, attachedAt: nil,
+            lastSeenAt: tile.session.lastSeenAt, now: now
+        ) {
+            Text(text)
+                .font(isLive ? Theme.captionLargeMedium : Theme.captionLarge)
+                .foregroundStyle(isLive ? Theme.liveText : Theme.textMuted)
+                .lineLimit(1)
+                .fixedSize()
         }
-        .lineLimit(1)
-        .fixedSize()
     }
 }

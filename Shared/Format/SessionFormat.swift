@@ -35,6 +35,23 @@ public enum SessionFormat {
         return (preview, true)
     }
 
+    /// 작업중 줄·타일 오른쪽 경과(대시보드·보드 타일·iPhone). live면 카드 줄(`attachedAt` 있음)은 카드에 연결된
+    /// 시각부터, 카드 없는 줄은 마지막 요청 시각(`lastPromptAt`)부터 「38분」(1분 미만 「방금」). 카드 없는 줄에
+    /// 요청 시각이 없으면 nil(비워 둔다). stalled면 어느 줄이든 「멈춤 22분」(`lastSeenAt`부터). none은 nil.
+    public static func rowElapsed(
+        state: CardWorkState, lastPromptAt: Date?, attachedAt: Date?, lastSeenAt: Date, now: Date
+    ) -> String? {
+        switch state {
+        case .live:
+            guard let start = attachedAt ?? lastPromptAt else { return nil }
+            return TimeFormat.elapsed(from: start, to: now)
+        case .stalled:
+            return "멈춤 \(TimeFormat.elapsed(from: lastSeenAt, to: now))"
+        case .none:
+            return nil
+        }
+    }
+
     /// 이 카드·세션의 가장 최근 `file.changed` 경로의 파일 이름. 없으면 nil.
     public static func recentFileName(card: Card, session: Session) -> String? {
         let latest = (card.events ?? [])
