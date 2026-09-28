@@ -15,11 +15,19 @@ public enum HookRouter {
         return name
     }
 
-    /// - Parameter handle: (이벤트 이름, 본문 JSON) → 컨텍스트 이벤트면 주입할 텍스트(없으면 nil)
-    public static func respond(to request: HTTPRequest, handle: (String, Data) -> String?) -> HTTPResponse {
+    /// 훅 스크립트가 Claude Code 프로세스 PID를 싣는 머리(SPEC 6장). 파서가 이름을 소문자로 바꾼다.
+    public static let claudePidHeader = "x-waypoint-claude-pid"
+
+    /// 머리의 Claude Code PID. 없거나 숫자가 아니면 nil.
+    public static func claudePid(from request: HTTPRequest) -> Int? {
+        HookParsing.pid(request.headers[claudePidHeader])
+    }
+
+    /// - Parameter handle: (이벤트 이름, 본문 JSON, Claude Code PID) → 컨텍스트 이벤트면 주입할 텍스트(없으면 nil)
+    public static func respond(to request: HTTPRequest, handle: (String, Data, Int?) -> String?) -> HTTPResponse {
         guard let event = eventName(from: request.path) else { return .notFound }
         guard request.method == "POST" else { return .methodNotAllowed }
-        let context = handle(event, request.body)
+        let context = handle(event, request.body, claudePid(from: request))
         if contextEvents.contains(event) {
             return .text(context ?? "")
         }

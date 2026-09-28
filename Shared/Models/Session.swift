@@ -16,6 +16,9 @@ public final class Session {
     public var startedAt: Date = Date()
     public var lastSeenAt: Date = Date()
     public var endedAt: Date?
+    /// 이 세션을 돌리는 Claude Code 프로세스 PID(훅 스크립트가 보낸 값). 메인 세션에만 기록한다.
+    /// `SessionEnd`가 오지 않고 프로세스가 사라진 세션을 끝내는 데 쓴다(`SessionSweep`).
+    public var claudePid: Int?
     /// 저장 캐시. 판정은 항상 `SessionRules.state(of:now:)`로 다시 계산한다.
     public var stateRaw: String = SessionState.live.rawValue
 

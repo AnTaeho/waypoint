@@ -54,7 +54,7 @@ import Testing
 
     @Test func sessionStartReturnsText() {
         var seen: [String] = []
-        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { event, _ in
+        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { event, _, _ in
             seen.append(event); return "컨텍스트"
         }
         #expect(r == .text("컨텍스트"))
@@ -62,20 +62,36 @@ import Testing
     }
 
     @Test func sessionStartWithoutTextIsEmpty200() {
-        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { _, _ in nil }
+        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { _, _, _ in nil }
         #expect(r.status == 200)
         #expect(r.body.isEmpty)
     }
 
     @Test func otherEventsAre204() {
-        let r = HookRouter.respond(to: request("POST", "/hooks/PostToolUse")) { _, _ in "무시됨" }
+        let r = HookRouter.respond(to: request("POST", "/hooks/PostToolUse")) { _, _, _ in "무시됨" }
         #expect(r == .noContent)
+    }
+
+    @Test func claudePidHeader() throws {
+        // 머리 이름은 파서가 소문자로 바꾼다
+        let raw = "POST /hooks/Stop HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Waypoint-Claude-PID: 5287\r\nContent-Length: 2\r\n\r\n{}"
+        guard case .request(let parsed) = HTTPRequestParser.parse(Data(raw.utf8)) else {
+            Issue.record("요청을 못 읽음"); return
+        }
+        var seen: [Int?] = []
+        _ = HookRouter.respond(to: parsed) { _, _, pid in seen.append(pid); return nil }
+        _ = HookRouter.respond(to: request("POST", "/hooks/Stop")) { _, _, pid in seen.append(pid); return nil }
+        #expect(seen == [5287, nil])
+        for bad in ["", "abc", "0", "1", "-3", "12x"] {
+            let r = HTTPRequest(method: "POST", path: "/hooks/Stop", headers: ["x-waypoint-claude-pid": bad], body: Data())
+            #expect(HookRouter.claudePid(from: r) == nil, "\(bad)")
+        }
     }
 
     @Test func wrongPathOrMethod() {
         var called = false
         func respond(_ method: String, _ path: String) -> HTTPResponse {
-            HookRouter.respond(to: request(method, path)) { _, _ in called = true; return nil }
+            HookRouter.respond(to: request(method, path)) { _, _, _ in called = true; return nil }
         }
         let mcp = respond("POST", "/mcp")
         let empty = respond("POST", "/hooks/")

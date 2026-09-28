@@ -17,6 +17,9 @@ public struct HookInput {
     public let toolName: String?
     public let toolInput: [String: Any]
     public let toolResponse: [String: Any]
+    /// 훅을 부른 Claude Code 프로세스 PID. 본문 JSON이 아니라 HTTP 머리 `X-Waypoint-Claude-PID`나
+    /// outbox 줄의 `claudePid`에서 온다. 없으면 nil.
+    public var claudePid: Int?
 
     /// 본문을 읽는다. JSON 객체가 아니거나 `session_id`가 없으면 nil.
     /// `event`는 경로(`/hooks/<EventName>`)나 outbox의 이름을 우선하고, 없으면 `hook_event_name`.
@@ -49,6 +52,19 @@ public struct HookInput {
 
 /// 훅 입력에서 뽑는 사실들. 순수 함수라 픽스처로 바로 테스트한다.
 public enum HookParsing {
+
+    /// PID 문자열·숫자를 검사한다. 1보다 큰 정수만(0·1·음수·숫자 아닌 것은 nil).
+    public static func pid(_ raw: Any?) -> Int? {
+        let value: Int?
+        switch raw {
+        case let string as String: value = Int(string.trimmingCharacters(in: .whitespaces))
+        case let number as NSNumber:
+            value = CFGetTypeID(number) == CFBooleanGetTypeID() ? nil : Int(exactly: number.doubleValue)
+        default: value = nil
+        }
+        guard let value, value > 1, value <= Int(Int32.max) else { return nil }
+        return value
+    }
 
     /// 서브에이전트를 띄우는 도구 이름(현재 `Agent`, 옛 이름 `Task`).
     public static let subagentTools: Set<String> = ["Agent", "Task"]

@@ -107,12 +107,8 @@ extension HookProcessor {
 
     /// 세션 종료: 끝나지 않은 하위 세션부터 닫고 세션을 닫는다.
     func sessionEnd(_ input: HookInput, at date: Date) {
-        guard let session = fetchSession(input.sessionID), session.endedAt == nil else { return }
-        for child in session.children ?? [] where child.endedAt == nil {
-            end(child, at: date)
-        }
-        end(session, at: date, reason: input.reason)
-        pendingSpawns[session.id] = nil
+        guard let session = fetchSession(input.sessionID) else { return }
+        finish(session, at: date, reason: input.reason)
     }
 
     // MARK: - 도우미
