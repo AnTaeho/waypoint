@@ -82,6 +82,7 @@ Session      id(= Claude Code session_id), project, kind: main | subagent,
              startedAt, lastSeenAt, endedAt?, claudePid:Int?,   // claudePid: 메인 세션만, 훅 스크립트가 보낸 Claude Code PID
              contextProjectKey:String?,          // 대화에 Waypoint 블록을 준 프로젝트 키(5장 「늦은 주입」)
              lastPrompt:String?,                 // 메인 세션의 마지막 사용자 요청 문장, 300자까지(5장 「마지막 요청 문장」)
+             lastPromptAt:Date?,                 // lastPrompt를 적은 훅 시각, lastPrompt와 함께 바뀐다
              state: live | stalled | ended          // 파생값, 저장 캐시
 
 CardSession  card, session, attachedAt, detachedAt?
@@ -111,6 +112,7 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 - 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. 그사이 사용자가 상태를 바꿨으면(`status != active`) 그대로 둔다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
 - 대시보드 "작업중" 목록 = 프로젝트별로 묶은 (세션, 카드) 쌍 + 카드가 붙지 않은 끝나지 않은 메인 세션 한 줄씩(카드 칸 비움, 제목 자리에 그 세션의 마지막 요청 문장 `lastPrompt`(없으면 「카드 없음」), 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`). 같은 프로젝트에 세션 2개가 서로 다른 카드를 작업하면 그 프로젝트 아래 2줄. 세션에 카드가 붙으면 카드 없는 줄은 카드 줄로 바뀐다(중복 없음). 카드 없는 서브에이전트는 줄을 만들지 않는다. 제목의 「작업 N개」는 live 줄 수, 사이드바·프로젝트 표의 작업중·멈춤 수는 카드 수 + 카드 없는 메인 세션 수.
 - 프로젝트 보드 작업중 칸 = 작업중 카드 + 그 아래 카드 없는 세션 타일(대시보드 카드 없는 줄과 같은 세션, `BoardQuery.sessionTiles`). 타일은 마지막 요청 문장(없으면 「카드 없음」), 세션(`sess·7f2a`), 최근 파일, 끝나지 않은 서브에이전트 수(있으면), 경과 또는 「멈춤 N분」. 끌거나 누를 수 없다. 칸 머리 개수는 카드 + 타일(사이드바·프로젝트 표 작업중 수와 같은 기준).
+- 작업중 줄·타일의 경과(`SessionFormat.rowElapsed`): live면 카드 줄은 그 카드에 연결된 시각(`CardSession.attachedAt`)부터, 카드 없는 줄·타일은 마지막 요청 시각(`lastPromptAt`)부터이고 없으면 비운다. 멈춤이면 어느 줄이든 「멈춤 N분」(`lastSeenAt`부터).
 
 ## 5. 훅 → 기록 매핑
 
@@ -181,7 +183,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 
 카드 없는 세션 줄·타일은 카드 제목이 없어 무슨 작업인지 알 수 없다. 앱은 LLM을 쓰지 않으므로 요약 대신 그 세션에서 사용자가 마지막으로 보낸 문장을 제목 자리에 보여 준다.
 
-- 메인 세션의 `UserPromptSubmit`에서 `prompt`(실측·문서. 옛 문서 예시 이름 `prompt_text`도 받는다)를 앞뒤 공백 정리 후 앞 300자(문자 단위)만 `Session.lastPrompt`에 적는다(`HookParsing.userPrompt`). 세션당 마지막 하나만 둔다.
+- 메인 세션의 `UserPromptSubmit`에서 `prompt`(실측·문서. 옛 문서 예시 이름 `prompt_text`도 받는다)를 앞뒤 공백 정리 후 앞 300자(문자 단위)만 `Session.lastPrompt`에 적고, 그 훅 시각을 `lastPromptAt`에 적는다(`HookParsing.userPrompt`). 세션당 마지막 하나만 둔다. 두 값은 아래 규칙대로 늘 함께 바뀐다.
 - 넣지 않는 것: 서브에이전트 안의 훅(`agent_id` 있음), 빈 문장, `<`로 시작하는 자동 메시지(서브에이전트 완료 알림 `<agent-message from=…>` — 실측 `real-UserPromptSubmit-agent-message.json`, 백그라운드 작업 알림 `<task-notification>` 등). 그때는 앞 값을 그대로 둔다. 슬래시 명령(`/tracker init`)은 그대로 적는다. 붙여 넣은 글(`<pasted_content id=…>…</pasted_content>`, 전사에서 확인)은 태그만 벗겨 적는다.
 - outbox로 흡수한 훅도 적는다. 단 비어 있지 않으면 이 훅이 지금까지 받은 것 중 가장 새것(`at >= lastSeenAt`)일 때만 바꿔서, 늦게 들어온 옛 프롬프트가 더 최근 값을 덮지 않는다(`claudePid`와 같은 규칙).
 - 화면(`SessionFormat.promptPreview`): 줄바꿈·연속 공백을 공백 하나로 모아 한 줄로 만들고 앞 160자(넘으면 「…」). 대시보드·iPhone은 흐리게 한 줄(iPhone 두 줄), 보드 타일은 두 줄. Mac은 마우스를 올리면 저장된 문장 전체.
