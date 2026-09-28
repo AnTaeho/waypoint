@@ -26,6 +26,9 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            UsageGaugeView()
+        }
         .scrollContentBackground(.hidden)
         .background(Theme.sidebar)
     }

@@ -3,7 +3,7 @@ import SwiftData
 import SwiftUI
 import WaypointKit
 
-/// 메뉴 막대 메뉴: 프로젝트별 작업중 세션 수, 기록을 받지 못할 때 한 줄, 창 열기, 종료.
+/// 메뉴 막대 메뉴: 프로젝트별 작업중 세션 수, 사용량 한 줄, 기록을 받지 못할 때 한 줄, 창 열기, 종료.
 struct MenuBarContent: View {
     /// 샘플 모드처럼 서버를 열지 않으면 nil
     let services: AppServices?
@@ -14,6 +14,7 @@ struct MenuBarContent: View {
     @Query(filter: #Predicate<Session> { $0.endedAt == nil })
     private var openSessions: [Session]
     @Environment(\.openWindow) private var openWindow
+    @Environment(UsageMonitor.self) private var usage
 
     var body: some View {
         let now = Date()
@@ -25,6 +26,10 @@ struct MenuBarContent: View {
             Text("진행 중인 작업 없음")
         } else {
             ForEach(lines, id: \.self) { Text($0) }
+        }
+        if let snapshot = usage.snapshot {
+            Divider()
+            Text(UsageFormat.menuLine(snapshot, now: now))
         }
         if case .some(.failed) = services?.serverState {
             Divider()
