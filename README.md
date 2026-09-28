@@ -23,10 +23,21 @@ Claude Code 세션을 프로젝트 단위로 추적하는 개인용 Apple 앱(ma
 | `integration/skills/tracker/SKILL.md` | 사용자의 모든 프로젝트에서 쓸 tracker 스킬 |
 | `integration/hooks/` | Claude Code 훅 설정 예시와 훅 스크립트 |
 | `integration/statusline/` | 상태줄 입력의 사용량을 `usage.json`으로 남기는 중계 스크립트와 테스트 |
+| `docs/DEVELOPMENT.md` | 평소용·개발용 인스턴스, 설치·실측 절차, 되돌리는 방법 |
+| `scripts/install-local.sh` | 평소용을 Release로 빌드해 `/Applications/Waypoint.app`에 설치·실행 |
+| `scripts/dev-probe-setup.sh` | 실측 폴더를 개발용 Waypoint Dev(47822)에 잇는 프로젝트 설정 |
+
+## 설치 (앱)
+
+```sh
+scripts/install-local.sh   # Release 빌드 → /Applications/Waypoint.app 교체·실행 → 로그인 항목
+```
+
+평소 쓰는 것은 이 평소용 하나다. Xcode에서 돌리는 Debug 빌드는 개발용 **Waypoint Dev**(포트 47822, 저장소 `Waypoint-Dev/`)라 평소용 기록과 섞이지 않는다. 자세한 것은 `docs/DEVELOPMENT.md`.
 
 ## 설치 (MCP·스킬)
 
-앱이 켜져 있으면 `http://127.0.0.1:47821/mcp`에 MCP 서버가 열린다. 한 번만 등록한다.
+평소용 앱이 켜져 있으면 `http://127.0.0.1:47821/mcp`에 MCP 서버가 열린다. 한 번만 등록한다.
 
 ```sh
 # MCP 서버(사용자 범위, ~/.claude.json에 적힌다)

@@ -11,6 +11,11 @@ Claude Code 세션을 프로젝트 단위로 추적하는 개인용 macOS + iOS 
 - 카드를 자동으로 done 처리하지 않는다.
 - 마일스톤 하나가 끝나면 멈추고 완료 조건 충족 여부를 보고한다.
 
+## 개발 규칙: 평소용과 개발용
+
+- 평소용 Waypoint(`/Applications/Waypoint.app`, 47821)는 개발 중 건드리지 않는다. 종료·교체·실측 금지, 새 버전은 `scripts/install-local.sh`로만.
+- 개발·실측은 Waypoint Dev(Debug 빌드, 47822, `Waypoint-Dev/` 저장소)와 `scripts/dev-probe-setup.sh`로 이은 실측 폴더에서만. 절차는 `docs/DEVELOPMENT.md`.
+
 ## 스택
 
 - Swift 6, SwiftUI, SwiftData, CloudKit. macOS 14+, iOS 17+.
