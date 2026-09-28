@@ -129,3 +129,24 @@
 - 실제 앱(Debug)에서 PRB(`~/workspace/waypoint-probe`)의 `GUIDE.md`를 후보 줄 「추가」로 등록했다. TRK에는 등록하지 않았다.
 - 앱 편집·⌘S → 파일에 반영(`cat`), 버전 app. `printf` 덮어쓰기와 `python3` 임시 파일 → `os.replace` 모두 1초 안에 반영, 버전 local. 저장 안 한 편집 중 `sed -i`로 파일을 고치자 충돌 → 비교 화면 → 「로컬 파일로」 반영. 앱을 끈 채 고친 내용은 다시 켤 때 반영(local).
 - 교체 전 저장소는 scratchpad에 복사해 두었고, 복사본에서 먼저 새 필드 마이그레이션(자동 경량)을 확인했다.
+
+## M6 iPhone과 CloudKit (2026-09-28)
+
+| 날짜 | 무엇을 | 왜 | 대안 | 되돌리는 방법 |
+|---|---|---|---|---|
+| 09-28 | 컨테이너를 인스턴스마다 따로(`iCloud.dev.antaeho.waypoint`, `….dev`), 둘 다 Development 환경 | 개발·실측 기록이 평소용 iPhone에 섞이지 않게. Development는 스키마를 손으로 배포하지 않아도 된다. 개인 앱이라 Production이 필요 없다 | 한 컨테이너 + 영역 나누기, Production 배포 | `AppInstance.cloudKitContainerIdentifier`, `project.yml`의 `WAYPOINT_CONTAINER` |
+| 09-28 | `WAYPOINT_SUPPORT_DIR`로 저장 폴더를 옮긴 실행은 CloudKit을 끈다(`WAYPOINT_CLOUDKIT=0`과 같게) | 이 변수는 「실제 저장소를 건드리지 않고 띄우기」용인데, 미러링이 켜져 있으면 실제 컨테이너의 기록을 받아 오고 임시 기록을 올린다 | 명시한 `WAYPOINT_CLOUDKIT=0`만 | `AppInstance.cloudKitContainer(environment:)`의 두 번째 조건 |
+| 09-28 | iOS 앱이 `registerForRemoteNotifications()`를 직접 부른다(`PhoneAppDelegate`, Release 포함) | 실측: 등록하지 않은 빌드는 Mac 변경을 50초 넘게 못 받았고(가져오기 0번), 등록한 빌드는 Mac 내보내기 1–2초 뒤 알림 → 가져오기. macOS 쪽 미러링은 로그에 알림 수신기를 스스로 열었다 | — | `WaypointApp`의 `@UIApplicationDelegateAdaptor` |
+| 09-28 | iOS는 CloudKit 가져오기가 끝날 때마다 새 `ModelContext`를 만들어 목록을 다시 읽는다(`RootView`, `.id(generation)`) | 실측: 가져오기가 끝나도 메인 context의 세션이 옛 `endedAt`(nil)을 들고 있어 끝난 세션이 30초 틱 뒤에도 작업중에 남았다. 새로 생긴 세션은 떴다. 목록 스크롤 위치는 가져오기마다 맨 위로 돌아간다(한 화면이라 두었다) | 원격 변경 알림에서 `rollback` 등으로 새로 고치기(SwiftData에 공개 API 없음) | `RootView`를 `@Query` 두 개만 두던 꼴로 |
+| 09-28 | 작업중 목록은 시안처럼 카드를 이어 놓고 프로젝트 이름을 카드 윗줄에 둔다(그룹 머리 없음). 순서는 대시보드 그룹 순서 | 시안 구조 그대로. 한 프로젝트 안의 줄은 이어져 묶음이 보인다 | 프로젝트 이름 머리 줄 | `PhoneHomeView` |
+| 09-28 | 「방금 기록된 아이디어」 = 보관 안 된 프로젝트의 idea 상태 카드 중 최근 7일에 생긴 것, 새것부터(`IdeaInbox`) | 오래된 아이디어는 Mac 보드에서 정리한다. iPhone은 방금 생긴 것만 빠르게 분류 | 기간 없이 전부 | `IdeaInbox.defaultWindow` |
+| 09-28 | 시안의 아래 탭 줄(작업중·프로젝트·기록·지침)과 상태 막대는 옮기지 않았다 | 이번 범위는 작업중·아이디어 분류뿐이고, 없는 화면으로 가는 탭을 두지 않는다 | — | — |
+| 09-28 | Debug 빌드에만 콘솔 실측 로그(`[waypoint] …Z`)와 실행 인자 `-WaypointMoveIdea <ID>` | `devicectl`에 화면 캡처가 없어 iPhone에 뜬 시각을 콘솔로 잰다. 인자는 버튼과 같은 `PhoneIdeaAction.move`를 탄다 | 사용자가 화면을 보고 알려 주기 | `#if DEBUG` 블록 |
+| 09-28 | iPad 방향 4개(`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad`) | iOS 기기 빌드가 「All interface orientations must be supported」 경고를 냈다 | iPhone만 지원(`TARGETED_DEVICE_FAMILY=1`) | `project.yml` 한 줄 |
+
+### 관찰 (2026-09-28, Dev)
+
+- 처음 만든 컨테이너로 바로 켜자 `CKError 5`(내부 1014)로 미러링 설정이 실패했고 다시 시도하지 않았다. 4분 뒤 다시 켜니 성공했다.
+- 기존 Dev 저장소(PRB 프로젝트·카드·세션·이벤트 9개)는 설정 직후 한 번에 올라갔다(「Found 9 objects needing export」 → 「Modify records finished」). iPhone에 PRB가 떴다.
+- Mac 내보내기는 시스템이 「discretionary」로 다룬다(`nsurlsessiond` 로그, 앱이 막 켜졌을 때만 non-discretionary). 대개 저장 1–1.5초 뒤 끝났지만(창 연 채 뒤에 있을 때 5번, 창 닫고 메뉴 막대만일 때 5번 모두), 한 번은 요청이 5분 넘게 멈췄다가 풀렸다. 코드로 고칠 공개 API가 없어 두었다.
+- 40초 실측 세션 하나에 Mac 내보내기 5번(시작·도구 전후·끝).
