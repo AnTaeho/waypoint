@@ -13,6 +13,7 @@ Waypoint로 다른 저장소의 세션을 늘 추적하면서 Waypoint 자체도
 | 훅·MCP | 전역 설정(`~/.claude/settings.json`, `~/.claude.json` 사용자 범위) | 실측 폴더의 프로젝트 설정만 |
 | CloudKit 컨테이너 | `iCloud.dev.antaeho.waypoint` | `iCloud.dev.antaeho.waypoint.dev` |
 | iPhone 앱 | 「Waypoint」(Release) | 「Waypoint Dev」(Debug) |
+| 앱 아이콘 | 이정표, 클레이 바탕(`AppIcon`) | 이정표, 검은 바탕(`AppIconDev`) |
 
 - 인스턴스는 번들 ID로 가른다(`Shared/Instance/AppInstance.swift`, 끝이 `.dev`면 개발용). 번들 ID가 없는 명령행 도구·테스트는 평소용으로 본다.
 - 환경 변수 `WAYPOINT_PORT`·`WAYPOINT_SUPPORT_DIR`가 있으면 기본값보다 먼저다(훅 스크립트와 같은 이름).
@@ -31,7 +32,7 @@ Waypoint로 다른 저장소의 세션을 늘 추적하면서 Waypoint 자체도
 scripts/install-local.sh
 ```
 
-Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 실행 → 47821을 설치한 앱이 여는지 확인 → 로그인 항목이 없으면 System Events로 추가. 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
+Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 뒤에서 실행(`open -g`, 쓰던 창의 초점을 뺏지 않는다) → 47821을 설치한 앱이 여는지 확인 → 로그인 항목이 없으면 System Events로 추가. 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
 
 앱이 꺼져 있는 동안 온 훅은 `outbox.jsonl`에 쌓였다가 새 앱이 켜질 때 흡수된다.
 
@@ -82,6 +83,12 @@ xcrun devicectl device process launch --console --terminate-existing \
 - 잠긴 기기에는 실행을 못 한다(「device was not, or could not be, unlocked」). 설치는 된다.
 - Debug 실행 인자 `-- -WaypointMoveIdea PRB-2`: 그 아이디어 카드를 버튼과 같은 길(`PhoneIdeaAction.move`)로 「다음 할 일로」 옮긴다. 손 없이 동기화를 확인할 때만.
 - `devicectl`에는 화면 캡처가 없다. 화면은 기기에서 직접 보거나 위 콘솔 줄로 확인한다.
+- Release 앱은 콘솔 줄이 없다. 무엇이 동기화됐는지는 기기 저장소를 꺼내 본다(개발 서명이라 된다):
+  `xcrun devicectl device copy from --device <UDID> --domain-type appDataContainer --domain-identifier dev.antaeho.waypoint --source "Library/Application Support/Waypoint/Waypoint.store" --destination /tmp/phone.store`(`-shm`·`-wal`도 같이).
+
+## 앱 아이콘
+
+원본 SVG는 `design/icon/`(mac-·ios-, stable·dev). 에셋은 `App/Assets.xcassets`의 `AppIcon`(평소용)·`AppIconDev`(Debug 구성). 바꿀 때는 SVG를 1024 PNG로 그린 뒤 macOS용은 `sips -z`로 16–512 @1x/@2x를, iOS용은 1024 한 장(알파 없이)을 넣는다.
 
 ## 실측 폴더
 

@@ -142,6 +142,8 @@
 | 09-28 | 「방금 기록된 아이디어」 = 보관 안 된 프로젝트의 idea 상태 카드 중 최근 7일에 생긴 것, 새것부터(`IdeaInbox`) | 오래된 아이디어는 Mac 보드에서 정리한다. iPhone은 방금 생긴 것만 빠르게 분류 | 기간 없이 전부 | `IdeaInbox.defaultWindow` |
 | 09-28 | 시안의 아래 탭 줄(작업중·프로젝트·기록·지침)과 상태 막대는 옮기지 않았다 | 이번 범위는 작업중·아이디어 분류뿐이고, 없는 화면으로 가는 탭을 두지 않는다 | — | — |
 | 09-28 | Debug 빌드에만 콘솔 실측 로그(`[waypoint] …Z`)와 실행 인자 `-WaypointMoveIdea <ID>` | `devicectl`에 화면 캡처가 없어 iPhone에 뜬 시각을 콘솔로 잰다. 인자는 버튼과 같은 `PhoneIdeaAction.move`를 탄다 | 사용자가 화면을 보고 알려 주기 | `#if DEBUG` 블록 |
+| 09-28 | Mac은 CloudKit 가져오기가 끝나면 새 context로 카드를 읽어, 메인 context에 이미 올라온 같은 카드 중 `updatedAt`이 더 늦은 것의 값을 옮겨 적고 저장한다(`RemoteCardMerge`, `AppServices`) | 실측: iPhone에서 옮긴 카드가 Mac 보드에 아이디어로 남았고, Mac에서 본문만 고친 `card_update`가 저장소 상태를 아이디어로 되돌렸다(PRB-3·PRB-4). 다시 fetch해도, `rollback`해도 옛 값 그대로였다. SwiftData에 객체를 새로 읽는 API가 없다. 서버·훅·MCP·화면이 모두 메인 context를 붙잡고 있어 context를 바꾸는 것보다 좁게 고쳤다. iPhone이 고치는 것은 카드뿐이라 카드만 맞춘다 | 가져오기마다 메인 context 대신 새 context로 전부 갈아타기 | `AppServices.observeCloudKitImports` 제거 |
+| 09-28 | 앱 아이콘: 이정표(후보 1). 평소용 `AppIcon`(클레이 바탕), 개발용 `AppIconDev`(검은 바탕, Debug 구성만 `ASSETCATALOG_COMPILER_APPICON_NAME`) | 사용자 선택. 두 인스턴스를 Dock·홈 화면에서 가려 보게 | — | `project.yml`의 `ASSETCATALOG_COMPILER_APPICON_NAME`, `App/Assets.xcassets` |
 | 09-28 | iPad 방향 4개(`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad`) | iOS 기기 빌드가 「All interface orientations must be supported」 경고를 냈다 | iPhone만 지원(`TARGETED_DEVICE_FAMILY=1`) | `project.yml` 한 줄 |
 
 ### 관찰 (2026-09-28, Dev)
@@ -150,3 +152,22 @@
 - 기존 Dev 저장소(PRB 프로젝트·카드·세션·이벤트 9개)는 설정 직후 한 번에 올라갔다(「Found 9 objects needing export」 → 「Modify records finished」). iPhone에 PRB가 떴다.
 - Mac 내보내기는 시스템이 「discretionary」로 다룬다(`nsurlsessiond` 로그, 앱이 막 켜졌을 때만 non-discretionary). 대개 저장 1–1.5초 뒤 끝났지만(창 연 채 뒤에 있을 때 5번, 창 닫고 메뉴 막대만일 때 5번 모두), 한 번은 요청이 5분 넘게 멈췄다가 풀렸다. 코드로 고칠 공개 API가 없어 두었다.
 - 40초 실측 세션 하나에 Mac 내보내기 5번(시작·도구 전후·끝).
+
+### 완료 조건 실측 (2026-09-28, Dev, `claude -p` + `ping -c 40`, 시각은 두 기기 NTP 기준 ±1초)
+
+| 측정 | 결과 |
+|---|---|
+| Mac 세션 시작(`startedAt`) → iPhone 작업중 표시(콘솔 `rows=1 live`) | 3.1초, 2.7초, 7.6초(마지막은 Mac 내보내기 1.1초 뒤 알림이 5.3초 늦게 옴) |
+| Mac 세션 끝(`endedAt`, `SessionEnd`) → iPhone에서 사라짐(`rows=0`) | 2.5초(가져오기마다 새 context로 읽게 고친 뒤). 고치기 전에는 30초 틱 뒤에도 남았다 |
+| iPhone 「다음 할 일로」(`-WaypointMoveIdea`) → Mac 저장소 `next` | PRB-2 2.7초 이하, PRB-3 2.3초, PRB-5 2.3초(0.5초 간격 조회) |
+| iPhone에서 옮긴 카드 → Mac 화면·메인 context | 고치기 전: 보드에 아이디어로 남고 Mac 저장이 상태를 되돌림(PRB-3·4). 고친 뒤(PRB-5): 3초 안에 보드 「다음 할 일」 칸, `card_get` next, 본문 수정 뒤에도 저장소 next |
+
+- 세션 종료는 네 번 모두 `SessionEnd`가 왔다(`endedAt == lastSeenAt`).
+- iPhone 앱이 뒤에 있을 때도(`applicationState` 2) 알림이 와서 가져오기가 돌았다.
+- Mac 화면의 최근 기록 인스펙터와 `card_get`의 `recentEvents`에는 iPhone이 남긴 `card.status` 이벤트가 앱을 다시 켤 때까지 안 보인다(이미 읽은 카드의 이벤트 관계가 옛 값). 카드 상태는 맞다.
+
+### 평소용 반영 (2026-09-28 20:02)
+
+- 백업: scratchpad `m6/backup-20260928-200211/`(sqlite `.backup` + 폴더 통째 복사). 무결성 ok, TRK·CHM, 카드 8, 세션 14, 이벤트 411.
+- `scripts/install-local.sh`: 「Waypoint 0.0.1 설치됨: /Applications/Waypoint.app · PID 60977 · 127.0.0.1:47821 LISTEN · 로그인 항목 이미 있음」. 컨테이너가 앞선 Release 빌드 때 만들어져 있어 첫 실행에 CloudKit 설정 성공(환경 Sandbox = Development), 기존 기록 453 + 54개를 8초 안에 올렸다. 오류 로그 없음.
+- 평소용 iPhone 앱(Release) 설치·실행 뒤 기기의 저장소를 `devicectl device copy from`으로 꺼내 조회: TRK·CHM, 카드 8, 세션 14, 이벤트 412, 이 저장소 메인 세션(29de4c3b…) 끝나지 않음.
