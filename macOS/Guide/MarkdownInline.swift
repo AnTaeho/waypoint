@@ -9,7 +9,7 @@ enum MarkdownInline {
         for run in result.runs {
             let intent = run.inlinePresentationIntent ?? []
             if intent.contains(.code) {
-                result[run.range].font = .system(size: size - 1, design: .monospaced)
+                result[run.range].font = .system(size: size - Theme.Guide.inlineCodeShrink, design: .monospaced)
                 result[run.range].backgroundColor = Theme.bgSunken
             } else if intent.contains(.stronglyEmphasized) {
                 result[run.range].font = Theme.rounded(size, .bold)

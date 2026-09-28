@@ -164,6 +164,13 @@ enum Theme {
         static let code = Font.system(size: 12, design: .monospaced)
         /// 편집기·비교 화면 원문
         static let source = Font.system(size: 12.5, design: .monospaced)
+        /// 문단·목록 줄 간격
+        static let lineSpacing: CGFloat = 3
+        /// 인라인 코드는 본문보다 1pt 작게, 표 칸은 0.5pt 작게
+        static let inlineCodeShrink: CGFloat = 1
+        static let tableTextShrink: CGFloat = 0.5
+        /// 충돌 비교 한 줄의 위아래 여백
+        static let diffLinePadding: CGFloat = 1
         static let tocWidth: CGFloat = 180
         /// 이 폭보다 좁으면 목차를 숨긴다
         static let tocMinBodyWidth: CGFloat = 620

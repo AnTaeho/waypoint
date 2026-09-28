@@ -77,7 +77,7 @@ private struct ConflictColumn: View {
                             .font(Theme.Guide.source)
                             .foregroundStyle(Theme.text)
                             .padding(.horizontal, Theme.Spacing.s)
-                            .padding(.vertical, 1)
+                            .padding(.vertical, Theme.Guide.diffLinePadding)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(line.kind == highlight ? background : Color.clear)
                     }

@@ -14,7 +14,7 @@ struct MarkdownBlockView: View {
         case .paragraph(let text):
             Text(MarkdownInline.text(text))
                 .foregroundStyle(Theme.text)
-                .lineSpacing(3)
+                .lineSpacing(Theme.Guide.lineSpacing)
         case .list(let items):
             MarkdownListView(items: items)
         case .code(_, let text):
@@ -66,7 +66,7 @@ private struct MarkdownListView: View {
                         .frame(minWidth: Theme.Spacing.l, alignment: .trailing)
                     Text(MarkdownInline.text(item.text))
                         .foregroundStyle(item.checked == true ? Theme.textMuted : Theme.text)
-                        .lineSpacing(3)
+                        .lineSpacing(Theme.Guide.lineSpacing)
                 }
                 .padding(.leading, CGFloat(item.depth) * Theme.Spacing.xl)
             }
@@ -114,7 +114,7 @@ private struct MarkdownTableView: View {
     private func row(_ cells: [String], header: Bool) -> some View {
         GridRow {
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
-                Text(MarkdownInline.text(cell, size: Theme.Guide.bodySize - 0.5, bold: header))
+                Text(MarkdownInline.text(cell, size: Theme.Guide.bodySize - Theme.Guide.tableTextShrink, bold: header))
                     .foregroundStyle(header ? Theme.textSecondary : Theme.text)
                     .frame(minWidth: Theme.Guide.tableCellMinWidth, alignment: frameAlignment(index))
                     .padding(.horizontal, Theme.Spacing.m)
