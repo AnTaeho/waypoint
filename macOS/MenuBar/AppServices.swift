@@ -82,7 +82,10 @@ final class AppServices {
     /// 등록한 프로젝트를 메인 창 사이드바에서 고른다. 메인 창이 없으면 연다.
     private func showRegistered(_ project: Project) {
         pendingSelection = project.persistentModelID
-        if mainWindowCount == 0 {
+        // 확인할 초안이 남았으면 등록 창을 앞에 둔다(선택은 메인 창이 뜰 때 받는다).
+        if drafts.current != nil {
+            initWindow?.show()
+        } else if mainWindowCount == 0 {
             openMainWindow?()
         } else if let main = NSApplication.shared.windows.first(where: {
             $0.isVisible && $0.canBecomeMain && initWindow?.owns($0) != true
