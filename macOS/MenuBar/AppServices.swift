@@ -1,4 +1,5 @@
 import AppKit
+import CoreData
 import Foundation
 import Observation
 import SwiftData
@@ -28,6 +29,7 @@ final class AppServices {
     @ObservationIgnored private var server: LocalServer?
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var guides: GuideMonitor?
+    @ObservationIgnored private var importObserver: NSObjectProtocol?
 
     /// `SessionEnd` 없이 끝난 세션 정리와 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
     static let refreshInterval: TimeInterval = 60
@@ -74,11 +76,33 @@ final class AppServices {
         self.guides = guides
         guides.start()
 
+        observeCloudKitImports()
+
         // 첫 outbox 흡수 뒤 한 번, 그 뒤 60초마다
         refreshStates()
         timer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshStates() }
         }
+    }
+
+    /// iPhone에서 온 변경(CloudKit 가져오기)을 메인 context에 들인다(`RemoteCardMerge`). 그대로 두면 iPhone에서
+    /// 「다음 할 일로」 옮긴 카드가 Mac 화면에 아이디어로 남고, Mac이 그 카드를 저장하면 상태가 되돌아간다(2026-09-28 실측).
+    private func observeCloudKitImports() {
+        importObserver = NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let event = note.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                as? NSPersistentCloudKitContainer.Event,
+                event.type == .import, event.endDate != nil, event.succeeded
+            else { return }
+            MainActor.assumeIsolated { self?.refreshAfterImport() }
+        }
+    }
+
+    private func refreshAfterImport() {
+        let context = container.mainContext
+        guard let merged = try? RemoteCardMerge.apply(from: ModelContext(container), to: context), merged > 0 else { return }
+        try? context.save()
     }
 
     /// 등록한 프로젝트를 메인 창 사이드바에서 고른다. 메인 창이 없으면 연다.
