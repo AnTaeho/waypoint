@@ -44,6 +44,7 @@
 		9257097A562C6AC262C6FCD6 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D73CD7F0A23DD2E40382BE8 /* DashboardView.swift */; platformFilters = (macos, ); };
 		92AC41A0FED105D8752026F9 /* PhoneHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFA0F3D0A8C7712C125F541 /* PhoneHomeView.swift */; platformFilters = (ios, ); };
 		934C88A85478383D594C906F /* PhoneWorkCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB8A9125DC79C85E7E2AA2A /* PhoneWorkCard.swift */; platformFilters = (ios, ); };
+		94211B1583F4EC35302E34C9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 18B4688E600F6DECA0E69FB6 /* Assets.xcassets */; };
 		96E1CBB3E7DA3EA349350AEA /* FontRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34DEBE029DF6C711921EBEC /* FontRegistry.swift */; };
 		9AF21E342B5A72C87A9BC9E6 /* PhoneIdeaSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B0741D1F70BCF8E90D1B8F /* PhoneIdeaSection.swift */; platformFilters = (ios, ); };
 		9DA64E17CECB64D0588A9110 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE919FAD36CA5AC89AEC861 /* AppServices.swift */; platformFilters = (macos, ); };
@@ -81,6 +82,7 @@
 		10B848F2A827633BD98960A5 /* RecentEventsInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentEventsInspector.swift; sourceTree = "<group>"; };
 		147DD09BAE6889ACD4D2B038 /* NanumSquareRoundL.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundL.ttf; sourceTree = "<group>"; };
 		156FAE3D89B42EB90C338012 /* CardInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInspector.swift; sourceTree = "<group>"; };
+		18B4688E600F6DECA0E69FB6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1B5C68F1762AE0ED6284C1FB /* GuideReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideReader.swift; sourceTree = "<group>"; };
 		1C31DE45B2536C9E57E0B79B /* GuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideView.swift; sourceTree = "<group>"; };
 		1F3B60D09C1EDAC5EC81AA0E /* CardInspectorLists.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInspectorLists.swift; sourceTree = "<group>"; };
@@ -262,6 +264,7 @@
 		4E35DD7639881259D9DC5B12 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				18B4688E600F6DECA0E69FB6 /* Assets.xcassets */,
 				A34DEBE029DF6C711921EBEC /* FontRegistry.swift */,
 				2EF3CC91475AFCB54D6E49BE /* Theme.swift */,
 				4806246D0F1AC28DE90C507A /* WaypointApp.swift */,
@@ -398,6 +401,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				94211B1583F4EC35302E34C9 /* Assets.xcassets in Resources */,
 				8228932BCA3E371ABBA655AC /* NanumSquareRoundB.ttf in Resources */,
 				AE9F35059E715B8E5776DD93 /* NanumSquareRoundEB.ttf in Resources */,
 				302718CFFF0EBCE13D5CDA0C /* NanumSquareRoundL.ttf in Resources */,
@@ -479,7 +483,7 @@
 		05F475883A011F7622EF250E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDev;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Config/Waypoint-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/Waypoint-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/Waypoint-macOS.entitlements";
