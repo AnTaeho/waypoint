@@ -10,19 +10,21 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $selection) {
             Label {
-                Text("대시보드")
+                Text("대시보드").font(Theme.body)
             } icon: {
                 Image(systemName: "square.grid.2x2").foregroundStyle(Theme.liveText)
             }
             .tag(SidebarSelection.dashboard)
 
-            Section("프로젝트") {
+            Section {
                 ForEach(projects) { project in
                     TimelineView(.periodic(from: .now, by: 30)) { timeline in
                         SidebarProjectRow(project: project, now: timeline.date)
                     }
                     .tag(SidebarSelection.project(project.persistentModelID))
                 }
+            } header: {
+                Text("프로젝트").font(Theme.tableHeader)
             }
         }
         .listStyle(.sidebar)
@@ -50,6 +52,7 @@ private struct SidebarProjectRow: View {
                 .foregroundStyle(isProminent ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.textMuted))
                 .frame(width: Theme.Size.sidebarKeyWidth, alignment: .leading)
             Text(project.name)
+                .font(Theme.body)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if summary.liveCount > 0 {
