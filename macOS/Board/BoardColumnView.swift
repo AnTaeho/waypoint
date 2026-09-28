@@ -53,6 +53,8 @@ struct BoardColumnView: View {
             Text(title)
                 .font(Theme.section)
                 .foregroundStyle(column == .active ? Theme.liveText : Theme.text)
+                .lineLimit(1)
+                .layoutPriority(1)
             Spacer(minLength: 0)
             Text("\(items.count)")
                 .font(Theme.captionLarge)
