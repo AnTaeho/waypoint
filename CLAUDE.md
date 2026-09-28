@@ -15,6 +15,7 @@ Claude Code 세션을 프로젝트 단위로 추적하는 개인용 macOS + iOS 
 
 - 평소용 Waypoint(`/Applications/Waypoint.app`, 47821)는 개발 중 건드리지 않는다. 종료·교체·실측 금지, 새 버전은 `scripts/install-local.sh`로만.
 - 개발·실측은 Waypoint Dev(Debug 빌드, 47822, `Waypoint-Dev/` 저장소)와 `scripts/dev-probe-setup.sh`로 이은 실측 폴더에서만. 절차는 `docs/DEVELOPMENT.md`.
+- 검증 중 사용자 화면을 가져가지 않는다: 앱 활성화·마우스·키보드 자동 조작(cliclick, System Events)·전체 화면 캡처 금지. 앱은 `open -g -j`로 뒤에서 띄우고 DB·HTTP·로그로 확인한다. 사람이 봐야 하는 것은 작업 끝에 확인 목록으로 넘긴다. 실제 `claude -p` 실측은 마일스톤 완료 조건 확인 때만.
 
 ## 스택
 
