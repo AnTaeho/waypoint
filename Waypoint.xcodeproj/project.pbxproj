@@ -12,6 +12,7 @@
 		157129890D1A3B79ABF3BB1A /* GuideConflictView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B86E6820B9D752F18548D4 /* GuideConflictView.swift */; platformFilters = (macos, ); };
 		1880CFB51BAA6076D0DBDB25 /* GuideVersionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E0447C0C3D3564FA361133 /* GuideVersionSheet.swift */; platformFilters = (macos, ); };
 		1B152AC5393D77BCB3C9C238 /* InitPathStackRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5F681EF62D7092B4EB128F /* InitPathStackRow.swift */; platformFilters = (macos, ); };
+		23FEADAF39A118FCDD2EF9F0 /* PhoneAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB9D4C5D904B017DB200339 /* PhoneAppDelegate.swift */; platformFilters = (ios, ); };
 		26E1CB786EC452F721D1A251 /* NanumSquareRoundR.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A2D3AC30512B9F9DFB6DC540 /* NanumSquareRoundR.ttf */; };
 		2AD411287EF1574FAF303695 /* ProjectTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C3491F0AD321EA7D4856FD /* ProjectTable.swift */; platformFilters = (macos, ); };
 		2BF7A1111F6FD51BD017BD1F /* InitFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60588B3D4D8F4FFA5A1DE9AE /* InitFields.swift */; platformFilters = (macos, ); };
@@ -25,6 +26,7 @@
 		40B9BBAE36C499828E03B0CF /* WaypointKit in Frameworks */ = {isa = PBXBuildFile; productRef = 40BCBD52B88D9C65C146385E /* WaypointKit */; };
 		417ADEC51642A897722BF325 /* CardDetailHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BF6E481CC8CB742C64E4F3A /* CardDetailHeader.swift */; platformFilters = (macos, ); };
 		4286870FC1F3EFFDE22CFC42 /* CardInspectorLists.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3B60D09C1EDAC5EC81AA0E /* CardInspectorLists.swift */; platformFilters = (macos, ); };
+		461BBAAAF30D7438A27BA9D6 /* PhoneCardDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50852FCDA4BF38DE4E570E7B /* PhoneCardDetail.swift */; platformFilters = (ios, ); };
 		483766829586C4679EAE620E /* CardInspectorSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F453B89102C767601AB4A40 /* CardInspectorSections.swift */; platformFilters = (macos, ); };
 		4B847A801B308B9C66568B32 /* SidebarProjectParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3ED573EF850C456FF91A39 /* SidebarProjectParts.swift */; platformFilters = (macos, ); };
 		4BD20823006EE49D488348A7 /* LiveDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DAD89B809522AC369D3FCB /* LiveDot.swift */; };
@@ -40,7 +42,10 @@
 		8FB4F0D5D0ED1AC61437B10E /* MarkdownInline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087B3204C74D79283C85C13B /* MarkdownInline.swift */; platformFilters = (macos, ); };
 		918DC6BAC3856EA398646C6E /* CardCriteriaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A86041D8ABF749C806E93C1 /* CardCriteriaView.swift */; platformFilters = (macos, ); };
 		9257097A562C6AC262C6FCD6 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D73CD7F0A23DD2E40382BE8 /* DashboardView.swift */; platformFilters = (macos, ); };
+		92AC41A0FED105D8752026F9 /* PhoneHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFA0F3D0A8C7712C125F541 /* PhoneHomeView.swift */; platformFilters = (ios, ); };
+		934C88A85478383D594C906F /* PhoneWorkCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB8A9125DC79C85E7E2AA2A /* PhoneWorkCard.swift */; platformFilters = (ios, ); };
 		96E1CBB3E7DA3EA349350AEA /* FontRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34DEBE029DF6C711921EBEC /* FontRegistry.swift */; };
+		9AF21E342B5A72C87A9BC9E6 /* PhoneIdeaSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B0741D1F70BCF8E90D1B8F /* PhoneIdeaSection.swift */; platformFilters = (ios, ); };
 		9DA64E17CECB64D0588A9110 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE919FAD36CA5AC89AEC861 /* AppServices.swift */; platformFilters = (macos, ); };
 		A4E1B4C563B6482F27B3E7AE /* SidebarSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 648F1BD947F2221E3616CC24 /* SidebarSelection.swift */; platformFilters = (macos, ); };
 		A6AFC6300AD9C9F662C6BCE0 /* BoardSessionBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F4EC7A40B6A8FAE8629FA1 /* BoardSessionBox.swift */; platformFilters = (macos, ); };
@@ -82,11 +87,13 @@
 		1F4A7D7AF9C02C92C35E3D73 /* RootInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootInspector.swift; sourceTree = "<group>"; };
 		24E0447C0C3D3564FA361133 /* GuideVersionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideVersionSheet.swift; sourceTree = "<group>"; };
 		2CA506015F36BD8C792F971D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		2DFA0F3D0A8C7712C125F541 /* PhoneHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneHomeView.swift; sourceTree = "<group>"; };
 		2EF3CC91475AFCB54D6E49BE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		3C30269DEA92A22D30679441 /* GuideInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideInspector.swift; sourceTree = "<group>"; };
 		3F3BE9B8CD1A8C96EBD9A09E /* waypoint */ = {isa = PBXFileReference; lastKnownFileType = folder; name = waypoint; path = .; sourceTree = SOURCE_ROOT; };
 		3F79E43D0AD5525DEAADCE1F /* CardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
 		4806246D0F1AC28DE90C507A /* WaypointApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointApp.swift; sourceTree = "<group>"; };
+		50852FCDA4BF38DE4E570E7B /* PhoneCardDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneCardDetail.swift; sourceTree = "<group>"; };
 		513714242E8675B19C5134DA /* ActiveWorkRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkRowView.swift; sourceTree = "<group>"; };
 		5451E3F0EEC533B30989C6CB /* DashboardSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSearch.swift; sourceTree = "<group>"; };
 		5A86041D8ABF749C806E93C1 /* CardCriteriaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardCriteriaView.swift; sourceTree = "<group>"; };
@@ -94,12 +101,14 @@
 		60588B3D4D8F4FFA5A1DE9AE /* InitFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitFields.swift; sourceTree = "<group>"; };
 		63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitor.swift; sourceTree = "<group>"; };
 		648F1BD947F2221E3616CC24 /* SidebarSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSelection.swift; sourceTree = "<group>"; };
+		6EB9D4C5D904B017DB200339 /* PhoneAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneAppDelegate.swift; sourceTree = "<group>"; };
 		7579DAE684178D0E8821A0EE /* NanumSquareRoundB.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundB.ttf; sourceTree = "<group>"; };
 		7589B21E222DC5DBB867A617 /* MarkdownBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBlockView.swift; sourceTree = "<group>"; };
 		786633AF6FAB07F8719504A1 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		7B5F681EF62D7092B4EB128F /* InitPathStackRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitPathStackRow.swift; sourceTree = "<group>"; };
 		8208066D1C74F68869BF5909 /* NanumSquareRoundEB.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundEB.ttf; sourceTree = "<group>"; };
 		83B5E7102286FAE2A09F9FD6 /* BoardColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardColumnView.swift; sourceTree = "<group>"; };
+		86B0741D1F70BCF8E90D1B8F /* PhoneIdeaSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneIdeaSection.swift; sourceTree = "<group>"; };
 		882355B5AEEAAD1B56A6093B /* CardHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardHistoryView.swift; sourceTree = "<group>"; };
 		89F36AB1BF7B1426264EAF3E /* TableWidth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableWidth.swift; sourceTree = "<group>"; };
 		8BF6E481CC8CB742C64E4F3A /* CardDetailHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailHeader.swift; sourceTree = "<group>"; };
@@ -110,6 +119,7 @@
 		A2D3AC30512B9F9DFB6DC540 /* NanumSquareRoundR.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundR.ttf; sourceTree = "<group>"; };
 		A34DEBE029DF6C711921EBEC /* FontRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontRegistry.swift; sourceTree = "<group>"; };
 		A55C4D1900BA2387763F86D8 /* InitChecklists.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitChecklists.swift; sourceTree = "<group>"; };
+		AFB8A9125DC79C85E7E2AA2A /* PhoneWorkCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneWorkCard.swift; sourceTree = "<group>"; };
 		B3905FDAF71CEBAF40695A08 /* ProjectBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectBoardView.swift; sourceTree = "<group>"; };
 		B5B86E6820B9D752F18548D4 /* GuideConflictView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideConflictView.swift; sourceTree = "<group>"; };
 		B9DAD89B809522AC369D3FCB /* LiveDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDot.swift; sourceTree = "<group>"; };
@@ -293,6 +303,11 @@
 		B6AF6AAC9701D1D702BCE5A1 /* iOS */ = {
 			isa = PBXGroup;
 			children = (
+				6EB9D4C5D904B017DB200339 /* PhoneAppDelegate.swift */,
+				50852FCDA4BF38DE4E570E7B /* PhoneCardDetail.swift */,
+				2DFA0F3D0A8C7712C125F541 /* PhoneHomeView.swift */,
+				86B0741D1F70BCF8E90D1B8F /* PhoneIdeaSection.swift */,
+				AFB8A9125DC79C85E7E2AA2A /* PhoneWorkCard.swift */,
 				2CA506015F36BD8C792F971D /* RootView.swift */,
 			);
 			path = iOS;
@@ -434,6 +449,11 @@
 				786DE851725A294441A17554 /* MarkdownBlockView.swift in Sources */,
 				8FB4F0D5D0ED1AC61437B10E /* MarkdownInline.swift in Sources */,
 				FC6C73EC6FDF95584A01134B /* MenuBarContent.swift in Sources */,
+				23FEADAF39A118FCDD2EF9F0 /* PhoneAppDelegate.swift in Sources */,
+				461BBAAAF30D7438A27BA9D6 /* PhoneCardDetail.swift in Sources */,
+				92AC41A0FED105D8752026F9 /* PhoneHomeView.swift in Sources */,
+				9AF21E342B5A72C87A9BC9E6 /* PhoneIdeaSection.swift in Sources */,
+				934C88A85478383D594C906F /* PhoneWorkCard.swift in Sources */,
 				64DA885EA5000630F5FE0452 /* ProjectBoardView.swift in Sources */,
 				2AD411287EF1574FAF303695 /* ProjectTable.swift in Sources */,
 				7BCF4AB93F95F3EC62939D07 /* RecentEventRow.swift in Sources */,

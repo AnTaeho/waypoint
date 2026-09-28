@@ -214,6 +214,37 @@ enum Theme {
         static let boxRowGap: CGFloat = 9
     }
 
+    /// iPhone 화면(`iPhone.dc.html`, 390pt 폭 기준)
+    enum Phone {
+        /// 날짜 줄 위의 「작업중 N」 제목
+        static let title = rounded(30, .bold)
+        static let date = rounded(13)
+        static let section = rounded(14, .bold)
+        static let cardTitle = rounded(15, .bold)
+        static let body = rounded(15)
+        static let elapsed = rounded(12, .bold)
+        static let stalled = rounded(12)
+        static let button = rounded(13, .bold)
+        static let meta = Font.system(size: 11, design: .monospaced)
+        /// 카드 상세 제목
+        static let detailTitle = rounded(22, .bold)
+        /// 화면 좌우 여백
+        static let gutter: CGFloat = 18
+        /// 구역 사이
+        static let sectionGap: CGFloat = 18
+        /// 카드 사이
+        static let cardGap: CGFloat = 10
+        /// 카드 안 줄 사이
+        static let lineGap: CGFloat = 8
+        static let cardPadding: CGFloat = 14
+        static let cardRadius: CGFloat = 14
+        /// 서브에이전트 카드 들여쓰기
+        static let indent: CGFloat = 16
+        static let buttonHeight: CGFloat = 36
+        static let buttonPaddingH: CGFloat = 14
+        static let titleLineSpacing: CGFloat = 4
+    }
+
     /// 개발용 인스턴스(Waypoint Dev) 표시
     enum Dev {
         static let badgeFont = rounded(11, .bold)

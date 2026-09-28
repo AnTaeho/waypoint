@@ -16,6 +16,9 @@ struct WaypointApp: App {
     /// 사용량 파일 읽기. 파일만 읽으므로 샘플 모드에서도 돈다.
     let usage = UsageMonitor()
     #endif
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(PhoneAppDelegate.self) private var appDelegate
+    #endif
 
     init() {
         FontRegistry.registerBundledFonts()
