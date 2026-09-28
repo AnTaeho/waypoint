@@ -45,7 +45,7 @@ Claude Code 세션들 ──훅(command)──▶ waypoint-hook.sh ──HTTP─
 - **훅은 curl만 쓴다.** 앱이 꺼져 있거나 응답이 없으면 `~/Library/Application Support/Waypoint/outbox.jsonl`에 한 줄씩 적재한다. 훅은 절대 Claude Code를 막거나 느리게 하면 안 된다 (타임아웃 1초, 항상 exit 0).
 - **MCP 서버**는 앱 내장 Streamable HTTP 엔드포인트. 사용자 범위로 한 번 등록한다:
   `claude mcp add --transport http --scope user waypoint http://127.0.0.1:47821/mcp`
-  (명령 형식은 구현 시점 Claude Code 문서로 확인)
+  (2026-09-28 Claude Code 2.1.283 `claude mcp add --help`로 확인. `~/.claude.json`의 사용자 범위에 적힌다)
 - iOS는 CloudKit 동기화로 같은 데이터를 본다. 로컬 서버는 macOS에만 있다.
 
 ## 4. 데이터 모델 (SwiftData)
@@ -107,7 +107,7 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 
 | 훅 | 입력(문서) | 서버 동작 | 비고 |
 |---|---|---|---|
-| `SessionStart` | `source`(startup/resume/clear/compact/fork), `model?` | `cwd`로 프로젝트 조회 → 세션 생성(이미 있으면 다시 살림). 응답 본문을 stdout으로 출력해 **대화 컨텍스트에 주입** | 주입 내용: 프로젝트 키, 세션 ID, 다음 할 일 상위 5개, 이 프로젝트의 다른 작업중 카드, 직전 세션 메모. command 훅만 지원 |
+| `SessionStart` | `source`(startup/resume/clear/compact/fork), `model?` | `cwd`로 프로젝트 조회 → 세션 생성(이미 있으면 다시 살림). 응답 본문을 stdout으로 출력해 **대화 컨텍스트에 주입** | 주입 형식은 아래 「SessionStart 주입」. command 훅만 지원 |
 | `UserPromptSubmit` | `prompt` | `lastSeenAt` 갱신 | heartbeat |
 | `PreToolUse` (`Agent`) | `tool_name`=`Agent`, `tool_input.prompt/description/subagent_type`, `tool_use_id` | 부모 세션 heartbeat. 프롬프트의 `[LDG-16]` 같은 카드 ID와 `subagent_type`을 **대기 목록**에 올린다 | 서브에이전트 도구 이름은 `Agent`(옛 이름 `Task`도 matcher에 남겨 둔다) |
 | `SubagentStart` | `agent_id`, `agent_type` | 하위 세션 생성(`id`=`agent_id`, `agentName`=`agent_type`, 부모=`session_id` 세션). 대기 목록에서 같은 `agent_type`의 가장 오래된 항목을 꺼내 카드가 있으면 연결 | 두 이벤트를 잇는 키는 실측에도 없다(`SubagentStart`에 `tool_use_id` 없음, 같은 `prompt_id`만 공유) → 순서·종류로 짝짓는다 |
@@ -117,6 +117,28 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 | `SessionEnd` | `reason`(clear/resume/logout/prompt_input_exit/other) | 세션 종료, 모든 연결 해제(하위 세션 포함) | 기본 타임아웃 1.5초. 가끔 오지 않는다 → 아래 「종료 판정」 |
 
 모든 훅: 스크립트가 보낸 Claude Code PID(6장)가 있으면 메인 세션 `claudePid`에 적는다. 비어 있거나 이 훅이 지금까지 받은 것 중 가장 새것(`at >= lastSeenAt`)일 때만 바꾼다(`--resume`은 같은 `session_id`를 새 프로세스로 이어 가고, outbox로 늦게 온 옛 훅은 되돌리지 않는다). 서브에이전트 훅의 PID는 부모와 같은 프로세스라 메인 세션에만 적는다.
+
+### SessionStart 주입
+
+`Waypoint:`로 시작하는 블록. tracker 스킬(`integration/skills/tracker/SKILL.md`)이 같은 형식을 적어 두고 읽는다. 바꾸면 둘을 같이 고친다.
+
+```
+Waypoint: PRB (훅 실측)
+sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
+다음 할 일:
+- PRB-1 실측용 카드
+다른 세션에서 작업중:
+- PRB-4 파서 (sess·a1b2)
+직전 세션 메모 (PRB-1 실측용 카드):
+  note.txt에 hello 추가함. 볼 파일: note.txt
+작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 tracker 스킬을 따른다.
+```
+
+- 1줄: `Waypoint: <키> (<이름>)`, 2줄: `sessionId: <Claude Code session_id>`. 마지막 줄은 스킬 안내(고정 문구).
+- 다음 할 일: status next, 번호순 상위 5개. 없으면 제목째 뺀다.
+- 다른 세션에서 작업중: 대시보드 작업중 줄 중 이 세션·이 세션의 서브에이전트가 아닌 카드 줄(카드 없는 세션 줄은 뺀다). 멈춘 세션은 `, 멈춤`.
+- 직전 세션 메모: 다음 세션 메모가 있고 done·archived가 아닌 카드 중 **가장 최근에 `card_handoff`한 카드 하나**(handoff 기록 시각, 없으면 `updatedAt`). 메모 줄은 두 칸 들여쓴다.
+- 등록되지 않은 폴더: 한 줄 `Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음.`
 
 등록되지 않은 폴더의 세션은 무시한다 (단, `SessionStart` 컨텍스트로 "이 폴더는 Waypoint에 없음, `/tracker init` 가능"을 한 줄 알린다). 하위 폴더에서 연 세션은 가장 가까운 상위 `rootPath` 프로젝트로 매칭한다.
 
@@ -165,21 +187,52 @@ Claude Code PID 찾기(스크립트): 조상 프로세스를 4단계까지 올�
 
 ## 7. MCP 도구 (스킬용)
 
-스킬이 호출한다. 모두 `project`는 키 또는 `cwd`로 지정 가능.
+스킬이 호출한다. Claude Code에서의 도구 이름은 `mcp__waypoint__<도구>`(실측).
 
-| 도구 | 입력 | 설명 |
+### 엔드포인트 `POST /mcp`
+
+MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, 외부 패키지 없음).
+
+- **POST만.** 본문은 JSON-RPC 2.0 메시지 하나 또는 배치(배열). 요청이 있으면 `200 application/json`(배치면 응답 배열, 알림은 빼고), 알림·클라이언트 응답뿐이면 `202` 본문 없음. SSE는 쓰지 않는다. `GET`·`DELETE`는 `405`.
+- **`Origin`** 머리가 있고 호스트가 `localhost`·`127.0.0.1`·`[::1]`이 아니면 `403`(DNS 리바인딩 방어). 서버는 루프백에만 묶여 있다(6장).
+- **프로토콜 버전**: 초기화 방식(legacy) `2025-11-25`·`2025-06-18`·`2025-03-26`. `initialize`는 클라이언트가 보낸 버전이 이 안에 있으면 그대로, 아니면 `2025-11-25`. `MCP-Protocol-Version` 머리가 이 밖의 값이면 **본문 없는 `400`**.
+- **`Mcp-Session-Id`**: `initialize` 성공 응답에 UUID를 준다. 이후 요청에서는 검사하지 않는다(없거나 몰라도 받는다) — 서버가 세션별 상태를 두지 않고, 앱을 다시 켜도 실행 중인 Claude Code 세션이 다시 초기화하지 않고 계속 쓰게.
+- 메서드: `initialize`, `notifications/initialized`(202), `ping`, `tools/list`, `tools/call`. 그 밖은 `-32601`. 깨진 JSON은 `400` + `-32700`(`id: null`), 형식이 틀린 메시지·빈 배치는 `-32600`, 모르는 도구 이름은 `-32602`.
+- 도구 결과: `content: [{type: "text", text: <JSON 문자열>}]`, `isError`. 도구가 실패하면(카드 없음, 규칙 위반 등) `isError: true`와 `{"error": "<이유>"}`, 그 호출의 변경은 되돌린다. 성공하면 바로 저장한다.
+
+### 실측 (2026-09-28, Claude Code 2.1.283)
+
+- 연결할 때 먼저 **새 방식(2026-07-28, 세션 없는 방식)** 으로 떠본다: `POST /mcp`, 머리 `mcp-protocol-version: 2026-07-28`, `mcp-method: server/discover`, 본문 `server/discover`(`params._meta`에 버전·클라이언트 정보). 본문 없는 `400`을 받으면 `initialize`(`protocolVersion: "2025-11-25"`, 머리에 버전 없음)로 내려온다. 원문은 `Tests/Fixtures/mcp/real-*.json`. 그래서 모르는 버전 머리에는 JSON-RPC 오류를 싣지 않는다(새 방식 오류 본문이면 새 방식 서버로 보고 내려오지 않는다).
+- `initialize`에도 실패하면 옛 HTTP+SSE로 `GET /mcp`를 한다(`405`면 연결 실패).
+- 요청은 `Connection: keep-alive`로 오지만 서버는 응답마다 닫는다. 문제없이 이어졌다.
+- `--allowedTools 'mcp__waypoint__*'`로 도구 8개가 모두 허용됐다. 도구는 지연 로딩되어 Claude가 `ToolSearch`로 불러 쓴다.
+- 스킬은 `~/.claude/skills/tracker/SKILL.md`에서 `-p` 세션에도 불렸다(주입 블록 + 「PRB-1 하자」에 `Skill(tracker)`가 먼저 호출됨).
+
+### 도구
+
+`project`는 키(대소문자 무시) 또는 폴더 경로(가장 가까운 상위 `rootPath`). `id`는 `PRB-1` 꼴 표시 ID. 모든 스키마는 `additionalProperties: false`.
+
+| 도구 | 입력(필수 굵게) | 동작 |
 |---|---|---|
-| `project_resolve` | `cwd` | 폴더 → 프로젝트 요약 (없으면 null) |
-| `project_init` | `cwd, name, key, summary, stack[], guideFiles[], seedCards[]` | 초안 생성. 앱에 확인 시트를 띄우고, 사용자가 **등록**을 눌러야 확정 |
-| `card_list` | `project, status?, query?` | 카드 목록 |
-| `card_get` | `id` | 카드 상세 + 최근 이벤트 |
-| `card_create` | `project, title, kind, status, body?, parentId?, criteria[]?` | 생성 (origin=claude) |
-| `card_start` | `id, sessionId` | 세션을 카드에 연결 → 작업중 |
-| `card_update` | `id, title?, body?, status?, criteria?` | 수정. `status: done`은 사용자 확인 후에만 |
-| `card_note` | `id, text` | 히스토리에 메모 |
-| `card_handoff` | `id, nextSessionNote` | 다음 세션을 위한 메모 저장 |
+| `project_resolve` | **`cwd`** | 폴더 → `{key, name, summary, rootPath}`, 없으면 `null`(오류 아님) |
+| `project_init` | — | **M5**(앱 확인 시트와 함께). 지금은 없다 |
+| `card_list` | **`project`**, `status`, `query` | status를 안 주면 done·archived를 뺀다. 순서: active → next → idea → done → archived, 같은 상태는 번호순. `query`는 ID·제목·본문 부분 일치 |
+| `card_get` | **`id`** | 카드 + `body`, `origin`, `nextSessionNote`, `children`, 최근 기록 20개 |
+| `card_create` | **`project`**, **`title`**, `kind`, `status`, `body`, `parentId`, `criteria`, `sessionId` | origin=claude, `originSessionId`=`sessionId`. 기본 kind task, status next(kind idea면 idea). `active`는 거부(만든 뒤 `card_start`). `parentId`는 같은 프로젝트. `card.created` 기록 |
+| `card_start` | **`id`**, **`sessionId`** | 세션이 없거나 끝났거나 프로젝트가 다르면 오류. 그 세션에 붙은 **다른** 카드 연결을 먼저 푼다(주제 전환 — 그 카드는 작업 전 상태로, done 아님). 그다음 연결 → 작업중. 같은 카드를 다시 부르면 아무 일 없음. 서브에이전트 세션 ID(`agent_id`)면 그 하위 세션에 붙인다. 결과: `card`, `detached`(풀린 카드 ID), `otherSessions`(같은 카드에 붙은 다른 살아 있는 세션) |
+| `card_update` | **`id`**, `title`, `body`, `status`, `criteria` | `status: active`는 거부(작업중은 `card_start`로만). 다른 상태는 `CardLifecycle.move`(done이면 `doneAt`). `criteria`는 통째로 바꾼다 |
+| `card_note` | **`id`**, **`text`** | `note` 기록 `{text}` |
+| `card_handoff` | **`id`**, **`nextSessionNote`** | `nextSessionNote` 저장 + `note` 기록 `{kind: "handoff", text}` |
 
-`sessionId`는 `SessionStart` 훅이 주입한 컨텍스트에서 Claude가 읽어 전달한다.
+`criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
+
+`sessionId`는 `SessionStart` 훅이 주입한 블록의 `sessionId:` 줄에서 Claude가 읽어 전달한다.
+
+### 완료 조건 실측 (2026-09-28, `~/workspace/waypoint-probe`, `claude -p`)
+
+- 「PRB-1 하자 … 나중에 CSV 내보내기도 … 마무리해줘」 한 번에: `Skill(tracker)` → `card_start(PRB-1)` → `card_create(kind idea, status idea)` → 작업 → `card_handoff(PRB-1)`. PRB-1은 17초 동안 active, `SessionEnd` 뒤 next로 돌아갔다(done 아님). PRB-2 「CSV 내보내기」 idea 생성.
+- 다음 새 세션의 주입 블록에 `직전 세션 메모 (PRB-1 실측용 카드):`와 그 메모가 들어갔다.
+- 서브에이전트: 스킬이 `card_create(parentId: PRB-1)`로 PRB-3을 만들고 프롬프트 첫 줄 `[PRB-3] …`로 `Agent`를 불렀다. 훅이 하위 세션(`general-purpose`)을 PRB-3에 붙여 PRB-3이 45초 동안 작업중, 대시보드에 PRB-1 아래 들여 쓴 줄로 보였다. 끝나자 next로 돌아갔다.
 
 ## 8. 지침 문서 동기화
 
@@ -206,5 +259,5 @@ Claude 사용량(5시간·7일 한도의 사용 비율)을 사이드바 아래�
 ## 11. 열린 질문 (구현 중 결정)
 
 - 앱 샌드박스 여부 (로컬 서버·파일 감시 편의 vs 배포 방식). 개인용이면 비샌드박스 + 직접 서명도 가능.
-- Swift MCP 서버 구현: 공식 Swift SDK 사용 가능 여부 확인, 안 되면 Streamable HTTP의 필요한 부분만 직접 구현.
+- ~~Swift MCP 서버 구현~~ → 필요한 부분만 직접 구현(7장). 새 방식(2026-07-28, 세션 없음)을 지원할지는 Claude Code가 옛 방식을 버릴 때 다시 본다.
 - 서브에이전트의 `session_id`가 부모와 같은지 별도인지 — 실제 훅 입력을 로깅해서 확인 후 `Session` 매핑 확정.
