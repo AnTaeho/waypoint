@@ -109,7 +109,9 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 
 - 카드가 **작업중** = 열린 `CardSession` 중 세션 `state == live`인 것이 1개 이상.
 - 세션 `stalled` = `endedAt == nil` 이고 `now - lastSeenAt > stallTimeout` (설정값, 기본 15분).
-- 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. 그사이 사용자가 상태를 바꿨으면(`status != active`) 그대로 둔다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
+- 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
+- **불변식: 열린 연결이 있으면 카드는 `active`다.** 카드가 active를 떠나면(앱 드래그·「완료로 옮기기」·iPhone 분류·`card_update(status)`, 모두 `CardLifecycle.move`) 그 카드의 열린 연결을 서브에이전트 것까지 모두 닫고 세션마다 `card.detached`(`reason: "card-moved"`)를 남긴다. 상태는 새로 정한 그대로 두고 `statusBeforeActive`로 돌리지 않는다. 연결이 풀린 세션은 끝나지 않았으면 카드 없는 세션 줄·타일이 된다.
+- 어긋난 연결 점검: 앱이 시작 직후 한 번, 그 뒤 60초마다(세션 정리와 같은 자리), CloudKit 가져오기 뒤에 「카드가 active가 아닌데 열린 연결」을 찾아 닫는다(`CardLifecycle.closeStrayLinks`, `card.detached`에 `reason: "status-not-active"`). 카드 상태·수정 시각은 건드리지 않는다. 불변식 이전 데이터와 iPhone에서 옮긴 카드(연결은 병합하지 않는다)를 위한 것이다.
 - 대시보드 "작업중" 목록 = 프로젝트별로 묶은 (세션, 카드) 쌍 + 카드가 붙지 않은 끝나지 않은 메인 세션 한 줄씩(카드 칸 비움, 제목 자리에 그 세션의 마지막 요청 문장 `lastPrompt`(없으면 「카드 없음」), 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`). 같은 프로젝트에 세션 2개가 서로 다른 카드를 작업하면 그 프로젝트 아래 2줄. 세션에 카드가 붙으면 카드 없는 줄은 카드 줄로 바뀐다(중복 없음). 카드 없는 서브에이전트는 줄을 만들지 않는다. 제목의 「작업 N개」는 live 줄 수, 사이드바·프로젝트 표의 작업중·멈춤 수는 카드 수 + 카드 없는 메인 세션 수.
 - 프로젝트 보드 작업중 칸 = 작업중 카드 + 그 아래 카드 없는 세션 타일(대시보드 카드 없는 줄과 같은 세션, `BoardQuery.sessionTiles`). 타일은 마지막 요청 문장(없으면 「카드 없음」), 세션(`sess·7f2a`), 최근 파일, 끝나지 않은 서브에이전트 수(있으면), 경과 또는 「멈춤 N분」. 끌거나 누를 수 없다. 칸 머리 개수는 카드 + 타일(사이드바·프로젝트 표 작업중 수와 같은 기준).
 - 작업중 줄·타일의 경과(`SessionFormat.rowElapsed`): live면 카드 줄은 그 카드에 연결된 시각(`CardSession.attachedAt`)부터, 카드 없는 줄·타일은 마지막 요청 시각(`lastPromptAt`)부터이고 없으면 비운다. 멈춤이면 어느 줄이든 「멈춤 N분」(`lastSeenAt`부터).
@@ -271,7 +273,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `card_get` | **`id`** | 카드 + `body`, `origin`, `nextSessionNote`, `children`, 최근 기록 20개 |
 | `card_create` | **`project`**, **`title`**, `kind`, `status`, `body`, `parentId`, `criteria`, `sessionId` | origin=claude, `originSessionId`=`sessionId`. 기본 kind task, status next(kind idea면 idea). `active`는 거부(만든 뒤 `card_start`). `parentId`는 같은 프로젝트. `card.created` 기록 |
 | `card_start` | **`id`**, **`sessionId`** | 세션이 없거나 끝났거나 프로젝트가 다르면 오류. 그 세션에 붙은 **다른** 카드 연결을 먼저 푼다(주제 전환 — 그 카드는 작업 전 상태로, done 아님). 그다음 연결 → 작업중. 같은 카드를 다시 부르면 아무 일 없음. 서브에이전트 세션 ID(`agent_id`)면 그 하위 세션에 붙인다. 결과: `card`, `detached`(풀린 카드 ID), `otherSessions`(같은 카드에 붙은 다른 살아 있는 세션) |
-| `card_update` | **`id`**, `title`, `body`, `status`, `criteria` | `status: active`는 거부(작업중은 `card_start`로만). 다른 상태는 `CardLifecycle.move`(done이면 `doneAt`). `criteria`는 통째로 바꾼다 |
+| `card_update` | **`id`**, `title`, `body`, `status`, `criteria` | `status: active`는 거부(작업중은 `card_start`로만). 다른 상태는 `CardLifecycle.move`(done이면 `doneAt`, active였으면 열린 세션 연결을 모두 닫는다 — 4장 불변식). `criteria`는 통째로 바꾼다 |
 | `card_note` | **`id`**, **`text`** | `note` 기록 `{text}` |
 | `card_handoff` | **`id`**, **`nextSessionNote`** | `nextSessionNote` 저장 + `note` 기록 `{kind: "handoff", text}` |
 

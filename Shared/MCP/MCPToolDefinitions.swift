@@ -87,7 +87,7 @@ extension MCPTools {
         ),
         MCPToolDefinition(
             name: "card_update",
-            description: "카드 수정. status active는 받지 않는다(card_start로). done은 사용자 확인 후에만.",
+            description: "카드 수정. status active는 받지 않는다(card_start로). active 카드의 status를 바꾸면 붙어 있던 세션 연결이 모두 풀린다. done은 사용자 확인 후에만.",
             inputSchema: schema([
                 "id": cardIdProperty,
                 "title": string("새 제목"),
