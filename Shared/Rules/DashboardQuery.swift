@@ -10,6 +10,8 @@ public struct DashboardRow: Identifiable {
     public let workState: CardWorkState
     /// 0 = 메인 세션, 1 = 부모 세션 줄 바로 아래 서브에이전트
     public let depth: Int
+    /// 이 카드에 세션이 연결된 시각(`CardSession.attachedAt`). 카드 없는 줄은 nil
+    public let attachedAt: Date?
 
     public var id: String { "\(session.id)|\(card?.id.uuidString ?? "-")" }
 }
@@ -123,11 +125,13 @@ public enum DashboardQuery {
             let session = top[index].session
             while index < top.count, top[index].session === session {
                 let p = top[index]
-                result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 0))
+                result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 0,
+                                          attachedAt: p.card == nil ? nil : p.attachedAt))
                 index += 1
             }
             for p in nested where p.session.parent === session {
-                result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 1))
+                result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 1,
+                                          attachedAt: p.card == nil ? nil : p.attachedAt))
             }
         }
         return result

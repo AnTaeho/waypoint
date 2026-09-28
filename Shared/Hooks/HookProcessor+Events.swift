@@ -27,13 +27,14 @@ extension HookProcessor {
         return SessionContext.text(project: project, session: session, now: date, stallTimeout: stallTimeout)
     }
 
-    /// UserPromptSubmit: heartbeat에 더해 메인 세션의 마지막 요청 문장(`lastPrompt`)을 적는다.
+    /// UserPromptSubmit: heartbeat에 더해 메인 세션의 마지막 요청 문장(`lastPrompt`)과 그 시각(`lastPromptAt`)을 적는다.
     /// outbox로 늦게 들어온 옛 프롬프트는 더 최근 값을 덮지 않는다: 비어 있거나 이 훅이 지금까지 받은 것 중
     /// 가장 새것(`at >= lastSeenAt`, `touch` 전에 비교)일 때만 바꾼다.
     func userPromptSubmit(_ input: HookInput, at date: Date) {
         guard let session = mainSession(input, at: date, create: true) else { return }
         if let prompt = HookParsing.userPrompt(input), session.lastPrompt == nil || date >= session.lastSeenAt {
             session.lastPrompt = prompt
+            session.lastPromptAt = date
         }
         touch(session, at: date)
         if let sub = subagentSession(input) { touch(sub, at: date) }

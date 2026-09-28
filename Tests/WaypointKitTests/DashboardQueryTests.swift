@@ -54,6 +54,20 @@ import Testing
         #expect(Set(rows.map(\.id)).count == 2)
     }
 
+    /// 카드 줄은 그 카드에 연결된 시각을 싣고(경과 기준), 카드 없는 줄은 nil.
+    @Test func rowCarriesLinkAttachedAt() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let now = t0 + minutes(60)
+        let withCard = makeSession(ctx, p, id: "card", startedAt: t0, lastSeenAt: now)
+        _ = makeSession(ctx, p, id: "free", startedAt: t0 + minutes(1), lastSeenAt: now)
+        CardLifecycle.attach(p.makeCard(in: ctx, title: "a", at: t0), withCard, at: t0 + minutes(40), in: ctx)
+
+        let rows = DashboardQuery.rows(for: p, now: now)
+        #expect(rows.map(\.session.id) == ["card", "free"])
+        #expect(rows.map(\.attachedAt) == [t0 + minutes(40), nil])
+    }
+
     @Test func cardlessRowTurnsIntoCardRowWithoutDuplicate() throws {
         let (_c, ctx) = try makeContext(); _ = _c
         let p = makeProject(ctx)
