@@ -37,10 +37,11 @@ public final class HookProcessor {
     }
 
     /// 훅 본문(JSON)을 처리하고 저장한다. SessionStart면 주입할 텍스트를, 아니면 nil.
-    /// 읽을 수 없는 본문은 무시한다(nil).
+    /// 읽을 수 없는 본문은 무시한다(nil). `claudePid`는 훅을 부른 Claude Code 프로세스(머리·outbox 필드).
     @discardableResult
-    public func handle(event: String?, json: Data, at date: Date) -> String? {
-        guard let input = HookInput(event: event, json: json) else { return nil }
+    public func handle(event: String?, json: Data, at date: Date, claudePid: Int? = nil) -> String? {
+        guard var input = HookInput(event: event, json: json) else { return nil }
+        input.claudePid = claudePid
         return handle(input, at: date)
     }
 
@@ -93,12 +94,17 @@ public final class HookProcessor {
     /// 메인 세션. 없으면 `create`일 때 cwd로 프로젝트를 찾아 만든다(등록 안 된 폴더면 nil).
     /// 끝난 세션은 그 뒤 시각의 훅이 오면(`create`일 때) 다시 살린다. 끝난 시각 이전의 늦은 기록이면 nil.
     /// 새로 만들거나 다시 살렸으면 `session.start`를 남긴다(SessionStart가 아니어도 — 훅을 세션 중간에 등록한 경우).
+    /// 훅에 Claude Code PID가 있으면 세션에 적는다(`recordPid`).
     func mainSession(_ input: HookInput, at date: Date, create: Bool) -> Session? {
         if let session = fetchSession(input.sessionID) {
-            guard let endedAt = session.endedAt else { return session }
+            guard let endedAt = session.endedAt else {
+                recordPid(session, input, at: date)
+                return session
+            }
             guard create, date > endedAt else { return nil }
             session.endedAt = nil
             session.cachedState = .live
+            recordPid(session, input, at: date)
             recordStart(session, input, at: date)
             return session
         }
@@ -109,8 +115,19 @@ public final class HookProcessor {
         )
         context.insert(session)
         session.project = project
+        recordPid(session, input, at: date)
         recordStart(session, input, at: date)
         return session
+    }
+
+    /// 메인 세션의 Claude Code PID를 적는다. 비어 있거나, 이 훅이 지금까지 받은 것 중 가장 새것이면 바꾼다
+    /// (`--resume`은 같은 `session_id`를 새 프로세스로 이어 간다). outbox로 늦게 들어온 옛 훅은 PID를 되돌리지 않는다.
+    /// `touch` 전에 불러야 한다(`lastSeenAt`과 비교).
+    private func recordPid(_ session: Session, _ input: HookInput, at date: Date) {
+        guard let pid = input.claudePid, session.claudePid != pid else { return }
+        if session.claudePid == nil || date >= session.lastSeenAt {
+            session.claudePid = pid
+        }
     }
 
     private func recordStart(_ session: Session, _ input: HookInput, at date: Date) {
@@ -124,10 +141,23 @@ public final class HookProcessor {
         if session.endedAt == nil { session.cachedState = .live }
     }
 
-    /// 세션을 끝낸다: 열린 연결을 모두 닫고 `session.end` 기록.
-    func end(_ session: Session, at date: Date, reason: String? = nil) {
+    /// 메인 세션을 끝낸다: 끝나지 않은 하위 세션부터 닫고, 세션의 열린 연결을 모두 닫고 `session.end`(`reason`)를 남긴다.
+    /// `SessionEnd` 훅과 `SessionEnd`가 오지 않은 세션 정리(`sweep`)가 같이 쓴다. 이미 끝났으면 아무것도 안 한다.
+    /// `activity`가 false면 `lastSeenAt`을 옮기지 않는다(훅 없이 앱이 끝낸 경우 — 마지막 활동은 그대로).
+    /// 저장(save)은 호출 쪽에서 한다.
+    public func finish(_ session: Session, at date: Date, reason: String?, activity: Bool = true) {
         guard session.endedAt == nil else { return }
-        touch(session, at: date)
+        for child in session.children ?? [] where child.endedAt == nil {
+            end(child, at: date, activity: activity)
+        }
+        end(session, at: date, reason: reason, activity: activity)
+        pendingSpawns[session.id] = nil
+    }
+
+    /// 세션을 끝낸다: 열린 연결을 모두 닫고 `session.end` 기록.
+    func end(_ session: Session, at date: Date, reason: String? = nil, activity: Bool = true) {
+        guard session.endedAt == nil else { return }
+        if activity { touch(session, at: date) }
         CardLifecycle.detachAll(session, at: date, in: context)
         Event.record(.sessionEnd, in: context, project: session.project, session: session, at: date,
                      payload: reason.map { ["reason": .string($0)] } ?? [:])

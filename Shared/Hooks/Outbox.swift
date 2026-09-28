@@ -1,7 +1,7 @@
 import Foundation
 
 /// 앱이 꺼져 있는 동안 훅 스크립트가 쌓은 `outbox.jsonl` 흡수(SPEC 6장).
-/// 한 줄: `{"event":"<EventName>","receivedAt":<unix>,"payload":<원본 JSON>}`
+/// 한 줄: `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID, 없을 수 있음>,"payload":<원본 JSON>}`
 public enum Outbox {
 
     public static let fileName = "outbox.jsonl"
@@ -12,6 +12,8 @@ public enum Outbox {
         public let event: String
         public let receivedAt: Date
         public let payload: Data
+        /// 훅을 부른 Claude Code 프로세스 PID(스크립트가 찾았을 때만)
+        public let claudePid: Int?
     }
 
     public struct DrainResult: Equatable, Sendable {
@@ -29,7 +31,8 @@ public enum Outbox {
               let payload = object["payload"] as? [String: Any],
               let payloadData = try? JSONSerialization.data(withJSONObject: payload)
         else { return nil }
-        return Entry(event: event, receivedAt: Date(timeIntervalSince1970: receivedAt), payload: payloadData)
+        return Entry(event: event, receivedAt: Date(timeIntervalSince1970: receivedAt), payload: payloadData,
+                     claudePid: HookParsing.pid(object["claudePid"]))
     }
 
     /// `directory`의 outbox를 처리하고 비운다.
@@ -70,6 +73,6 @@ public enum Outbox {
 extension HookProcessor {
     /// outbox 한 줄을 처리한다. 시각은 훅이 받은 시각(`receivedAt`). SessionStart의 주입 텍스트는 버린다.
     public func handle(_ entry: Outbox.Entry) {
-        handle(event: entry.event, json: entry.payload, at: entry.receivedAt)
+        handle(event: entry.event, json: entry.payload, at: entry.receivedAt, claudePid: entry.claudePid)
     }
 }

@@ -26,6 +26,22 @@ import Testing
         #expect(Outbox.parse(line: #"{"event":"Stop","receivedAt":1}"#) == nil)
     }
 
+    @Test func parseClaudePid() throws {
+        let payload = String(decoding: try fixture("doc-Stop"), as: UTF8.self).replacingOccurrences(of: "\n", with: "")
+        let withPid = #"{"event":"Stop","receivedAt":100,"claudePid":5287,"payload":\#(payload)}"#
+        let entry = try #require(Outbox.parse(line: Substring(withPid)))
+        #expect(entry.claudePid == 5287)
+        #expect(HookInput(event: entry.event, json: entry.payload)?.sessionID == HookHarness.sessionID)
+        #expect(try #require(Outbox.parse(line: Substring(try line("Stop", "doc-Stop", at: t0)))).claudePid == nil)
+        let bad = #"{"event":"Stop","receivedAt":100,"claudePid":"x","payload":\#(payload)}"#
+        #expect(try #require(Outbox.parse(line: Substring(bad))).claudePid == nil)
+
+        // 흡수하면 메인 세션에 PID가 적힌다
+        let h = try HookHarness()
+        h.processor.handle(entry)
+        #expect(try h.session()?.claudePid == 5287)
+    }
+
     @Test func drainAppliesInOrderAndEmpties() throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

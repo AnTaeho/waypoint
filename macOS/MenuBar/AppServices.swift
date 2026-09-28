@@ -3,7 +3,7 @@ import Observation
 import SwiftData
 import WaypointKit
 
-/// 창과 상관없이 앱이 살아 있는 동안 도는 것: outbox 흡수, 로컬 서버, 세션 상태 캐시 갱신 타이머.
+/// 창과 상관없이 앱이 살아 있는 동안 도는 것: outbox 흡수, 로컬 서버, 세션 정리·상태 캐시 갱신 타이머.
 /// 메뉴 막대 상주(`MenuBarExtra`)라 창을 닫아도 계속 돈다.
 @MainActor
 @Observable
@@ -15,7 +15,7 @@ final class AppServices {
     @ObservationIgnored private var server: LocalServer?
     @ObservationIgnored private var timer: Timer?
 
-    /// 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
+    /// `SessionEnd` 없이 끝난 세션 정리와 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
     static let refreshInterval: TimeInterval = 60
 
     init(container: ModelContainer) {
@@ -30,8 +30,8 @@ final class AppServices {
         drainOutbox()
 
         let server = LocalServer { request in
-            HookRouter.respond(to: request) { event, body in
-                processor.handle(event: event, json: body, at: Date())
+            HookRouter.respond(to: request) { event, body, claudePid in
+                processor.handle(event: event, json: body, at: Date(), claudePid: claudePid)
             }
         }
         server.onStateChange = { [weak self] state in
@@ -43,6 +43,7 @@ final class AppServices {
         self.server = server
         server.start()
 
+        // 첫 outbox 흡수 뒤 한 번, 그 뒤 60초마다
         refreshStates()
         timer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshStates() }
@@ -54,11 +55,14 @@ final class AppServices {
         Outbox.drain(directory: directory) { processor.handle($0) }
     }
 
+    /// `SessionEnd`가 오지 않은 세션을 끝내고(`SessionSweep`), 남은 세션의 상태 캐시를 맞춘다.
     private func refreshStates() {
+        let now = Date()
+        processor?.sweep(now: now, probe: SessionSweep.systemProbe)
         let context = container.mainContext
         let open = FetchDescriptor<Session>(predicate: #Predicate<Session> { $0.endedAt == nil })
         let sessions = (try? context.fetch(open)) ?? []
-        if SessionStateCache.refresh(sessions, now: Date()) > 0 {
+        if SessionStateCache.refresh(sessions, now: now) > 0 {
             try? context.save()
         }
     }
