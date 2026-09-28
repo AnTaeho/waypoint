@@ -28,27 +28,39 @@ enum Theme {
 
     // MARK: 폰트
 
-    /// 본문 맨 위 페이지 제목. 세리프 500.
-    static let pageTitle = Font.system(size: 26, weight: .medium, design: .serif)
-    static let section = Font.system(size: 13, weight: .semibold)
+    /// 나눔스퀘어라운드 굵기(PostScript 이름). 파일은 `App/Fonts`, 등록은 `FontRegistry`.
+    /// 등록이 안 되면 `Font.custom`이 시스템 폰트로 그린다.
+    enum Face: String {
+        case regular = "NanumSquareRoundR"
+        case bold = "NanumSquareRoundB"
+    }
+
+    /// Dynamic Type을 따르지 않는 고정 크기(기존 `Font.system(size:)`와 같게).
+    static func rounded(_ size: CGFloat, _ face: Face = .regular) -> Font {
+        Font.custom(face.rawValue, fixedSize: size)
+    }
+
+    /// 본문 맨 위 페이지 제목. 나눔스퀘어라운드 B.
+    static let pageTitle = rounded(26, .bold)
+    static let section = rounded(13, .bold)
     /// 카드 상세 본문의 구역 제목(완료 조건·히스토리)
-    static let sectionLarge = Font.system(size: 14, weight: .semibold)
+    static let sectionLarge = rounded(14, .bold)
     /// 인스펙터 구역 제목
-    static let inspectorSection = Font.system(size: 12, weight: .semibold)
-    static let body = Font.system(size: 13)
-    static let bodyMedium = Font.system(size: 13, weight: .medium)
-    static let bodyStrong = Font.system(size: 13, weight: .semibold)
-    static let tableHeader = Font.system(size: 11, weight: .semibold)
-    static let caption = Font.system(size: 11)
-    static let captionLarge = Font.system(size: 12)
-    static let captionLargeMedium = Font.system(size: 12, weight: .medium)
+    static let inspectorSection = rounded(12, .bold)
+    static let body = rounded(13)
+    static let bodyMedium = rounded(13, .bold)
+    static let bodyStrong = rounded(13, .bold)
+    static let tableHeader = rounded(11, .bold)
+    static let caption = rounded(11)
+    static let captionLarge = rounded(11.5)
+    static let captionLargeMedium = rounded(11.5, .bold)
     static let mono = Font.system(size: 12, design: .monospaced)
     static let monoSmall = Font.system(size: 10, weight: .medium, design: .monospaced)
-    static let cardTitle = Font.system(size: 14, weight: .medium)
+    static let cardTitle = rounded(14, .bold)
     static let monoCaption = Font.system(size: 11, design: .monospaced)
-    /// 카드 상세 제목. 세리프 500.
-    static let detailTitle = Font.system(size: 28, weight: .medium, design: .serif)
-    static let detailBody = Font.system(size: 14)
+    /// 카드 상세 제목. 나눔스퀘어라운드 B.
+    static let detailTitle = rounded(28, .bold)
+    static let detailBody = rounded(14)
 
     // MARK: 모서리
 
