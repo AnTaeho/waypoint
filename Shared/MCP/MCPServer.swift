@@ -6,10 +6,13 @@ import SwiftData
 public final class MCPServer {
     public let tools: MCPTools
     public static let serverName = "waypoint"
-    public static let serverVersion = "0.3.0"
+    public static let serverVersion = "0.5.0"
 
-    public init(context: ModelContext, home: String = NSHomeDirectory(), now: @escaping () -> Date = Date.init) {
-        self.tools = MCPTools(context: context, home: home, now: now)
+    public init(
+        context: ModelContext, home: String = NSHomeDirectory(), drafts: ProjectDraftQueue? = nil,
+        now: @escaping () -> Date = Date.init
+    ) {
+        self.tools = MCPTools(context: context, home: home, drafts: drafts, now: now)
     }
 
     public var context: ModelContext { tools.context }

@@ -27,9 +27,17 @@ public enum GuideLibrary {
         return GuidePaths.fileURL(rootPath: project.rootPath, relPath: doc.relPath)
     }
 
-    /// 파일 내용으로 문서를 만들고 버전(local)과 `guide.synced`를 남긴다.
+    /// 파일 내용으로 문서를 만들고 버전(local)과 `guide.synced`를 남긴 뒤 저장한다.
     @discardableResult
     public static func register(_ relPath: String, in project: Project, at date: Date, context: ModelContext) throws -> GuideDoc {
+        let doc = try add(relPath, to: project, at: date, context: context)
+        try context.save()
+        return doc
+    }
+
+    /// `register`에서 저장만 뺀 것. 프로젝트 등록처럼 여러 변경을 한 번에 저장할 때 쓴다.
+    @discardableResult
+    public static func add(_ relPath: String, to project: Project, at date: Date, context: ModelContext) throws -> GuideDoc {
         guard let url = GuidePaths.fileURL(rootPath: project.rootPath, relPath: relPath) else { throw Failure.noRoot }
         if (project.guideDocs ?? []).contains(where: { $0.relPath == relPath }) { throw Failure.alreadyRegistered }
         guard case .present(let content, let hash) = try GuideFile.read(url) else { throw Failure.fileMissing }
@@ -37,7 +45,6 @@ public enum GuideLibrary {
         context.insert(doc)
         doc.project = project
         record(doc, content: content, source: .local, at: date, context: context)
-        try context.save()
         return doc
     }
 
