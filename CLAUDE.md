@@ -7,7 +7,7 @@ Claude Code 세션을 프로젝트 단위로 추적하는 개인용 macOS + iOS 
 ## 절대 규칙
 
 - 앱은 Anthropic API나 어떤 LLM API도 호출하지 않는다. 요약·추천·자동 분류 기능을 추가하지 않는다.
-- 훅 스크립트는 Claude Code를 절대 막으면 안 된다: 타임아웃 1초, 실패해도 exit 0, stdout은 `SessionStart`에서만 사용.
+- 훅 스크립트는 Claude Code를 절대 막으면 안 된다: 타임아웃 1초, 실패해도 exit 0, stdout은 `SessionStart`, 그리고 블록을 받지 못한 세션의 `UserPromptSubmit`에서 한 번만.
 - 카드를 자동으로 done 처리하지 않는다.
 - 마일스톤 하나가 끝나면 멈추고 완료 조건 충족 여부를 보고한다.
 

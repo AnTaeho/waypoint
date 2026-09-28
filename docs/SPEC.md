@@ -80,6 +80,7 @@ Criterion    text, isDone
 Session      id(= Claude Code session_id), project, kind: main | subagent,
              parent: Session?, agentName?, cwd, gitBranch?,
              startedAt, lastSeenAt, endedAt?, claudePid:Int?,   // claudePid: 메인 세션만, 훅 스크립트가 보낸 Claude Code PID
+             contextProjectKey:String?,          // 대화에 Waypoint 블록을 준 프로젝트 키(5장 「늦은 주입」)
              state: live | stalled | ended          // 파생값, 저장 캐시
 
 CardSession  card, session, attachedAt, detachedAt?
@@ -108,6 +109,7 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 - 세션 `stalled` = `endedAt == nil` 이고 `now - lastSeenAt > stallTimeout` (설정값, 기본 15분).
 - 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. 그사이 사용자가 상태를 바꿨으면(`status != active`) 그대로 둔다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
 - 대시보드 "작업중" 목록 = 프로젝트별로 묶은 (세션, 카드) 쌍 + 카드가 붙지 않은 끝나지 않은 메인 세션 한 줄씩(카드 칸 비움, 제목 자리 「카드 없음」, 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`). 같은 프로젝트에 세션 2개가 서로 다른 카드를 작업하면 그 프로젝트 아래 2줄. 세션에 카드가 붙으면 카드 없는 줄은 카드 줄로 바뀐다(중복 없음). 카드 없는 서브에이전트는 줄을 만들지 않는다. 제목의 「작업 N개」는 live 줄 수, 사이드바·프로젝트 표의 작업중·멈춤 수는 카드 수 + 카드 없는 메인 세션 수.
+- 프로젝트 보드 작업중 칸 = 작업중 카드 + 그 아래 카드 없는 세션 타일(대시보드 카드 없는 줄과 같은 세션, `BoardQuery.sessionTiles`). 타일은 「카드 없음」, 세션(`sess·7f2a`), 최근 파일, 끝나지 않은 서브에이전트 수(있으면), 경과 또는 「멈춤 N분」. 끌거나 누를 수 없다. 칸 머리 개수는 카드 + 타일(사이드바·프로젝트 표 작업중 수와 같은 기준).
 
 ## 5. 훅 → 기록 매핑
 
@@ -128,7 +130,7 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 | 훅 | 입력(문서) | 서버 동작 | 비고 |
 |---|---|---|---|
 | `SessionStart` | `source`(startup/resume/clear/compact/fork), `model?` | `cwd`로 프로젝트 조회 → 세션 생성(이미 있으면 다시 살림). 응답 본문을 stdout으로 출력해 **대화 컨텍스트에 주입** | 주입 형식은 아래 「SessionStart 주입」. command 훅만 지원 |
-| `UserPromptSubmit` | `prompt` | `lastSeenAt` 갱신 | heartbeat |
+| `UserPromptSubmit` | `prompt` | `lastSeenAt` 갱신. 메인 세션이 지금 프로젝트의 블록을 받지 못했으면 같은 블록을 응답 본문으로 돌려줘 stdout으로 **주입**(한 번) | heartbeat. 아래 「늦은 주입」 |
 | `PreToolUse` (`Agent`) | `tool_name`=`Agent`, `tool_input.prompt/description/subagent_type`, `tool_use_id` | 부모 세션 heartbeat. 프롬프트의 `[LDG-16]` 같은 카드 ID와 `subagent_type`을 **대기 목록**에 올린다 | 서브에이전트 도구 이름은 `Agent`(옛 이름 `Task`도 matcher에 남겨 둔다) |
 | `SubagentStart` | `agent_id`, `agent_type` | 하위 세션 생성(`id`=`agent_id`, `agentName`=`agent_type`, 부모=`session_id` 세션). 대기 목록에서 같은 `agent_type`의 가장 오래된 항목을 꺼내 카드가 있으면 연결 | 두 이벤트를 잇는 키는 실측에도 없다(`SubagentStart`에 `tool_use_id` 없음, 같은 `prompt_id`만 공유) → 순서·종류로 짝짓는다 |
 | `PostToolUse` (Edit/Write/Bash 등) | `tool_name`, `tool_input`, `tool_response` | `lastSeenAt` 갱신(서브에이전트면 그 하위 세션도), 변경 파일을 현재 작업중 카드 이벤트로. `Bash`의 `tool_response.gitOperation.commit`(없으면 `git commit` 출력 `[브랜치 해시] 메시지`)에서 commit 이벤트 | 줄 수는 `structuredPatch`·`bashEditDiff.files[].hunks`의 `+`/`-` 줄. 조각이 없으면 `Edit`은 `old_string/new_string`, `Write`는 `content`로 추정. `bashEditDiff.changedFiles`에만 있는 파일은 줄 수 0 |
@@ -161,6 +163,18 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - 등록되지 않은 폴더: 한 줄 `Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음.`
 
 **보관된 프로젝트 폴더**(가장 가까운 상위 `rootPath`가 보관된 프로젝트)는 등록되지 않은 폴더처럼 기록하지 않되, `SessionStart`에 안내 줄도 주지 않는다(빈 본문). 보관하기 전에 시작한 세션도 보관 뒤의 훅(heartbeat·파일 변경 등)은 기록하지 않는다. 단 `SessionEnd`·`SubagentStop`은 열린 세션을 닫는다(보관을 풀었을 때 끝난 세션이 작업중으로 남지 않게). 닫히지 않은 세션은 종료 판정이 닫는다. 보관을 풀면 다음 훅부터 다시 기록한다.
+
+### 늦은 주입 (`UserPromptSubmit`)
+
+`SessionStart`는 세션을 열 때 한 번만 난다. 그래서 등록 전에 시작한 세션, 등록 안 된 폴더에서 시작해 등록 폴더로 옮겨 온 세션은 블록을 받지 못해 스킬이 `sessionId`를 모른다(2026-09-28 chainmate 세션: `~/workspace`에서 시작해 옮겨 왔고 CHM은 그 뒤 등록 → 「이 폴더는 Waypoint에 없음」만 받았다).
+
+- 세션에 블록을 준 프로젝트 키를 적는다(`Session.contextProjectKey`). `SessionStart`에서 블록을 줄 때, 그리고 아래 늦은 주입 때.
+- 메인 세션의 `UserPromptSubmit`에서 `contextProjectKey`가 없거나 세션의 지금 프로젝트 키와 다르면 「SessionStart 주입」과 같은 블록을 응답 본문(`200 text/plain`)으로 돌려주고 키를 적는다. 그다음부터는 `204`. 블록을 받은 뒤 세션의 프로젝트가 바뀌면 한 번 더 준다(세션의 프로젝트는 처음 만들 때 정해지고 지금은 옮겨 가지 않는다 — 프로젝트를 옮기는 경로가 생기면 저절로 적용된다).
+- 주지 않는 경우: 서브에이전트 안의 훅(`agent_id` 있음), 끝난 세션, 미등록·보관 폴더(미등록 안내 줄은 `SessionStart`에서만).
+- outbox로 흡수하는 훅(앱이 꺼져 있던 동안의 것)은 이미 지난 일이라 텍스트를 만들지 않고 키도 적지 않는다. `SessionStart`도 같다. 그래서 앱이 꺼진 채 시작한 세션은 앱이 켜진 뒤 첫 프롬프트에 블록을 받는다.
+- 문서(2026-09-28 확인, https://code.claude.com/docs/en/hooks 「UserPromptSubmit decision control」): exit 0의 평문 stdout은 `UserPromptSubmit`·`SessionStart` 등에서 Claude가 보는 컨텍스트가 된다. JSON `hookSpecificOutput.additionalContext`(v2.1.196+, 10,000자)도 있지만 `SessionStart`와 같은 평문 방식을 쓴다. 전사에는 사용자 프롬프트 앞에 훅 이름을 보낸 쪽으로 한 별도 메시지로 남는다.
+- 이 기능을 넣기 전부터 떠 있던 세션은 `SessionStart`로 블록을 받았어도 키가 비어 있어 다음 프롬프트에 한 번 더 받는다.
+- 실측(2026-09-28, Claude Code 2.1.283, Dev, `~/workspace/waypoint-late-probe`): 미등록일 때 `claude -p`로 시작(「이 폴더는 Waypoint에 없음」만 받음) → 앱을 끈 채 폴더를 등록(LPR) → `--resume`에서 `SessionStart`를 빼고(대화형으로 이어 가는 경우와 같게) 프롬프트 → 전사에 `attachment` `{"type":"hook_success","hookEvent":"UserPromptSubmit","stdout":"Waypoint: LPR (늦은 주입 실측)\nsessionId: 0124a6c7-…"}`이 들어갔고 Claude가 블록을 그대로 옮겨 적었다. 두 번째 `--resume`에는 UserPromptSubmit 출력이 없었고 Claude는 「없음」. 저장소 `contextProjectKey` = `LPR`. 전사에서 이 attachment는 사용자 메시지 바로 뒤 줄에 적힌다.
 
 등록되지 않은 폴더의 세션은 무시한다 (단, `SessionStart` 컨텍스트로 "이 폴더는 Waypoint에 없음, `/tracker init` 가능"을 한 줄 알린다). 하위 폴더에서 연 세션은 가장 가까운 상위 `rootPath` 프로젝트로 매칭한다.
 
@@ -201,7 +215,10 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 모두 `POST http://127.0.0.1:47821/hooks/<EventName>`, 본문은 Claude Code가 훅에 넘긴 JSON 그대로. 스크립트가 훅을 부른 Claude Code 프로세스를 찾으면 머리 `X-Waypoint-Claude-PID: <PID>`를 더한다(없으면 뺀다). 응답:
 
 - `SessionStart`: `200 text/plain` — 컨텍스트로 주입할 짧은 텍스트 (없으면 빈 본문)
+- `UserPromptSubmit`: 늦은 주입(5장)이 있으면 `200 text/plain` 블록, 없으면 `204`
 - 나머지: `204`
+
+스크립트는 `SessionStart`·`UserPromptSubmit`이 `200`이고 본문이 있을 때만 stdout으로 찍는다. 다른 이벤트는 본문이 와도 찍지 않는다.
 
 outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID>,"payload":<원본 JSON>}`. `claudePid`는 PID를 찾았을 때만 있다. `payload`는 원본 그대로 둔다. 앱은 실행 시 순서대로 흡수하고 파일을 비운다.
 

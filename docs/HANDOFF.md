@@ -49,7 +49,7 @@ M1 완료 조건 중 남은 것: 프로젝트 보드와 카드 상세 화면, �
 ### 제품
 - 앱은 Anthropic API나 어떤 LLM API도 호출하지 않는다. 요약·추천·자동 분류 없음.
 - 카드를 자동으로 done 처리하지 않는다.
-- 훅 스크립트는 Claude Code를 막지 않는다: 타임아웃 1초, 실패해도 exit 0, stdout은 `SessionStart`에서만.
+- 훅 스크립트는 Claude Code를 막지 않는다: 타임아웃 1초, 실패해도 exit 0, stdout은 `SessionStart`, 그리고 블록을 받지 못한 세션의 `UserPromptSubmit`에서 한 번만.
 - 외부 Swift 패키지는 추가하지 않는다. 필요해 보이면 `docs/DECISIONS.md`에 제안으로만 남긴다.
 
 ### 코드

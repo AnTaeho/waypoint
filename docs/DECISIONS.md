@@ -145,6 +145,11 @@
 | 09-28 | Mac은 CloudKit 가져오기가 끝나면 새 context로 카드를 읽어, 메인 context에 이미 올라온 같은 카드 중 `updatedAt`이 더 늦은 것의 값을 옮겨 적고 저장한다(`RemoteCardMerge`, `AppServices`) | 실측: iPhone에서 옮긴 카드가 Mac 보드에 아이디어로 남았고, Mac에서 본문만 고친 `card_update`가 저장소 상태를 아이디어로 되돌렸다(PRB-3·PRB-4). 다시 fetch해도, `rollback`해도 옛 값 그대로였다. SwiftData에 객체를 새로 읽는 API가 없다. 서버·훅·MCP·화면이 모두 메인 context를 붙잡고 있어 context를 바꾸는 것보다 좁게 고쳤다. iPhone이 고치는 것은 카드뿐이라 카드만 맞춘다 | 가져오기마다 메인 context 대신 새 context로 전부 갈아타기 | `AppServices.observeCloudKitImports` 제거 |
 | 09-28 | 앱 아이콘: 이정표(후보 1). 평소용 `AppIcon`(클레이 바탕), 개발용 `AppIconDev`(검은 바탕, Debug 구성만 `ASSETCATALOG_COMPILER_APPICON_NAME`) | 사용자 선택. 두 인스턴스를 Dock·홈 화면에서 가려 보게 | — | `project.yml`의 `ASSETCATALOG_COMPILER_APPICON_NAME`, `App/Assets.xcassets` |
 | 09-28 | iPad 방향 4개(`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad`) | iOS 기기 빌드가 「All interface orientations must be supported」 경고를 냈다 | iPhone만 지원(`TARGETED_DEVICE_FAMILY=1`) | `project.yml` 한 줄 |
+| 09-28 | 늦은 주입: 블록을 받지 못한 메인 세션의 다음 `UserPromptSubmit`에 같은 블록을 한 번(`Session.contextProjectKey`로 판정), 평문 stdout | 등록 전에 시작하거나 다른 폴더에서 옮겨 온 세션은 `SessionStart` 블록을 못 받아 스킬이 카드를 붙이지 못했다(chainmate). 문서상 `UserPromptSubmit` 평문 stdout은 컨텍스트가 되고, `SessionStart`와 같은 방식이라 스크립트가 단순하다 | JSON `additionalContext`(v2.1.196+, 10,000자) | `HookProcessor.lateContext`, `HookRouter.lateContextEvents`, 스크립트 `case`를 `SessionStart`만으로 |
+| 09-28 | 세션의 프로젝트는 옮기지 않는다. 「다른 프로젝트로 옮긴 세션」은 `contextProjectKey != project.key` 비교로만 다룬다 | 세션을 옮기면 열린 카드 연결·서브에이전트·이벤트 소유가 함께 걸리고, 잠깐 `cd`한 것만으로 프로젝트가 뒤집힌다. 레코드는 두고 cwd 기준 다른 프로젝트 블록만 주면 `card_start`가 「세션과 카드의 프로젝트가 다름」으로 막힌다 | UserPromptSubmit의 cwd로 세션을 다른 프로젝트로 옮기기 | — |
+| 09-28 | outbox로 흡수한 훅(`SessionStart` 포함)은 주입 텍스트를 만들지 않고 `contextProjectKey`도 적지 않는다(`delivers: false`) | 이미 지난 훅이라 대화에 들어가지 않았다. 적어 두면 앱이 꺼진 채 시작한 세션이 블록을 영영 못 받는다 | 흡수 때도 키 적기 | `HookProcessor.handle(_ entry:)`의 `delivers: false` |
+| 09-28 | 보드 작업중 칸에 카드 없는 세션 타일(카드 아래), 칸 머리 개수는 카드 + 타일 | 대시보드 작업중 줄·사이드바·프로젝트 표 작업중 수가 이미 카드 없는 메인 세션을 센다. 보드만 빼면 같은 프로젝트의 숫자가 화면마다 다르다 | 카드 수만 | `BoardColumnView` 머리 `items.count` |
+| 09-28 | 평소용 반영 순서: 훅 스크립트 교체 → 앱 설치 | 새 앱 + 옛 스크립트면 앱이 UserPromptSubmit에 블록(200)을 주고 키를 적는데 옛 스크립트는 찍지 않아 한 번뿐인 주입이 사라진다. 새 스크립트 + 옛 앱은 204라 무해하다 | 앱 먼저 | — |
 
 ### 관찰 (2026-09-28, Dev)
 
