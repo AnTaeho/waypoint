@@ -27,23 +27,23 @@ struct RootView: View {
                     CardDetailView(card: card)
                 }
             }
-            .inspector(isPresented: $showsInspector) {
-                inspector
-                    .inspectorColumnWidth(
-                        min: Theme.Size.inspectorMinWidth,
-                        ideal: Theme.Size.inspectorWidth,
-                        max: Theme.Size.inspectorMaxWidth
-                    )
-            }
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showsInspector.toggle()
-                    } label: {
-                        Label(inspectorTitle, systemImage: "sidebar.right")
-                    }
-                    .help(inspectorTitle)
+        }
+        .inspector(isPresented: $showsInspector) {
+            inspector
+                .inspectorColumnWidth(
+                    min: Theme.Size.inspectorMinWidth,
+                    ideal: Theme.Size.inspectorWidth,
+                    max: Theme.Size.inspectorMaxWidth
+                )
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showsInspector.toggle()
+                } label: {
+                    Label(inspectorTitle, systemImage: "sidebar.right")
                 }
+                .help(inspectorTitle)
             }
         }
         .searchable(text: $searchText, placement: .toolbar, prompt: "검색")
