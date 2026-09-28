@@ -34,6 +34,10 @@ public enum WaypointStore {
         try supportDirectory(create: create).appendingPathComponent("Sample.store")
     }
 
+    /// 컨테이너 생성을 한 번에 하나씩. 여러 컨테이너가 같은 `schema`로 동시에 저장소를 열면
+    /// Core Data가 트리거 SQL을 만들며 공유 사전을 함께 고쳐 signal 11로 죽는다(병렬 테스트에서 재현).
+    private static let creationLock = NSLock()
+
     /// - Parameters:
     ///   - inMemory: true면 파일을 쓰지 않는다(url 무시).
     ///   - url: 저장 파일. nil이면 `defaultStoreURL()`.
@@ -48,6 +52,8 @@ public enum WaypointStore {
             )
             config = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
         }
+        creationLock.lock()
+        defer { creationLock.unlock() }
         return try ModelContainer(for: schema, configurations: [config])
     }
 }
