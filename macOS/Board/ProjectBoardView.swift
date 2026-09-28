@@ -66,7 +66,7 @@ struct ProjectBoardView: View {
     }
 }
 
-/// 보드 머리: 이름(세리프) + 키, 요약, 폴더 경로.
+/// 보드 머리: 이름(페이지 제목) + 키, 요약, 폴더 경로.
 private struct BoardHeader: View {
     let project: Project
 
