@@ -16,6 +16,7 @@ struct WaypointApp: App {
     #endif
 
     init() {
+        FontRegistry.registerBundledFonts()
         container = Self.makeContainer()
         #if os(macOS)
         services = Self.usesSampleData ? nil : AppServices(container: container)
