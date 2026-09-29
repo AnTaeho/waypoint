@@ -38,7 +38,8 @@ struct BoardColumnView: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(Theme.Spacing.rowH)
+        .padding(.horizontal, Theme.Board.columnPaddingH)
+        .padding(.vertical, Theme.Board.columnPaddingV)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: Theme.Radius.panel)

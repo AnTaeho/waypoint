@@ -112,8 +112,9 @@ enum Theme {
         static let liveBorder: CGFloat = 1.5
         static let liveShadowRadius: CGFloat = 5
         static let liveShadowY: CGFloat = 2
-        /// 보드 한 칸의 최소 폭. 1280pt 창에 사이드바·인스펙터가 열려도 네 칸이 다 들어가는 값. 더 좁으면 보드를 가로로 넘긴다.
-        static let boardColumnMinWidth: CGFloat = 165
+        /// 보드 한 칸의 최소 폭. 보드는 인스펙터를 닫은 채 시작해 1280pt 창에서 칸이 약 240pt가 된다.
+        /// 창이 좁거나 인스펙터를 열어 이 폭보다 좁아지면 칸을 줄이지 않고 보드를 가로로 넘긴다.
+        static let boardColumnMinWidth: CGFloat = 220
         static let checkbox: CGFloat = 16
         /// 카드 상세 본문 최대 폭
         static let detailBodyMaxWidth: CGFloat = 720
@@ -153,6 +154,12 @@ enum Theme {
         static let doneOpacity: Double = 0.85
         /// 아이디어 칸에 처음 보이는 카드 수
         static let ideaPreviewCount = 3
+        /// 카드·세션 타일 안쪽 여백. 제목 줄 폭을 넓히려고 가로를 세로보다 좁게.
+        static let cardPaddingH: CGFloat = 10
+        static let cardPaddingV: CGFloat = 12
+        /// 칸 안쪽 여백(칸 바탕과 카드 사이)
+        static let columnPaddingH: CGFloat = 10
+        static let columnPaddingV: CGFloat = 12
     }
 
     /// 지침 문서
