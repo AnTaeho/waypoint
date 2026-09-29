@@ -31,7 +31,8 @@ struct BoardSessionTileView: View {
             }
             if hasDetail { detailBox }
         }
-        .padding(Theme.Spacing.rowH)
+        .padding(.horizontal, Theme.Board.cardPaddingH)
+        .padding(.vertical, Theme.Board.cardPaddingV)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.card)

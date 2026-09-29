@@ -12,6 +12,8 @@ struct RootView: View {
     /// 지침 문서 화면에서 고른 문서. 프로젝트를 바꾸면 비운다(첫 문서).
     @State private var guideDocID: PersistentIdentifier?
     @State private var showsInspector = true
+    /// 프로젝트 보드 화면의 인스펙터. 네 칸이 넓게 보이도록 닫힌 채 시작하고, 연 뒤에는 앱을 끌 때까지 기억한다.
+    @State private var showsBoardInspector = false
     @State private var searchText = ""
     /// 샘플 모드에서는 nil
     @Environment(AppServices.self) private var services: AppServices?
@@ -40,7 +42,7 @@ struct RootView: View {
                 }
             }
         }
-        .inspector(isPresented: $showsInspector) {
+        .inspector(isPresented: inspectorShown) {
             RootInspector(
                 projectID: selectedProjectID,
                 card: path.last,
@@ -67,7 +69,7 @@ struct RootView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showsInspector.toggle()
+                    inspectorShown.wrappedValue.toggle()
                 } label: {
                     Label(inspectorTitle, systemImage: "sidebar.right")
                 }
@@ -98,6 +100,12 @@ struct RootView: View {
     private var inspectorTitle: String {
         if !path.isEmpty { return "카드 정보" }
         return projectMode == .guide && selectedProjectID != nil ? "문서 정보" : "최근 기록"
+    }
+
+    /// 보드 화면이면 보드 전용 상태, 대시보드·카드 상세·지침 문서는 공용 상태.
+    private var inspectorShown: Binding<Bool> {
+        let isBoard = selectedProjectID != nil && projectMode == .board && path.isEmpty
+        return isBoard ? $showsBoardInspector : $showsInspector
     }
 
     private var selectedProjectID: PersistentIdentifier? {

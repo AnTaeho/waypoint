@@ -39,7 +39,8 @@ struct BoardCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
             footer(link: link)
         }
-        .padding(Theme.Spacing.rowH)
+        .padding(.horizontal, Theme.Board.cardPaddingH)
+        .padding(.vertical, Theme.Board.cardPaddingV)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { cardBackground }
         .opacity(column == .done ? Theme.Board.doneOpacity : 1)
