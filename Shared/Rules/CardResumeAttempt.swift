@@ -31,7 +31,7 @@ public struct CardResumeAttempt {
         return links.isEmpty ? .waiting : .disconnected
     }
 
-    /// 연결 확인(`connected`)일 때 그 연결이 붙은 가장 이른 시각. 재개 시간 지표가 쓴다(감지 시각이 아니다).
+    /// 연결 확인(`connected`)일 때 그 연결이 붙은 가장 이른 시각. 재개 시간 지표가 쓴다(알아챈 시각은 쓰지 않는다).
     public func connectedAt(for card: Card) -> Date? {
         guard state(for: card) == .connected else { return nil }
         return newLinks(card).filter { $0.isOpen && $0.session?.endedAt == nil }.map(\.attachedAt).min()
