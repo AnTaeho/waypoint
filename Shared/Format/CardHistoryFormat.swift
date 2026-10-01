@@ -74,6 +74,9 @@ public enum CardHistoryFormat {
                 let done = p["isDone"]?.boolValue ?? false
                 return make(.note, "완료 조건 \(done ? "체크" : "해제") · \(text)")
             }
+            if p["kind"]?.stringValue == PromptRetention.promptKind, (p["text"]?.stringValue ?? "").isEmpty {
+                return make(.note, ActivityEntryFormat.clearedPromptText)
+            }
             guard let text = p["text"]?.stringValue, !text.isEmpty else { return nil }
             return make(.note, text)
         case .sessionStart, .sessionEnd, .guideSynced:

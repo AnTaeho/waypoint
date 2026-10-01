@@ -27,7 +27,7 @@ public struct ActivitySessionGroup: Identifiable {
     public let at: Date
     public let entries: [ActivityEntry]
     public var title: String {
-        entries.first(where: { $0.kind == "user.prompt" })?.text
+        entries.first(where: { $0.kind == PromptRetention.promptKind && $0.detail == ActivityEntryFormat.promptDetail })?.text
             ?? session.map(SessionFormat.label(for:)) ?? "카드·프로젝트 기록"
     }
     public var summary: String {
