@@ -1,0 +1,10 @@
+{
+  "session_id": "same-id",
+  "cwd": "/Users/me/dev/ledger",
+  "transcript_path": null,
+  "model": "test-model",
+  "hook_event_name": "SubagentStop",
+  "agent_id": "agent-1",
+  "agent_type": "worker",
+  "stop_hook_active": false
+}

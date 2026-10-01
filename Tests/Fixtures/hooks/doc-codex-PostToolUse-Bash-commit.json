@@ -1,0 +1,17 @@
+{
+  "session_id": "same-id",
+  "cwd": "/Users/me/dev/ledger",
+  "transcript_path": null,
+  "model": "test-model",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "git commit -m \"Codex 연결\""
+  },
+  "tool_response": {
+    "output": "[feat/codex abc1234] Codex 연결\n 1 file changed",
+    "metadata": {
+      "exit_code": 0
+    }
+  }
+}

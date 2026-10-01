@@ -39,8 +39,8 @@ import Testing
     @Test func verdictWithoutPid() {
         var probed = false
         let probe: SessionSweep.Probe = { _ in probed = true; return nil }
-        #expect(SessionSweep.verdict(pid: nil, lastSeenAt: t0, now: t0 + 24 * 3600, probe: probe) == .keep)
-        #expect(SessionSweep.verdict(pid: nil, lastSeenAt: t0, now: t0 + 24 * 3600 + 1, probe: probe) == .end(reason: "inactive-24h"))
+        #expect(SessionSweep.verdict(pid: nil, lastSeenAt: t0, now: t0 + 30 * 60, probe: probe) == .keep)
+        #expect(SessionSweep.verdict(pid: nil, lastSeenAt: t0, now: t0 + 30 * 60 + 1, probe: probe) == .end(reason: "tracking-expired-30m"))
         #expect(!probed)
     }
 
@@ -84,17 +84,17 @@ import Testing
         #expect(try h.session()?.endedAt == nil)
     }
 
-    @Test func noPidEndsOnlyAfter24h() throws {
+    @Test func noPidExpiresAfter30Minutes() throws {
         let h = try HookHarness()
         try send(h, "doc-SessionStart", at: t0, pid: nil)
         let main = try #require(try h.session())
         #expect(main.claudePid == nil)
-        #expect(h.processor.sweep(now: t0 + 23 * 3600, probe: gone) == 0)
+        #expect(h.processor.sweep(now: t0 + 29 * 60, probe: gone) == 0)
         #expect(main.endedAt == nil)
-        #expect(h.processor.sweep(now: t0 + 25 * 3600, probe: gone) == 1)
-        #expect(main.endedAt == t0 + 25 * 3600)
+        #expect(h.processor.sweep(now: t0 + 31 * 60, probe: gone) == 1)
+        #expect(main.endedAt == t0 + 31 * 60)
         let end = (main.events ?? []).first { $0.type == .sessionEnd }
-        #expect(end?.payloadValues["reason"]?.stringValue == "inactive-24h")
+        #expect(end?.payloadValues["reason"]?.stringValue == "tracking-expired-30m")
     }
 
     @Test func lateHookAfterSweepRevivesButOlderDoesNot() throws {
@@ -133,6 +133,16 @@ import Testing
         // PID 없는 훅은 지우지 않는다
         try send(h, "doc-Stop", at: t0 + 90, pid: nil)
         #expect(main.claudePid == 222)
+    }
+
+    @Test func resumedHookWithoutPidDoesNotRetainDeadProcess() throws {
+        let h = try HookHarness()
+        try send(h, "doc-SessionStart", at: t0)
+        let main = try #require(try h.session())
+        h.processor.sweep(now: t0 + 60, probe: gone)
+        try send(h, "doc-SessionStart", at: t0 + 120, pid: nil)
+        #expect(main.endedAt == nil && main.claudePid == nil)
+        #expect(h.processor.sweep(now: t0 + 180, probe: gone) == 0)
     }
 
     @Test func sweepIgnoresEndedAndSubagentSessions() throws {

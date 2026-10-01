@@ -48,7 +48,7 @@ extension MCPTools {
             rootPath: root, name: name, key: key,
             summary: optionalString(args, "summary")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             stack: ProjectRegistry.cleanStack(try stringArray(args, "stack")),
-            guideFiles: guides, seedCards: seeds, createdAt: now()
+            guideFiles: guides, seedCards: seeds, createdAt: now(), provider: try provider(args)
         )
         let replaced = drafts.submit(draft)
 

@@ -6,7 +6,7 @@ import SwiftData
 public final class MCPServer {
     public let tools: MCPTools
     public static let serverName = "waypoint"
-    public static let serverVersion = "0.5.0"
+    public static let serverVersion = "0.7.0"
 
     public init(
         context: ModelContext, home: String = NSHomeDirectory(), drafts: ProjectDraftQueue? = nil,
@@ -59,7 +59,7 @@ public final class MCPServer {
             "protocolVersion": .string(version),
             "capabilities": ["tools": ["listChanged": false]],
             "serverInfo": ["name": .string(Self.serverName), "version": .string(Self.serverVersion)],
-            "instructions": "Waypoint 카드 보드. 사용법은 tracker 스킬을 따른다.",
+            "instructions": "Waypoint 카드 보드(Claude Code·Codex). tracker 스킬을 따른다. 작업 대상 폴더를 project_resolve로 확인하고 session_bind로 연결한다. 실제 sessionId는 훅 블록 또는 Codex 실행 환경 CODEX_SESSION_ID/CODEX_THREAD_ID에서 얻는다. ID를 추측하거나 만들지 않는다. 연결 결과의 sessionId를 card_start·card_create에 쓴다. Codex ID의 codex: 접두사를 유지한다. 작업 시작·전환에는 card_start, 나중에 할 일은 card_create(kind: idea), 중단·마무리는 card_handoff. 완료는 사용자 승인 후에만 card_update(status: done). Codex의 project_init 및 세션 없는 card_create에는 provider: codex를 보낸다.",
         ]
     }
 

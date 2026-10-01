@@ -1,0 +1,12 @@
+{
+  "session_id": "same-id",
+  "cwd": "/Users/me/dev/ledger",
+  "transcript_path": null,
+  "model": "test-model",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "apply_patch",
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Add File: new.swift\n+one\n+two\n*** Update File: old.swift\n@@\n-old\n+new\n context\n*** End Patch"
+  },
+  "tool_response": "Success. Updated the following files:\nA new.swift\nM old.swift\n"
+}

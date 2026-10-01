@@ -3,10 +3,11 @@ import Foundation
 /// 보드 카드·카드 상세에 보이는 짧은 문구.
 public enum CardFormat {
 
-    /// 만든 곳: 「Claude」「직접 작성」.
+    /// 만든 곳: 「Claude」「Codex」「직접 작성」.
     public static func originName(_ origin: CardOrigin) -> String {
         switch origin {
         case .claude: "Claude"
+        case .codex: "Codex"
         case .manual: "직접 작성"
         }
     }
@@ -36,7 +37,8 @@ public enum CardFormat {
     }
 
     /// 작업중 카드 오른쪽 위: live면 「38분째」(1분 미만 「방금」), stalled면 「멈춤 22분」.
-    public static func workTime(state: CardWorkState, attachedAt: Date, lastSeenAt: Date, now: Date) -> String? {
+    public static func workTime(state: CardWorkState, attachedAt: Date, lastSeenAt: Date, now: Date, session: Session? = nil) -> String? {
+        if let session { return SessionFormat.activityText(session, now: now) }
         switch state {
         case .live:
             let elapsed = TimeFormat.elapsed(from: attachedAt, to: now)

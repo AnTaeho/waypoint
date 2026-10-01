@@ -13,16 +13,18 @@ import Testing
         #expect(s.project === h.project)
         #expect(s.startedAt == t0)
         #expect(s.gitBranch == "feat/ocr-mapping")
-        #expect(SessionRules.state(of: s, now: t0) == .live)
+        #expect(SessionRules.state(of: s, now: t0) == .stalled)
+        #expect(SessionActivityRules.activity(s, now: t0) == .waiting)
         #expect(text.contains("LDG"))
         #expect(text.contains(HookHarness.sessionID))
         #expect((s.events ?? []).filter { $0.type == .sessionStart }.count == 1)
     }
 
-    @Test func unregisteredFolderIsIgnoredWithOneLine() throws {
+    @Test func unregisteredFolderProvidesIdentityWithoutCreatingSession() throws {
         let h = try HookHarness()
         let text = try h.send("doc-SessionStart-unregistered", at: t0)
-        #expect(text == SessionContext.unregistered)
+        #expect(text?.hasPrefix(SessionContext.unregistered) == true)
+        #expect(text?.contains("sessionId: \(try #require(HookInput(event: nil, json: fixture("doc-SessionStart-unregistered"))).sessionID)") == true)
         #expect(try h.context.fetchCount(FetchDescriptor<Session>()) == 0)
     }
 

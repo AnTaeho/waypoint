@@ -97,7 +97,8 @@ public enum DashboardQuery {
             for link in links {
                 pending.append(Pending(card: link.card, session: session, state: work, attachedAt: link.attachedAt))
             }
-            if links.isEmpty, session.kind == .main {
+            if links.isEmpty, session.kind == .main,
+               SessionRules.hasUnassignedWork(session, now: now, stallTimeout: stallTimeout) {
                 pending.append(Pending(card: nil, session: session, state: work, attachedAt: session.startedAt))
             }
         }
@@ -158,7 +159,8 @@ public enum DashboardQuery {
         }
         // 카드 없이 도는 메인 세션도 작업중·멈춤에 센다(대시보드 줄과 같은 기준).
         for session in project.sessions ?? [] where session.kind == .main && session.endedAt == nil {
-            guard !session.openCardSessions.contains(where: { $0.card != nil }) else { continue }
+            guard !session.openCardSessions.contains(where: { $0.card != nil }),
+                  SessionRules.hasUnassignedWork(session, now: now, stallTimeout: stallTimeout) else { continue }
             switch SessionRules.state(of: session, now: now, stallTimeout: stallTimeout) {
             case .live: live += 1
             case .stalled: stalled += 1

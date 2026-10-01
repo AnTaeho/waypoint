@@ -24,6 +24,7 @@ extension MCPTools {
             description: "폴더를 새 프로젝트로 등록하는 초안을 Waypoint 앱에 띄운다. 사용자가 앱에서 확인하고 등록하므로 결과는 pending. 이미 등록된 폴더면 오류.",
             inputSchema: schema([
                 "cwd": string("등록할 폴더 절대 경로"),
+                "provider": providerProperty,
                 "name": string("프로젝트 이름"),
                 "key": string("카드 키(영문 대문자 2–5자, 다른 프로젝트와 겹치지 않게). 없으면 앱이 추천"),
                 "summary": string("한두 문장 개요"),
@@ -49,6 +50,16 @@ extension MCPTools {
             ], required: ["cwd", "name"])
         ),
         MCPToolDefinition(
+            name: "session_bind",
+            description: "시작 폴더와 관계없이 실제 작업 대상 프로젝트에 메인 세션을 연결한다. 훅 또는 실행 환경의 실제 ID만 사용한다. 프로젝트 전환 시 이전 카드 연결을 풀지만 과거 기록의 프로젝트는 유지한다.",
+            inputSchema: schema([
+                "project": projectProperty,
+                "sessionId": string("훅 또는 실행 환경의 실제 세션 ID. Codex는 codex: 접두사 포함"),
+                "provider": providerProperty,
+                "cwd": string("세션 시작 폴더 절대 경로"),
+            ], required: ["project", "sessionId", "provider", "cwd"])
+        ),
+        MCPToolDefinition(
             name: "card_list",
             description: "프로젝트의 카드 목록. status를 안 주면 done·archived를 뺀다.",
             inputSchema: schema([
@@ -64,9 +75,10 @@ extension MCPTools {
         ),
         MCPToolDefinition(
             name: "card_create",
-            description: "카드를 만든다(origin=claude). 나중에 할 것은 kind·status를 idea로.",
+            description: "카드를 만든다. 만든 곳은 연결 세션의 도구(Claude·Codex). 나중에 할 것은 kind·status를 idea로.",
             inputSchema: schema([
                 "project": projectProperty,
+                "provider": providerProperty,
                 "title": string("제목"),
                 "kind": ["type": "string", "enum": ["task", "idea", "bug"], "description": "기본 task"],
                 "status": ["type": "string", "enum": ["idea", "next", "done", "archived"],
@@ -113,6 +125,10 @@ extension MCPTools {
 
     static let projectProperty: JSONValue = [
         "type": "string", "description": "프로젝트 키(예: PRB) 또는 작업 폴더 경로",
+    ]
+    static let providerProperty: JSONValue = [
+        "type": "string", "enum": ["claude", "codex"],
+        "description": "호출 도구. 기본 claude. card_create는 연결 세션의 도구를 우선함",
     ]
     static let cardIdProperty: JSONValue = [
         "type": "string", "pattern": "^[A-Za-z]{2,5}-[0-9]+$", "description": "카드 ID(예: PRB-1)",

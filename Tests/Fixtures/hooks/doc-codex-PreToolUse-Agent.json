@@ -1,0 +1,13 @@
+{
+  "session_id": "same-id",
+  "cwd": "/Users/me/dev/ledger",
+  "transcript_path": null,
+  "model": "test-model",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_use_id": "call-1",
+  "tool_input": {
+    "message": "[LDG-2] 파서 테스트",
+    "agent_type": "worker"
+  }
+}

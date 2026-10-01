@@ -5,6 +5,8 @@ import SwiftData
 /// 넘겨받은 context가 속한 액터(앱에서는 메인 액터)에서만 부른다. Sendable이 아니다.
 public final class HookProcessor {
     public let context: ModelContext
+    /// 최근 처리의 저장 실패. 진단 화면은 오류 원문이나 사용자 입력을 노출하지 않는다.
+    public private(set) var lastSaveFailed = false
     public var stallTimeout: TimeInterval
     /// 프로젝트 매칭에 쓰는 홈 폴더(`~` 펼치기). 테스트에서 바꾼다.
     public var home: String
@@ -41,18 +43,26 @@ public final class HookProcessor {
     /// 읽을 수 없는 본문은 무시한다(nil). `claudePid`는 훅을 부른 Claude Code 프로세스(머리·outbox 필드).
     /// `delivers`가 false면(outbox 흡수 — 이미 지난 훅) 텍스트를 만들지 않고 블록을 줬다고 적지도 않는다.
     @discardableResult
-    public func handle(event: String?, json: Data, at date: Date, claudePid: Int? = nil, delivers: Bool = true) -> String? {
-        guard var input = HookInput(event: event, json: json) else { return nil }
-        input.claudePid = claudePid
+    public func handle(event: String?, json: Data, at date: Date, claudePid: Int? = nil,
+                       delivers: Bool = true, provider: AgentProvider = .claude, processPid: Int? = nil) -> String? {
+        guard var input = HookInput(event: event, json: json, provider: provider) else { return nil }
+        input.claudePid = provider == .claude ? claudePid : nil
+        input.processPid = processPid
         return handle(input, at: date, delivers: delivers)
     }
 
     @discardableResult
     public func handle(_ input: HookInput, at date: Date, delivers: Bool = true) -> String? {
+        lastSaveFailed = false
         let result = process(input, at: date, delivers: delivers)
+        if let main = fetchSession(input.sessionID), main.project?.archivedAt == nil {
+            let target = input.event == "SubagentStart" ? subagentSession(input) : (subagentSession(input) ?? main)
+            SessionActivityRules.observe(input, session: target ?? main, at: date)
+        }
         do {
             try context.save()
         } catch {
+            lastSaveFailed = true
             context.rollback()
         }
         return result
@@ -66,7 +76,7 @@ public final class HookProcessor {
         case "UserPromptSubmit":
             userPromptSubmit(input, at: date)
             return delivers ? lateContext(input, at: date) : nil
-        case "Stop":
+        case "Stop", "Interrupt", "PostToolUseFailure", "PermissionRequest":
             heartbeat(input, at: date)
         case "PreToolUse":
             preToolUse(input, at: date)
@@ -119,6 +129,10 @@ public final class HookProcessor {
             guard create, date > endedAt else { return nil }
             session.endedAt = nil
             session.cachedState = .live
+            SessionActivityRules.reset(session)
+            // 새 훅에 PID가 없으면 이전 프로세스를 계속 검사하지 않는다.
+            session.claudePid = nil
+            session.processPid = nil
             recordPid(session, input, at: date)
             recordStart(session, input, at: date)
             return session
@@ -126,7 +140,7 @@ public final class HookProcessor {
         guard create, let project = matchProject(input.cwd) else { return nil }
         let session = Session(
             id: input.sessionID, kind: .main, cwd: input.cwd,
-            gitBranch: gitBranch(input.cwd), startedAt: date
+            gitBranch: gitBranch(input.cwd), startedAt: date, provider: input.provider
         )
         context.insert(session)
         session.project = project
@@ -139,9 +153,12 @@ public final class HookProcessor {
     /// (`--resume`은 같은 `session_id`를 새 프로세스로 이어 간다). outbox로 늦게 들어온 옛 훅은 PID를 되돌리지 않는다.
     /// `touch` 전에 불러야 한다(`lastSeenAt`과 비교).
     private func recordPid(_ session: Session, _ input: HookInput, at date: Date) {
-        guard let pid = input.claudePid, session.claudePid != pid else { return }
-        if session.claudePid == nil || date >= session.lastSeenAt {
-            session.claudePid = pid
+        let pid = input.provider == .claude ? input.claudePid : input.processPid
+        guard let pid else { return }
+        if input.provider == .claude {
+            if session.claudePid == nil || date >= session.lastSeenAt { session.claudePid = pid }
+        } else if session.processPid == nil || date >= session.lastSeenAt {
+            session.processPid = pid
         }
     }
 
@@ -163,7 +180,7 @@ public final class HookProcessor {
     public func finish(_ session: Session, at date: Date, reason: String?, activity: Bool = true) {
         guard session.endedAt == nil else { return }
         for child in session.children ?? [] where child.endedAt == nil {
-            end(child, at: date, activity: activity)
+            end(child, at: date, reason: reason, activity: activity)
         }
         end(session, at: date, reason: reason, activity: activity)
         pendingSpawns[session.id] = nil
@@ -173,7 +190,9 @@ public final class HookProcessor {
     func end(_ session: Session, at date: Date, reason: String? = nil, activity: Bool = true) {
         guard session.endedAt == nil else { return }
         if activity { touch(session, at: date) }
-        CardLifecycle.detachAll(session, at: date, in: context)
+        CardLifecycle.detachAll(session, at: date, in: context, reason: reason)
+        session.pendingToolsData = nil
+        session.endReason = reason
         Event.record(.sessionEnd, in: context, project: session.project, session: session, at: date,
                      payload: reason.map { ["reason": .string($0)] } ?? [:])
     }

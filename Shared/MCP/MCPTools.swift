@@ -35,6 +35,7 @@ public final class MCPTools {
         switch name {
         case "project_resolve": return try projectResolve(args)
         case "project_init": return try projectInit(args)
+        case "session_bind": return try sessionBind(args)
         case "card_list": return try cardList(args)
         case "card_get": return try cardGet(args)
         case "card_create": return try cardCreate(args)
@@ -108,14 +109,16 @@ public final class MCPTools {
         }
         let date = now()
         let sessionId = optionalString(args, "sessionId")
+        let session = sessionId.flatMap(fetchSession)
+        let requestedProvider = try provider(args)
+        let origin = (session?.provider ?? requestedProvider).cardOrigin
         let card = project.makeCard(
             in: context, title: title, kind: kind, status: status,
-            body: optionalString(args, "body") ?? "", origin: .claude, originSessionId: sessionId,
+            body: optionalString(args, "body") ?? "", origin: origin, originSessionId: sessionId,
             parent: parent, criteria: try criteria(args), at: date
         )
-        let session = sessionId.flatMap(fetchSession)
         Event.record(.cardCreated, in: context, project: project, card: card, session: session, at: date,
-                     payload: ["origin": .string(CardOrigin.claude.rawValue), "status": .string(status.rawValue)])
+                     payload: ["origin": .string(origin.rawValue), "status": .string(status.rawValue)])
         return cardJSON(card)
     }
 

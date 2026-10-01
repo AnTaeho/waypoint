@@ -1,8 +1,9 @@
 import Foundation
 
-/// Claude Code 훅 입력(JSON)에서 Waypoint가 쓰는 필드만 꺼낸 것.
-/// 필드 이름은 SPEC 5장(hooks 문서 + Claude Code 2.1.283 실측). 모르는 필드는 무시한다.
+/// Claude Code·Codex 훅 입력(JSON)에서 Waypoint가 쓰는 필드를 정규화한다.
+/// 필드 이름은 SPEC 5장(Claude 실측 + Codex 공식 훅 문서). 모르는 필드는 무시한다.
 public struct HookInput {
+    public let provider: AgentProvider
     public let event: String
     public let sessionID: String
     public let cwd: String
@@ -16,20 +17,22 @@ public struct HookInput {
     /// UserPromptSubmit: 사용자 문장. 실측·문서는 `prompt`, 옛 문서 예시의 `prompt_text`도 받는다.
     public let prompt: String?
     public let toolName: String?
+    public let toolUseID: String?
     public let toolInput: [String: Any]
     public let toolResponse: [String: Any]
     /// 훅을 부른 Claude Code 프로세스 PID. 본문 JSON이 아니라 HTTP 머리 `X-Waypoint-Claude-PID`나
     /// outbox 줄의 `claudePid`에서 온다. 없으면 nil.
     public var claudePid: Int?
+    public var processPid: Int?
 
     /// 본문을 읽는다. JSON 객체가 아니거나 `session_id`가 없으면 nil.
     /// `event`는 경로(`/hooks/<EventName>`)나 outbox의 이름을 우선하고, 없으면 `hook_event_name`.
-    public init?(event: String?, json: Data) {
+    public init?(event: String?, json: Data, provider: AgentProvider = .claude) {
         guard let object = try? JSONSerialization.jsonObject(with: json) as? [String: Any] else { return nil }
-        self.init(event: event, object: object)
+        self.init(event: event, object: object, provider: provider)
     }
 
-    public init?(event: String?, object: [String: Any]) {
+    public init?(event: String?, object: [String: Any], provider: AgentProvider = .claude) {
         func string(_ key: String) -> String? {
             guard let value = object[key] as? String, !value.isEmpty else { return nil }
             return value
@@ -38,16 +41,23 @@ public struct HookInput {
               let event = event ?? string("hook_event_name")
         else { return nil }
         self.event = event
-        self.sessionID = sessionID
+        self.provider = provider
+        self.sessionID = provider.sessionID(sessionID)
         self.cwd = string("cwd") ?? ""
-        self.agentID = string("agent_id")
+        self.agentID = string("agent_id").map { provider.sessionID($0) }
         self.agentType = object["agent_type"] as? String
         self.source = string("source")
         self.reason = string("reason")
         self.prompt = string("prompt") ?? string("prompt_text")
         self.toolName = string("tool_name")
-        self.toolInput = object["tool_input"] as? [String: Any] ?? [:]
-        self.toolResponse = object["tool_response"] as? [String: Any] ?? [:]
+        self.toolUseID = string("tool_use_id")
+        if provider == .codex {
+            self.toolInput = CodexHookAdapter.toolInput(object["tool_input"])
+            self.toolResponse = CodexHookAdapter.toolResponse(object["tool_response"])
+        } else {
+            self.toolInput = object["tool_input"] as? [String: Any] ?? [:]
+            self.toolResponse = object["tool_response"] as? [String: Any] ?? [:]
+        }
     }
 }
 
@@ -110,6 +120,9 @@ public enum HookParsing {
     /// - Edit: old_string/new_string 줄 수, MultiEdit: edits 합, Write: content 줄 수(지운 줄 0)
     /// - Bash: `bashEditDiff.changedFiles`(조각이 없는 파일은 줄 수 0)
     public static func changedFiles(_ input: HookInput) -> [(path: String, added: Int, removed: Int)] {
+        if input.provider == .codex, input.toolName == "apply_patch" {
+            return CodexHookAdapter.changedFiles(input)
+        }
         let tool = input.toolInput
         let patch = input.toolResponse["structuredPatch"] as? [[String: Any]] ?? []
         switch input.toolName {
