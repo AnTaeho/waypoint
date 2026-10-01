@@ -24,7 +24,7 @@ Waypoint는 이것을 **프로젝트 단위의 카드 보드**로 보여주는 �
 | 카드 | Jira 티켓에 해당. `LDG-14` 형식 ID |
 | 세션 | Claude Code 세션 1개 (`session_id`). 서브에이전트는 부모 세션의 하위 세션으로 기록 |
 | 작업중 | 카드에 살아있는(live) 세션이 붙어 있는 상태 |
-| 멈춤 | 세션이 끝났다는 신호 없이 일정 시간 활동이 없는 상태 |
+| 활동 없음 | 응답 진행 또는 이전 버전 세션에서 15분간 새 활동을 확인하지 못한 상태. 실패를 의미하지 않음 |
 
 ## 3. 아키텍처
 
@@ -59,7 +59,7 @@ Claude Code 세션들 ──훅(command)──▶ waypoint-hook.sh ──HTTP─
 - iOS는 앱이 원격 알림을 직접 등록한다(`PhoneAppDelegate`). 등록하지 않으면 Mac 변경이 앱을 다시 열 때까지 오지 않았다(2026-09-28 실측). macOS는 미러링이 알림 수신을 스스로 연다.
 - iOS 화면은 CloudKit 가져오기가 끝날 때마다 새 `ModelContext`로 다시 읽는다. 메인 context는 새로 생긴 객체만 보이고 이미 읽은 객체(세션 `endedAt` 등)를 옛 값으로 둬, 끝난 세션이 작업중에 남았다(iOS 26 실측).
 - Mac은 가져오기가 끝나면 새 context로 카드를 읽어 메인 context에 이미 올라온 같은 카드에 늦은 값을 옮겨 적는다(`RemoteCardMerge`). 그대로 두면 메인 context가 옛 상태를 들고 있다가 그 카드를 저장할 때 iPhone에서 옮긴 상태를 되돌린다(실측). iPhone이 고치는 것은 카드뿐이다.
-- 세션 상태는 `lastSeenAt`으로 판정하므로 iPhone의 멈춤 판정은 동기화 지연만큼 늦을 수 있다.
+- 세션 상태는 훅 이벤트와 활동 시각으로 판정하며 iPhone에는 해당 상태 필드가 동기화된다.
 - 쓰기 양: 훅마다 이벤트·세션 갱신이 저장되고 미러링이 묶어서 올린다. 40초짜리 실측 세션 하나에 내보내기 5번(2026-09-28).
 
 ## 4. 데이터 모델 (SwiftData)
@@ -108,15 +108,24 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 ### 파생 규칙
 
 - 카드가 **작업중** = 열린 `CardSession` 중 세션 `state == live`인 것이 1개 이상.
-- 세션 `stalled` = `endedAt == nil` 이고 `now - lastSeenAt > stallTimeout` (설정값, 기본 15분).
+- 표시 상태는 `SessionActivityRules`로 판정한다. `live`/`stalled`/`ended`는 이전 버전 호환을 위한 묶음이며 `stalled`는 입력·승인 대기와 활동 없음이지 작업 실패가 아니다. 입력 대기와 실행 중인 도구는 15분이 지나도 다른 상태로 덮지 않는다.
 - 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
 - **불변식: 열린 연결이 있으면 카드는 `active`다.** 카드가 active를 떠나면(앱 드래그·「완료로 옮기기」·iPhone 분류·`card_update(status)`, 모두 `CardLifecycle.move`) 그 카드의 열린 연결을 서브에이전트 것까지 모두 닫고 세션마다 `card.detached`(`reason: "card-moved"`)를 남긴다. 상태는 새로 정한 그대로 두고 `statusBeforeActive`로 돌리지 않는다. 연결이 풀린 세션은 끝나지 않았으면 카드 없는 세션 줄·타일이 된다.
-- 어긋난 연결 점검: 앱이 시작 직후 한 번, 그 뒤 60초마다(세션 정리와 같은 자리), CloudKit 가져오기 뒤에 「카드가 active가 아닌데 열린 연결」을 찾아 닫는다(`CardLifecycle.closeStrayLinks`, `card.detached`에 `reason: "status-not-active"`). 카드 상태·수정 시각은 건드리지 않는다. 불변식 이전 데이터와 iPhone에서 옮긴 카드(연결은 병합하지 않는다)를 위한 것이다.
+- 어긋난 연결 점검: 앱이 시작 직후 한 번, 그 뒤 10초마다(세션 정리와 같은 자리), CloudKit 가져오기 뒤에 「카드가 active가 아닌데 열린 연결」을 찾아 닫는다(`CardLifecycle.closeStrayLinks`, `card.detached`에 `reason: "status-not-active"`). 카드 상태·수정 시각은 건드리지 않는다. 불변식 이전 데이터와 iPhone에서 옮긴 카드(연결은 병합하지 않는다)를 위한 것이다.
 - 대시보드 "작업중" 목록 = 프로젝트별로 묶은 (세션, 카드) 쌍 + 카드가 붙지 않은 끝나지 않은 메인 세션 한 줄씩(카드 칸 비움, 제목 자리에 그 세션의 마지막 요청 문장 `lastPrompt`(없으면 「카드 없음」), 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`). 같은 프로젝트에 세션 2개가 서로 다른 카드를 작업하면 그 프로젝트 아래 2줄. 세션에 카드가 붙으면 카드 없는 줄은 카드 줄로 바뀐다(중복 없음). 카드 없는 서브에이전트는 줄을 만들지 않는다. 제목의 「작업 N개」는 live 줄 수, 사이드바·프로젝트 표의 작업중·멈춤 수는 카드 수 + 카드 없는 메인 세션 수.
-- 프로젝트 보드 작업중 칸 = 작업중 카드 + 그 아래 카드 없는 세션 타일(대시보드 카드 없는 줄과 같은 세션, `BoardQuery.sessionTiles`). 타일은 마지막 요청 문장(없으면 「카드 없음」), 세션(`sess·7f2a`), 최근 파일, 끝나지 않은 서브에이전트 수(있으면), 경과 또는 「멈춤 N분」. 끌거나 누를 수 없다. 칸 머리 개수는 카드 + 타일(사이드바·프로젝트 표 작업중 수와 같은 기준).
-- 작업중 줄·타일의 경과(`SessionFormat.rowElapsed`): live면 카드 줄은 그 카드에 연결된 시각(`CardSession.attachedAt`)부터, 카드 없는 줄·타일은 마지막 요청 시각(`lastPromptAt`)부터이고 없으면 비운다. 멈춤이면 어느 줄이든 「멈춤 N분」(`lastSeenAt`부터).
+- 프로젝트 보드 작업중 칸 = 작업중 카드 + 그 아래 카드 없는 세션 타일(대시보드 카드 없는 줄과 같은 세션, `BoardQuery.sessionTiles`). 타일은 마지막 요청 문장(없으면 「카드 없음」), 세션(`sess·7f2a`), 최근 파일, 끝나지 않은 서브에이전트 수(있으면), 이벤트 기반 상태와 대기 시간. 끌거나 누를 수 없다. 칸 머리 개수는 카드 + 타일(사이드바·프로젝트 표 작업중 수와 같은 기준).
+- 작업중 줄·타일·카드 상세는 `SessionFormat.activityText`로 도구 작업·응답 진행·입력 대기·승인 대기·활동 없음을 표시한다. 대기는 해당 전환 시각, 활동 없음은 마지막 활동 시각부터 경과를 표시한다.
+- 프로젝트 화면의 **활동** 탭은 이벤트의 불변 `project` 연결을 기준으로 날짜·세션별 요청, 파일 변경, 커밋, 완료, 인수인계 메모를 시간순으로 보여준다. 세션이 나중에 다른 프로젝트로 연결되어도 과거 기록은 이동하지 않는다. 도구·카드·세션 필터와 카드 상세 연결을 제공하며, 같은 파일의 연속 변경만 5분 단위로 묶는다. 처음에는 최신 300건을 읽고 「더 보기」로 확장한다. 검색은 현재 읽은 기록 범위에만 적용된다.
 
 ## 5. 훅 → 기록 매핑
+
+### 카드 작업 이어가기
+
+Mac 카드 상세에서 재개 문맥을 준비하고 Claude Code·Codex를 선택해 미리보기·복사한다. 외부 AI 호출 없이 카드 본문, 다음 세션 메모, 미완료 조건, 해당 카드의 변경 파일과 커밋을 조합한다. 본문 6,000자, 메모 3,000자, 조건 20개(각 500자), 중복 없는 최신 파일 10개, 커밋 3개로 제한하며 생략 여부를 표시한다. 생성·복사는 상태나 이벤트를 변경하지 않는다. 완료·보관·프로젝트 없는 카드와 경로 없는 프로젝트는 준비할 수 없다.
+
+사용자가 새 대화에 붙여넣으면 `project_resolve → session_bind → card_get → card_start` 순서로 연결하도록 안내한다. 복사한 과거 ID 대신 현재 대화의 실제 ID를 사용하며, 최신 카드가 완료·보관된 경우 자동으로 재개하지 않는다. 기존 세션 연결이 있으면 `otherSessions`를 통해 알려 작업 범위를 확인한다. 연결이 성공한 뒤에만 작업중으로 표시된다. 앱에서 AI 프로그램을 실행하거나 작업을 자동 실행하지 않는다.
+
+활동 탭의 사용자 요청은 `note`의 `kind: user.prompt`로 최대 300자씩 저장한다. 이 버전 이전의 전체 요청 이력은 복원하지 않는다. 재수신된 동일 시각·내용의 요청은 중복 저장하지 않으며, 지연 수신은 세션 시작·프로젝트 연결 이력과 당시 카드 연결 구간으로 소속을 결정한다.
 
 설정 예시: `integration/hooks/settings.example.json`. 사용자 전역(`~/.claude/settings.json`)에 둔다.
 **이벤트 이름과 입력 JSON 필드는 구현 시점의 Claude Code hooks 문서로 반드시 확인할 것.**
@@ -208,21 +217,34 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - **`Bash`의 `tool_response`**: `stdout`, `stderr`, `interrupted`, `isImage`, `noOutputExpected`. 파일을 바꾸면 `bashEditDiff`: `files:[{filePath, hunks:[…lines], created}]`, `moreFiles`, `changedFiles`. 커밋하면 `gitOperation.commit`: `{sha, kind: "committed", branch}`. 커밋은 이것을 먼저 쓰고, 메시지는 출력 첫 줄 `[브랜치 해시] 메시지`에서 얻는다.
 - **`MultiEdit`**: 실측 세션의 도구 목록에 없다. 바이너리에는 권한 규칙 호환용으로 이름이 남아 있어 matcher와 파서는 그대로 둔다.
 - **속도**: 훅 한 번 실행에 수십 ms(전사의 `stop_hook_summary`에서 Waypoint `Stop` 32 ms). `claude -p "hi"` 전체 9초로 눈에 띄는 지연 없음.
-- **`PostToolUse` matcher**(`Edit|MultiEdit|Write|Bash`) 밖의 도구만 오래 쓰면 heartbeat가 없다. `Bash`가 45초 걸리는 동안에도 `PostToolUse`는 끝난 뒤에야 온다. 멈춤 판정 15분에는 문제없다.
+- **이전 matcher 제한 해소(2026-09-30)**: PreToolUse·PostToolUse는 모든 도구를 관찰한다. 도구 실행은 시작과 완료를 tool_use_id로 연결하므로 장시간 실행을 활동 없음으로 오판하지 않는다.
 
 ### 종료 판정 (`SessionEnd`가 오지 않은 세션)
 
-앱이 60초마다, 그리고 시작할 때 outbox를 흡수한 직후 한 번, 끝나지 않은 **메인 세션**을 검사한다(`SessionSweep`, `AppServices.refreshStates`).
+앱이 10초마다, 시작 직후, 앱 활성화·잠자기 복귀 때 outbox를 흡수하고, 끝나지 않은 **메인 세션**을 검사한다(`SessionSweep`, `AppServices.refreshStates`).
 
-- `claudePid`가 있으면 그 프로세스를 본다(`sysctl KERN_PROC_PID`). 없거나 좀비면 끝낸다(`reason: "process-gone"`). 프로세스 시작 시각(`p_starttime`)이 `lastSeenAt`보다 2초 넘게 늦으면 PID를 재사용한 다른 프로세스로 보고 끝낸다(마지막 훅 뒤에 시작한 프로세스는 그 훅을 보냈을 수 없다. 2초는 outbox `receivedAt`이 초 단위로 잘리는 몫). 프로세스가 살아 있으면 오래 조용해도 둔다.
-- `claudePid`가 없으면(옛 스크립트, PID를 못 찾은 경우) `lastSeenAt`에서 24시간이 지나면 끝낸다(`reason: "inactive-24h"`).
+- 도구별 PID(Claude의 `claudePid`, Codex의 `processPid`)가 있으면 그 프로세스를 본다(`sysctl KERN_PROC_PID`). 없거나 좀비면 끝낸다(`reason: "process-gone"`). 프로세스 시작 시각(`p_starttime`)이 `lastSeenAt`보다 2초 넘게 늦으면 PID를 재사용한 다른 프로세스로 보고 끝낸다(마지막 훅 뒤에 시작한 프로세스는 그 훅을 보냈을 수 없다. 2초는 outbox `receivedAt`이 초 단위로 잘리는 몫). 프로세스가 살아 있으면 오래 조용해도 둔다.
+- PID가 없으면(옛 스크립트, PID를 못 찾은 경우) `lastSeenAt`에서 30분이 지나면 추적을 만료한다(`reason: "tracking-expired-30m"`). 실제 작업 완료로 판단하지 않는다. Claude 네이티브 설치의 버전 번호 실행 파일도 경로로 식별하며 조상을 8단계까지 확인한다.
 - 끝내는 경로는 `SessionEnd`와 같다(`HookProcessor.finish`): 끝나지 않은 하위 세션부터 닫고, 카드 연결을 모두 해제해 카드를 작업 전 상태로 돌리고(done으로 바꾸지 않는다), `session.end`에 `reason`을 남긴다. 끝낸 시각은 검사 시각, `lastSeenAt`은 그대로 둔다.
-- 끝낸 뒤 그 시각보다 늦은 훅이 오면(resume 등) 세션은 다시 살아난다(기존 규칙). 그 이전 시각의 늦은 outbox 기록은 무시한다.
+- 끝낸 뒤 그 시각보다 늦은 훅이 오면(resume 등) 세션은 다시 살아난다(기존 규칙). 그 이전 시각의 늦은 outbox 기록은 무시한다. 재개할 때 옛 PID는 비운다. 자동 정리된 세션은 실제 ID를 전달한 `session_bind`로도 재연결할 수 있다. 명시적으로 종료된 세션은 이 경로로 되살리지 않는다.
 - 실측(2026-09-28): 도구를 쓰는 `claude -p` 2개를 동시에 돌리다 `kill -9`로 죽이자 두 세션 모두 28초 뒤 `process-gone`으로 끝났다. 같은 날 정상 종료한 동시 세션 12개는 모두 `SessionEnd`가 왔다.
 
 ### 남은 문제
 
 - `SessionStart(source: clear/compact)`의 `session_id`는 대화형 세션에서 따로 확인해야 한다.
+
+### Codex 연결 (2026-09-30)
+
+- 공식 기준: https://learn.chatgpt.com/docs/hooks, https://developers.openai.com/codex/mcp. 로컬 Codex CLI 훅을 먼저 지원한다. 클라우드 실행은 로컬 훅 지원 범위에 포함하지 않는다.
+- Codex는 `/hooks/codex/<EventName>`으로 원본 JSON을 보낸다. 기존 `/hooks/<EventName>`은 Claude Code 그대로다. 두 입력은 공유 처리기로 들어가기 전에 도구별 필드를 정규화한다.
+- 세션은 `providerRaw`(claude/codex, 기본 claude)를 저장한다. 기존 Claude ID는 유지하고 Codex ID는 `codex:<원본 session_id>`로 저장·주입한다. 하위 세션도 같은 접두사를 써서 두 도구의 ID가 겹치지 않게 한다.
+- `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `SubagentStart`, `SubagentStop`, `Stop`, `Interrupt`, `SessionEnd`를 받는다. Stop·Interrupt는 활동 기록이고 완료 처리를 하지 않는다. 파일 변경은 성공한 `apply_patch`의 패치·결과에서 추출한다.
+- Codex의 훅에는 `tool_input`/`tool_response`가 JSON 문자열로 올 수 있다. `apply_patch`는 command 패치 문자열, Bash는 command 입력과 텍스트 출력으로 정규화한다. Agent 입력의 message/agent_type도 처리한다. 전사 파일 형식은 안정된 API가 아니므로 전사 파일 감시는 하지 않는다.
+- Codex PID는 `X-Waypoint-Process-PID`로 받아 `processPid`에 저장하고 기존 Claude `claudePid`는 유지한다. 프로세스 소멸 시 종료 정리는 두 도구에 동일하게 적용한다.
+- outbox는 Codex 줄에 `provider: "codex"`, 선택적 `processPid`를 추가한다. provider가 없는 기존 줄은 Claude로 처리한다.
+- MCP 서버와 카드 API는 공유한다. card_create는 연결 세션의 도구로 origin을 정하고, 세션이 없는 호출과 project_init에는 선택적 provider를 받는다. 초기 카드에도 해당 origin을 남긴다.
+- 훅 출력은 SessionStart·늦은 UserPromptSubmit의 컨텍스트만 허용한다. 스크립트는 1초 HTTP 타임아웃·실패 시 exit 0·outbox 적재를 유지한다. Codex의 `/hooks` 신뢰 검토는 사용자가 직접 한다.
+- Codex 픽스처는 `doc-codex-*`로 문서 기반임을 구분한다. 실제 신뢰된 Codex 세션과 CloudKit 스키마 배포는 별도 실측 대상이다.
 
 ## 6. 로컬 HTTP API (훅용)
 
@@ -346,3 +368,31 @@ Claude 사용량(5시간·7일 한도의 사용 비율)을 사이드바 아래�
 - 앱 샌드박스 여부 (로컬 서버·파일 감시 편의 vs 배포 방식). 개인용이면 비샌드박스 + 직접 서명도 가능.
 - ~~Swift MCP 서버 구현~~ → 필요한 부분만 직접 구현(7장). 새 방식(2026-07-28, 세션 없음)을 지원할지는 Claude Code가 옛 방식을 버릴 때 다시 본다.
 - 서브에이전트의 `session_id`가 부모와 같은지 별도인지 — 실제 훅 입력을 로깅해서 확인 후 `Session` 매핑 확정.
+
+## 작업 대상 프로젝트 연결 (2026-09-30)
+
+시작 cwd는 초기 프로젝트 추정값이다. 실제 작업 대상 폴더가 등록되어 있으면 `session_bind(project, sessionId, provider, cwd)`로 연결한다. cwd는 시작 폴더 그대로 유지한다. 미등록 시작 폴더의 SessionStart도 실제 sessionId와 provider를 전달하지만, 대상이 정해지기 전에는 프로젝트나 카드를 만들지 않는다. Codex는 실행 환경의 실제 CODEX_SESSION_ID/CODEX_THREAD_ID를 ID 근거로 사용할 수 있으며 ID를 추측하지 않는다.
+
+프로젝트 전환은 기존 메인 세션의 카드 연결을 풀어 이전 상태로 돌리고, 세션의 현재 프로젝트와 컨텍스트 키를 바꾼다. 이전 카드·이벤트·이미 실행 중인 하위 세션의 프로젝트는 바꾸지 않는다. 종료된 세션·다른 도구의 ID·보관 프로젝트 연결은 거절한다.
+
+PostToolUse 파일 기록은 변경 파일의 가장 가까운 등록 프로젝트로 귀속한다. 현재 카드의 소속과 같을 때만 해당 카드에도 기록한다. 여러 프로젝트를 한 번에 수정해도 파일별로 나누고 임의의 프로젝트를 기본값으로 고르지 않는다. 등록 밖 절대 경로와 보관 프로젝트에는 기록하지 않는다. 명시적 tool_input.workdir/cwd가 있으면 커밋은 그 폴더의 프로젝트에 기록한다.
+
+### 로컬 연동 상태 (2026-09-30)
+
+macOS 대시보드의 AI 연동 요약과 모든 화면의 툴바 버튼에서 상태 패널을 연다. 사용자 범위 Claude·Codex 훅 설정의 필수 이벤트, 실행 파일·실행 권한, 앱 포트 일치, 훅 비활성화를 점검한다. 프로젝트별 설정과 신뢰 승인은 설정 파일만으로 단정하지 않는다. 설치만 되어 있으면 「첫 수신 대기」, 실제 훅을 받았으면 「수신 확인」으로 구분한다. 활동 공백은 장애로 취급하지 않는다.
+
+패널에는 마지막 훅 활동·실제 수신 시각·수신 당시 프로젝트, 현재 연결된 프로젝트, MCP 마지막 요청, 미처리 outbox 수와 읽기·처리 오류, 원인에 맞는 복구 안내를 표시한다. 미등록 폴더 수신은 프로젝트 미연결로 표시한다. 10초 점검·활성화·잠자기 복귀·다시 점검 때 설정과 대기 기록을 갱신한다. 「다시 점검」은 실패한 로컬 서버의 시작도 재시도한다.
+
+수신 이력은 이 기기의 저장 폴더 `integration-health.json`에만 남고 CloudKit 모델을 변경하지 않는다. 사용자 대화·파일 경로·세션 ID·설정 원문은 저장하지 않는다. 지연 재수신은 원래 활동 시각으로 비교해 더 최신 상태를 덮어쓰지 않는다. 누락 기록은 활동과 실제 재수신 시각을 따로 표시한다. `/integration/status`는 루프백 서버의 읽기 전용 진단 정보다.
+
+### 이벤트 기반 작업 상태 (2026-09-30)
+
+`Session.activityRaw`, `activityAt`, `pendingToolsData`, `endReason`를 추가한다. 기존 stateRaw 캐시와 live/stalled/ended API는 호환을 유지한다. 이전 세션은 마지막 활동만 아는 경우 「최근 활동」 또는 「활동 없음」으로 표시한다.
+
+- SessionStart/Stop/Interrupt → 입력 대기, UserPromptSubmit → 응답 진행 중. 응답 진행이 15분 넘게 갱신되지 않으면 활동 없음.
+- PreToolUse → 도구 작업 중(tool_use_id별 목록), PermissionRequest → 승인 대기. 질문 도구 AskUserQuestion/request_user_input → 입력 대기.
+- PostToolUse → 해당 도구 종료. Claude의 PostToolUseFailure도 종료한다. Codex는 공식 지원 이벤트만 설치한다. 다른 병렬 호출이 남아 있으면 도구 작업 중을 유지한다. 늦은 완료는 해당 호출만 제거하고 최신 시각을 되돌리지 않는다.
+- 진행 중인 하위 작업이 있으면 부모도 작업 중으로 표시한다. 전체 프로세스 종료가 확인되면 세션 종료, PID 없는 활동 유효기간이 끝나면 추적 만료다. 둘 다 카드를 자동 완료하지 않는다. 카드 연결 해제 기록에 종료 이유를 보존해 재개 후에도 과거 추적 만료 표시는 바뀌지 않는다.
+- 입력·승인 대기는 작업 실패를 뜻하지 않는다. PID가 없는 세션의 30분 추적 유효기간은 그대로 적용한다.
+
+훅은 관찰만 하며 승인 허용/거절 결정을 출력하지 않는다. Claude·Codex 공식 훅 문서를 확인하여 tool_use_id·PermissionRequest와 전체 matcher를 사용한다. Codex 훅 정의를 바꾸면 /hooks에서 재신뢰가 필요하다.
