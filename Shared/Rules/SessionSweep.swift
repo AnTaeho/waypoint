@@ -87,6 +87,7 @@ extension HookProcessor {
             try context.save()
         } catch {
             context.rollback()
+            ContextReload.apply(context)
             return 0
         }
         return ended
