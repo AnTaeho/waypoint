@@ -79,6 +79,9 @@ public enum CardHistoryFormat {
             }
             guard let text = p["text"]?.stringValue, !text.isEmpty else { return nil }
             return make(.note, text)
+        case .check:
+            guard let record = CheckRecord(event: event) else { return nil }
+            return make(.neutral, EvidenceFormat.historyText(record), code: EvidenceFormat.shortCommand(record.command))
         case .sessionStart, .sessionEnd, .guideSynced:
             return nil
         }

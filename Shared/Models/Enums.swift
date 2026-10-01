@@ -45,6 +45,8 @@ public enum EventType: String, Codable, Sendable, CaseIterable {
     case commit = "commit"
     case note = "note"
     case guideSynced = "guide.synced"
+    /// 검증 근거(명령·결과·출처). payload는 `CheckRecord`.
+    case check = "check"
 }
 
 public enum GuideSource: String, Codable, Sendable, CaseIterable {
