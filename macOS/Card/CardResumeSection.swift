@@ -4,6 +4,7 @@ import WaypointKit
 struct CardResumeSection: View {
     let card: Card
     @State private var showsResume = false
+    @State private var resumeAttempt: CardResumeAttempt?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
@@ -13,6 +14,10 @@ struct CardResumeSection: View {
                 Button("재개 문맥 준비") { showsResume = true }
                     .buttonStyle(.bordered)
                     .disabled(CardResumeContext.unavailableReason(card) != nil)
+            }
+            if let resumeAttempt {
+                Text(resumeAttempt.label(for: card)).font(Theme.captionLarge)
+                    .foregroundStyle(resumeAttempt.state(for: card) == .connected ? Theme.done : Theme.textMuted)
             }
             if let reason = CardResumeContext.unavailableReason(card) {
                 Text(reason).font(Theme.body).foregroundStyle(Theme.textMuted)
@@ -27,6 +32,7 @@ struct CardResumeSection: View {
         }
         .padding(Theme.Spacing.l)
         .background(Theme.bgPanel, in: RoundedRectangle(cornerRadius: Theme.Radius.panel))
-        .sheet(isPresented: $showsResume) { CardResumeSheet(card: card) }
+        .onChange(of: card.id) { resumeAttempt = nil }
+        .sheet(isPresented: $showsResume) { CardResumeSheet(card: card, resumeAttempt: $resumeAttempt) }
     }
 }

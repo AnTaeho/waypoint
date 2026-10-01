@@ -110,6 +110,8 @@ import Testing
             let old = makeSession(h.context, h.project, id: "previous")
             CardLifecycle.attach(card, old, at: t0, in: h.context)
             CardLifecycle.detach(card, old, at: t0 + 1, in: h.context)
+            let attempt = CardResumeAttempt(card: card, provider: provider, at: t0 + 2)
+            #expect(attempt.state(for: card) == .waiting)
             let tools = MCPTools(context: h.context, now: { t0 + 10 })
             let id = provider == .codex ? "codex:new-real-session" : "new-real-session"
             #expect(CardResumeContext.text(card: card, provider: provider) != nil)
@@ -118,6 +120,7 @@ import Testing
             let latest = try tools.call("card_get", ["id": .string(card.displayID)])
             #expect(latest["status"] == "next")
             _ = try tools.call("card_start", ["id": .string(card.displayID), "sessionId": .string(id)])
+            #expect(attempt.state(for: card) == .connected)
             #expect(card.status == .active && card.openCardSessions.count == 1)
             #expect(card.openCardSessions.first?.session?.id == id)
             #expect(card.cardSessions?.count == 2)
