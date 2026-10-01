@@ -247,8 +247,22 @@ Codex 한도는 `~/.codex/sessions`의 최근 기록 파일 끝부분에서 마�
 | 결정 | 이유 | 대안 | 되돌리기 |
 |---|---|---|---|
 | 저장 실패한 줄부터 끝까지를 떼어 낸 파일에 남기고 그 뒤 파일까지 멈춘다. 다음 흡수가 그 줄부터 다시 한다 | 순서가 중요하다(`SessionStart` 전에 `Stop`이 들어가면 안 된다). 실패 원인은 대개 디스크·저장소 전체 문제라 뒤 줄도 실패한다 | 실패한 줄만 따로 빼고 계속 | `Outbox.drain`의 `preserve` 대신 `continue` |
-| 저장 실패로 남긴 줄은 다음 앱 실행 때만 다시 흡수한다. 같은 실행에서는 10초 점검·**다시 점검**·서버 준비 때도 흡수하지 않는다(`AppServices.outboxHeld`). 횟수 제한은 없다 | 아래 rollback 한계 때문에 같은 context로 다시 처리하면 잘못된 기록(세션 id `""`, 세션 없는 연결)이 저장된다. 새 실행의 새 context로 처리하면 깨끗하다(`OutboxTests.preservedLineRetriedWithFreshContextLeavesNoStaleRecords`). N번 실패 시 격리는 디스크가 잠깐 막혀도 멀쩡한 기록을 치워 버린다 | 10초 점검마다 재시도(처음 구현, 잘못된 기록이 생겨 버림). outbox 흡수를 별도 `ModelContext`에서 하고 실패하면 그 context를 버리기 — 같은 실행 안 재시도가 가능해지지만 서버 실시간 경로·`pendingSpawns` 공유를 함께 바꿔야 해서 다음 카드로 남김 | `drainOutbox`의 `outboxHeld` 줄 삭제 |
+| ~~저장 실패로 남긴 줄은 다음 앱 실행 때만 다시 흡수한다.~~ (TRK-33에서 뒤집음, 아래 항목) 같은 실행에서는 10초 점검·**다시 점검**·서버 준비 때도 흡수하지 않는다(`AppServices.outboxHeld`). 횟수 제한은 없다 | 아래 rollback 한계 때문에 같은 context로 다시 처리하면 잘못된 기록(세션 id `""`, 세션 없는 연결)이 저장된다. 새 실행의 새 context로 처리하면 깨끗하다(`OutboxTests.preservedLineRetriedWithFreshContextLeavesNoStaleRecords`). N번 실패 시 격리는 디스크가 잠깐 막혀도 멀쩡한 기록을 치워 버린다 | 10초 점검마다 재시도(처음 구현, 잘못된 기록이 생겨 버림). outbox 흡수를 별도 `ModelContext`에서 하고 실패하면 그 context를 버리기 — 같은 실행 안 재시도가 가능해지지만 서버 실시간 경로·`pendingSpawns` 공유를 함께 바꿔야 해서 다음 카드로 남김 | `drainOutbox`의 `outboxHeld` 줄 삭제 |
 | 읽을 수 없는 줄은 `outbox.quarantine.jsonl`에 원문 그대로 덧붙이고(0600) 미처리 수에 넣지 않는다. 덧붙이기 실패는 저장 실패와 같이 다룬다 | 원본을 잃지 않는다. outbox 줄은 이미 줄인 형식이라(6장) 파일 내용·명령 출력이 없다. 미처리 수에 넣으면 지울 화면이 없어 연동 상태가 늘 「확인 필요」 | 버리기(이전 동작), 미처리 수에 포함 | `quarantine` 호출을 `skipped += 1`로 |
 | 저장 실패 때 `HookProcessor.pendingSpawns`(메모리의 서브에이전트 대기)를 처리 전 값으로 되돌린다 | DB는 rollback되는데 대기 항목만 남으면 재시도한 `PreToolUse(Agent)`가 두 번 쌓이고, `SubagentStart`는 짝을 잃는다 | 그대로 두기 | `handle(_:at:delivers:)`의 `spawns` 복원 줄 |
 
 알려진 한계(다음 실행 재시도로 outbox 경로는 막았다): SwiftData `rollback()`은 이미 메모리에 올라온 모델의 값과 관계를 되돌리지 않는다(실측: 실패한 `SubagentStart` 뒤에도 메모리의 카드는 active·연결 1개, 새 context로 읽으면 next·연결 0개). 그 상태에서 같은 줄을 다시 처리하면 남은 연결이 기본값(세션 id `""`, 연결 `session` nil)으로 함께 저장된다(메모리 저장소와 임시 파일 SQLite 저장소에서 같았다). 그래서 같은 실행에서는 다시 흡수하지 않는다. 남은 위험: 실패 뒤 메인 화면은 앱을 다시 켤 때까지 되돌려지지 않은 값을 보여 주고, 같은 실행에서 실시간 훅이 그 카드의 연결을 또 바꾸면 남은 모델이 함께 저장될 수 있다. 근본 해결은 위 대안(별도 `ModelContext`)이다.
+
+## 2026-10-01 — outbox 흡수를 별도 저장 문맥으로, 실패하면 통째로 폐기 (TRK-33)
+
+TRK-32의 「다음 실행 때만 다시 흡수」를 뒤집는다.
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 흡수 한 번마다 새 `ModelContext`(같은 컨테이너, autosave 끔)와 흡수용 `HookProcessor`로 처리한다. 줄마다 저장하고, 실패하면 그 context를 버린다(`HookProcessor.absorbOutbox`). 남긴 줄은 같은 실행의 10초 점검·**다시 점검**·서버 준비 때 바로 다시 흡수한다. 횟수 제한 없음 유지 | rollback이 되돌리지 못한 메모리 값이 버린 context에만 남아 메인 context로 들어오지 않는다. 디스크 저장소로 실패 → 같은 실행 재흡수가 깨끗함을 확인(`OutboxAbsorbTests`) | 다음 실행 때만(TRK-32). 메인 context에서 흡수하고 실패 시 다시 읽기만 — 다시 읽기는 관찰한 SwiftData 동작이라, 흡수 쪽은 버리는 context로 이중으로 막는다 | `drainOutbox`가 `Outbox.drain`에 메인 처리기를 바로 넘기게 |
+| 흡수 뒤(처리한 줄이 있거나 실패했으면) 메인 context가 올려 둔 프로젝트·카드·세션·연결을 모두 다시 가져온다(`ContextReload`). 기록(`Event`)은 넣기만 하므로 빼다 | 다른 context의 저장은 이미 올라온 객체에 저절로 들어오지 않고, 그 객체를 저장하면 옛 값이 저장소를 덮는다(실측: 카드 상태가 되돌아가고 연결이 끊김). 다시 가져오면 돌려받은 객체가 저장소 값·관계로 바뀐다(`ContextReloadTests`가 고정) | 바뀐 객체만 골라 맞추기(`RemoteCardMerge`처럼 값 복사) — 세션·연결·관계까지 옮겨야 해 길고 빠뜨리기 쉽다 | `absorbOutbox`의 `ContextReload.apply` 줄 |
+| 흡수 전에 메인 context의 저장 안 된 변경을 저장한다. 저장하지 못하면 그 흡수를 미루고 `retryPending` | 저장 안 된 객체는 다시 가져와도 바뀌지 않고, 나중에 저장하면 흡수가 쓴 값을 덮는다(실측) | 그대로 흡수 | `absorbOutbox` 앞 `hasChanges` 블록 |
+| `pendingSpawns`(메모리의 서브에이전트 대기)는 흡수용 처리기에 복사해 넘기고, 흡수가 끝나면 성공·실패와 상관없이 그 처리기의 값을 돌려받는다 | 흡수용 처리기는 실패한 줄의 대기 항목을 이미 되돌리므로(TRK-32) 끝난 값이 저장된 줄까지의 결과와 같다. 흡수는 메인 액터에서 동기로 돌아 실시간 훅이 끼어들지 않는다 | 실패 시 처리 전 값으로 통째 복원 — 저장에 성공한 앞 줄(`PreToolUse(Agent)`)의 대기 항목을 잃는다 | `absorbOutbox`의 `pendingSpawns = worker.pendingSpawns` |
+| 실시간 훅(`HookProcessor.handle`)과 세션 정리(`sweep`)의 저장 실패도 rollback 뒤 `ContextReload`로 메모리를 저장소에 맞춘다 | 같은 위험이 있었다: 실패한 `SubagentStart`를 같은 context로 다시 처리하면 세션 id `""`·세션 없는 연결이 저장됐다. rollback 뒤 다시 가져오면 깨끗하다(`ContextReloadTests.failedLiveSaveRetriedInSameContextLeavesNoStaleRecords`). 요청마다 context를 새로 만드는 것보다 바꿀 곳이 적다 | 요청 단위 context — 훅마다 메인 context 전체를 다시 읽어야 하고 MCP·화면과의 순서를 다시 맞춰야 한다 | `handle`·`sweep`의 `ContextReload.apply` 줄 |
+
+알아 둘 것: 저장소가 계속 막혀 있으면 「작업 기록 저장 실패 · 미처리 기록 보존」이 10초마다 다시 적힌다(TRK-32 전과 같은 동작). MCP 도구(`MCPServer`), 프로젝트 등록(`ProjectRegistry`), 보드·카드 화면의 저장 실패 rollback은 아직 다시 읽지 않는다 — 같은 한계가 남아 있다.
