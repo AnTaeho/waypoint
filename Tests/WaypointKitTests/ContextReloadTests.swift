@@ -7,16 +7,10 @@ import Testing
 @Suite struct ContextReloadTests {
     private enum SaveFailure: Error { case diskUnavailable }
 
-    private func diskContainer() throws -> ModelContainer {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("waypoint-reload-\(UUID().uuidString)").appendingPathComponent("t.store")
-        return try WaypointStore.makeContainer(url: url)
-    }
-
     /// 다른 context의 저장은 이미 올라온 객체에 저절로 들어오지 않고, 그대로 저장하면 옛 값이 저장소를 덮는다.
     /// 다시 읽으면 값과 관계가 저장소대로 바뀌고, 그 뒤 저장해도 다른 context의 변경이 남는다.
     @Test func reloadPicksUpSiblingSave() throws {
-        let container = try diskContainer()
+        let container = try makeDiskContainer("reload")
         let main = ModelContext(container)
         let p = makeProject(main)
         let card = p.makeCard(in: main, title: "c", status: .next, at: t0)

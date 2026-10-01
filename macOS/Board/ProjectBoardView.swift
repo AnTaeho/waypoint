@@ -57,14 +57,7 @@ struct ProjectBoardView: View {
     /// 끌어 놓은 카드(UUID 문자열)를 이 프로젝트에서 찾아 옮기고 저장한다.
     private func drop(_ id: String, on column: BoardColumn) -> Bool {
         guard let card = (project.cards ?? []).first(where: { $0.id.uuidString == id }) else { return false }
-        guard BoardQuery.drop(card, on: column, at: Date(), in: context) else { return false }
-        do {
-            try context.save()
-        } catch {
-            context.rollback()
-            return false
-        }
-        return true
+        return BoardQuery.dropAndSave(card, on: column, at: Date(), in: context)
     }
 }
 

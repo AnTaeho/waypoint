@@ -265,4 +265,16 @@ TRK-32의 「다음 실행 때만 다시 흡수」를 뒤집는다.
 | `pendingSpawns`(메모리의 서브에이전트 대기)는 흡수용 처리기에 복사해 넘기고, 흡수가 끝나면 성공·실패와 상관없이 그 처리기의 값을 돌려받는다 | 흡수용 처리기는 실패한 줄의 대기 항목을 이미 되돌리므로(TRK-32) 끝난 값이 저장된 줄까지의 결과와 같다. 흡수는 메인 액터에서 동기로 돌아 실시간 훅이 끼어들지 않는다 | 실패 시 처리 전 값으로 통째 복원 — 저장에 성공한 앞 줄(`PreToolUse(Agent)`)의 대기 항목을 잃는다 | `absorbOutbox`의 `pendingSpawns = worker.pendingSpawns` |
 | 실시간 훅(`HookProcessor.handle`)과 세션 정리(`sweep`)의 저장 실패도 rollback 뒤 `ContextReload`로 메모리를 저장소에 맞춘다 | 같은 위험이 있었다: 실패한 `SubagentStart`를 같은 context로 다시 처리하면 세션 id `""`·세션 없는 연결이 저장됐다. rollback 뒤 다시 가져오면 깨끗하다(`ContextReloadTests.failedLiveSaveRetriedInSameContextLeavesNoStaleRecords`). 요청마다 context를 새로 만드는 것보다 바꿀 곳이 적다 | 요청 단위 context — 훅마다 메인 context 전체를 다시 읽어야 하고 MCP·화면과의 순서를 다시 맞춰야 한다 | `handle`·`sweep`의 `ContextReload.apply` 줄 |
 
-알아 둘 것: 저장소가 계속 막혀 있으면 「작업 기록 저장 실패 · 미처리 기록 보존」이 10초마다 다시 적힌다(TRK-32 전과 같은 동작). MCP 도구(`MCPServer`), 프로젝트 등록(`ProjectRegistry`), 보드·카드 화면의 저장 실패 rollback은 아직 다시 읽지 않는다 — 같은 한계가 남아 있다.
+알아 둘 것: 저장소가 계속 막혀 있으면 「작업 기록 저장 실패 · 미처리 기록 보존」이 10초마다 다시 적힌다(TRK-32 전과 같은 동작). MCP 도구(`MCPServer`), 프로젝트 등록(`ProjectRegistry`), 보드·카드 화면의 저장 실패 rollback은 아직 다시 읽지 않는다 — 같은 한계가 남아 있다. → TRK-34에서 모두 `ContextReload.commit`으로 다시 읽게 했다(아래 항목).
+
+## 2026-10-01 — MCP·등록·보드·카드 상세의 저장 실패 뒤 다시 읽기 (TRK-34)
+
+TRK-33에서 남긴 rollback 경로를 마저 막는다.
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 「바꾸고 저장, 실패하면 rollback 뒤 다시 읽고 오류를 다시 던짐」을 `ContextReload.commit(context, save:) { 변경 }` 하나로 묶고 MCP 도구(`MCPServer.callTool`), 프로젝트 등록(`ProjectRegistry.register`), 보드 끌어 놓기(`BoardQuery.dropAndSave`), 카드 상세의 완료·완료 조건(`CardEditing.completeAndSave`·`setCriterionAndSave`)이 쓴다. `save`는 테스트 이음새 | rollback만 하면 실패한 값(카드 상태·번호, 연결)이 메모리에 남아 화면에 보이고 다음 저장에 섞인다. 다시 읽기를 빼면 새 테스트(`SaveFailureReloadTests`)가 MCP·보드·카드 상세에서 모두 실패한다 | 경로마다 `rollback(); ContextReload.apply` 두 줄 — 빠뜨리기 쉽다. 화면 코드는 테스트할 수 없어 `Shared/`로 옮겼다 | 각 호출부를 `try context.save()` + `rollback()`으로 |
+| MCP는 도구가 오류를 던진 경우(입력 검사 실패 포함)에도 다시 읽는다 | 도구가 일부를 바꾼 뒤 던지면 저장 실패와 같이 메모리가 남는다. 다시 읽기는 프로젝트·카드·세션·연결 네 번 가져오기라 개인 저장소에서는 가볍다 | 저장 실패에만 다시 읽기 | `callTool`에서 `commit` 대신 저장만 감싸기 |
+| 보드에서 놓을 수 없는 칸(`canDrop` false)과 바꿀 것이 없는 완료 조건은 `commit`에 들어가기 전에 거른다 | 거절에도 rollback하면 메인 context의 다른 저장 안 된 변경을 버린다(`boardRefusedDropKeepsOtherChanges`) | 모두 `commit` 안에서 판단 | 두 함수의 앞 `guard` |
+
+알아 둘 것: 프로젝트 등록은 새로 넣기만 해서 rollback만으로도 테스트가 통과한다. 다시 읽기는 같은 도우미를 쓰는 덕에 따라온 방어다. 화면 쪽 실패 표시는 그대로다(보드는 끌어 놓기 실패, 카드 상세는 표시 없음).

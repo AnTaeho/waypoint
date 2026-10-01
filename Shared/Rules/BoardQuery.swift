@@ -135,6 +135,24 @@ public enum BoardQuery {
         }
     }
 
+    /// 보드에서 끌어 놓은 카드를 옮기고 저장한다. 옮겨 저장했으면 true.
+    /// 놓을 수 없는 칸이면 아무것도 바꾸지 않는다. 옮기기·저장이 실패하면 rollback 뒤 저장소 값으로 다시 읽는다.
+    @discardableResult
+    public static func dropAndSave(
+        _ card: Card, on column: BoardColumn, at date: Date, in context: ModelContext,
+        save: (ModelContext) throws -> Void = { try $0.save() }
+    ) -> Bool {
+        guard canDrop(card, on: column) else { return false }
+        do {
+            try ContextReload.commit(context, save: save) {
+                try CardLifecycle.move(card, to: column.status, at: date, in: context)
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// 카드에 표시할 대표 연결: 열린 연결 중 live 세션 → stalled 세션 순, 같으면 먼저 붙은 것.
     public static func primaryLink(
         of card: Card,

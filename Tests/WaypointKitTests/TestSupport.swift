@@ -12,6 +12,13 @@ func makeContext() throws -> (ModelContainer, ModelContext) {
     return (container, ModelContext(container))
 }
 
+/// 임시 폴더의 SQLite 저장소(저장 실패·다른 context 저장을 실제 저장소로 확인할 때).
+func makeDiskContainer(_ label: String = "test") throws -> ModelContainer {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("waypoint-\(label)-\(UUID().uuidString)").appendingPathComponent("t.store")
+    return try WaypointStore.makeContainer(url: url)
+}
+
 func makeProject(_ ctx: ModelContext, key: String = "LDG", name: String = "가계부 앱") -> Project {
     let p = Project(key: key, name: name, createdAt: t0)
     ctx.insert(p)

@@ -30,9 +30,7 @@ struct HookHarness {
     /// `onDisk`면 임시 폴더의 SQLite 저장소(저장 실패·다른 context 저장을 실제 저장소로 확인할 때).
     init(onDisk: Bool = false) throws {
         if onDisk {
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("waypoint-hooks-\(UUID().uuidString)").appendingPathComponent("t.store")
-            container = try WaypointStore.makeContainer(url: url)
+            container = try makeDiskContainer("hooks")
             context = ModelContext(container)
         } else {
             (container, context) = try makeContext()

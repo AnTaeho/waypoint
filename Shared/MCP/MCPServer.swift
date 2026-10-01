@@ -7,6 +7,8 @@ public final class MCPServer {
     public let tools: MCPTools
     public static let serverName = "waypoint"
     public static let serverVersion = "0.7.0"
+    /// 도구 호출 뒤 저장. 테스트가 저장 실패를 흉내 낼 때 바꾼다.
+    var saveContext: (ModelContext) throws -> Void = { try $0.save() }
 
     public init(
         context: ModelContext, home: String = NSHomeDirectory(), drafts: ProjectDraftQueue? = nil,
@@ -74,12 +76,10 @@ public final class MCPServer {
         let content: JSONValue
         let isError: Bool
         do {
-            let value = try tools.call(name, arguments)
-            try context.save()
-            content = value
+            // 도구가 바꾸다 실패하거나 저장에 실패하면 rollback 뒤 저장소 값으로 다시 읽는다(`ContextReload.commit`).
+            content = try ContextReload.commit(context, save: saveContext) { try tools.call(name, arguments) }
             isError = false
         } catch {
-            context.rollback()
             let message = (error as? MCPToolError)?.message ?? String(describing: error)
             content = ["error": .string(message)]
             isError = true

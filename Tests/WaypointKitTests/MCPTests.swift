@@ -21,10 +21,14 @@ struct MCPHarness {
     let session: Session
     static let sessionID = "5e1f0c2a-0000-4000-8000-000000000001"
 
-    init() throws {
-        let (container, context) = try makeContext()
-        self.container = container
-        self.context = context
+    /// `onDisk`면 임시 폴더의 SQLite 저장소(저장 실패를 실제 저장소로 확인할 때).
+    init(onDisk: Bool = false) throws {
+        if onDisk {
+            container = try makeDiskContainer("mcp")
+            context = ModelContext(container)
+        } else {
+            (container, context) = try makeContext()
+        }
         let project = Project(key: "PRB", name: "probe", rootPath: "~/probe", createdAt: t0)
         context.insert(project)
         self.project = project

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// 카드 상세에서 사용자가 바꾸는 것. 저장(save)은 호출 쪽에서 한다.
+/// 카드 상세에서 사용자가 바꾸는 것. `setCriterion`은 저장하지 않고, `…AndSave`는 저장까지 한다(실패하면 다시 읽기).
 public enum CardEditing {
 
     /// `note` 이벤트 payload의 `kind` 값: 완료 조건 체크 변경.
@@ -25,5 +25,39 @@ public enum CardEditing {
             "isDone": .bool(isDone),
         ])
         return true
+    }
+    /// 카드 상세의 완료 버튼: 완료로 옮기고 저장한다. 저장했으면 true.
+    /// 옮기기·저장이 실패하면 rollback 뒤 저장소 값으로 다시 읽는다.
+    @discardableResult
+    public static func completeAndSave(
+        _ card: Card, at date: Date, in context: ModelContext,
+        save: (ModelContext) throws -> Void = { try $0.save() }
+    ) -> Bool {
+        do {
+            try ContextReload.commit(context, save: save) {
+                try CardLifecycle.move(card, to: .done, at: date, in: context)
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// 완료 조건 체크를 바꾸고 저장한다. 바꿀 것이 없으면(`setCriterion`이 false) 저장하지 않고 false.
+    /// 저장이 실패하면 rollback 뒤 저장소 값으로 다시 읽고 false.
+    @discardableResult
+    public static func setCriterionAndSave(
+        _ card: Card, at index: Int, isDone: Bool, date: Date, in context: ModelContext,
+        save: (ModelContext) throws -> Void = { try $0.save() }
+    ) -> Bool {
+        guard card.criteria.indices.contains(index), card.criteria[index].isDone != isDone else { return false }
+        do {
+            try ContextReload.commit(context, save: save) {
+                setCriterion(card, at: index, isDone: isDone, date: date, in: context)
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 }

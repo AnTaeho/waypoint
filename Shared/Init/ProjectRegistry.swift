@@ -27,11 +27,12 @@ public enum ProjectRegistry {
 
     /// 확인한 초안으로 등록한다. 초안에는 고른 지침 파일·카드만 들어 있다.
     /// 한 번에 저장한다: 프로젝트 → 지침 문서(버전 local, `guide.synced`) → 카드(origin claude, `card.created`).
-    /// 실패하면 아무것도 남기지 않는다(저장 안 된 변경을 되돌린다).
+    /// 실패하면 아무것도 남기지 않는다(저장 안 된 변경을 되돌리고 저장소 값으로 다시 읽는다). `save`는 테스트 이음새.
     @discardableResult
     public static func register(
         _ draft: ProjectDraft, at date: Date, context: ModelContext,
-        home: String = NSHomeDirectory(), fileManager: FileManager = .default
+        home: String = NSHomeDirectory(), fileManager: FileManager = .default,
+        save: (ModelContext) throws -> Void = { try $0.save() }
     ) throws -> Project {
         let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw Failure.emptyName }
@@ -49,8 +50,8 @@ public enum ProjectRegistry {
             stack: cleanStack(draft.stack),
             createdAt: date
         )
-        context.insert(project)
-        do {
+        try ContextReload.commit(context, save: save) {
+            context.insert(project)
             for relPath in draft.guideFiles {
                 do {
                     try GuideLibrary.add(relPath, to: project, at: date, context: context)
@@ -68,10 +69,6 @@ public enum ProjectRegistry {
                 Event.record(.cardCreated, in: context, project: project, card: card, at: date,
                              payload: ["origin": .string(draft.provider.cardOrigin.rawValue), "status": .string(seed.status.rawValue)])
             }
-            try context.save()
-        } catch {
-            context.rollback()
-            throw error
         }
         return project
     }
