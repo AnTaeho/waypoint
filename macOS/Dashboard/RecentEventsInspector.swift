@@ -24,15 +24,15 @@ struct RecentEventsInspector: View {
 
     var body: some View {
         ScrollView {
-            TimelineView(.periodic(from: .now, by: 30)) { timeline in
+            LiveDataTimeline { now in
                 VStack(alignment: .leading, spacing: Theme.Spacing.l) {
                     Text("최근 기록")
                         .font(Theme.section)
                         .foregroundStyle(Theme.text)
-                    let lines = RecentEventFormat.lines(from: scoped, now: timeline.date)
+                    let lines = RecentEventFormat.lines(from: scoped, now: now)
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                            RecentEventRow(line: line, now: timeline.date, showsDivider: index < lines.count - 1)
+                            RecentEventRow(line: line, now: now, showsDivider: index < lines.count - 1)
                         }
                     }
                 }

@@ -24,7 +24,7 @@ struct BoardCardView: View {
                 Spacer(minLength: 0)
                 if let link, let session = link.session,
                    let time = CardFormat.workTime(
-                       state: state, attachedAt: link.attachedAt, lastSeenAt: session.lastSeenAt, now: now
+                       state: state, attachedAt: link.attachedAt, lastSeenAt: session.lastSeenAt, now: now, session: session
                    ) {
                     Text(time)
                         .font(state == .live ? Theme.captionLargeMedium : Theme.captionLarge)

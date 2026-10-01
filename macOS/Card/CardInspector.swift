@@ -9,8 +9,8 @@ struct CardInspector: View {
 
     var body: some View {
         ScrollView {
-            TimelineView(.periodic(from: .now, by: 30)) { timeline in
-                content(now: timeline.date)
+            LiveDataTimeline { now in
+                content(now: now)
             }
         }
         .background(Theme.bgPanel)

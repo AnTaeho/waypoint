@@ -23,8 +23,8 @@ struct SidebarView: View {
 
             Section {
                 ForEach(projects) { project in
-                    TimelineView(.periodic(from: .now, by: 30)) { timeline in
-                        SidebarProjectRow(project: project, now: timeline.date)
+                    LiveDataTimeline { now in
+                        SidebarProjectRow(project: project, now: now)
                     }
                     .tag(SidebarSelection.project(project.persistentModelID))
                     .contextMenu {

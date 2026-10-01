@@ -25,7 +25,7 @@ import Testing
             "- LDG-4 다음 4",
             "- LDG-5 다음 5",
             "다른 세션에서 작업중:",
-            "- LDG-7 다른 작업 (sess·0the)",
+            "- LDG-7 다른 작업 (sess·0the, 최근 활동)",
             "직전 세션 메모 (LDG-7 다른 작업):",
             "  승인금액 케이스 남음",
             SessionContext.skillHint,

@@ -4,16 +4,24 @@ import SwiftData
 /// `SessionEnd` 훅이 오지 않은 세션 정리(SPEC 5장 「종료 판정」).
 /// Claude Code 2.1.283 실측에서 `-p` 세션 20개 중 3개가 `SessionEnd` 없이 끝났다.
 /// - PID를 아는 세션: 그 프로세스가 없으면(또는 마지막 훅 뒤에 시작한 다른 프로세스면) 끝난 것으로 본다.
-/// - PID를 모르는 세션: 마지막 활동에서 24시간이 지나면 끝낸다.
+/// - PID를 모르는 세션: 마지막 활동에서 30분이 지나면 끝낸다.
 public enum SessionSweep {
 
-    /// PID를 모르는 세션을 끝내는 무활동 시간(24시간).
-    public static let inactiveLimit: TimeInterval = 24 * 60 * 60
+    /// PID를 모르는 세션을 끝내는 무활동 시간(30분).
+    public static let inactiveLimit: TimeInterval = 30 * 60
     /// 프로세스 시작 시각 비교 여유(초). outbox `receivedAt`은 초 단위로 잘린다.
     public static let startTolerance: TimeInterval = 2
 
     public static let reasonProcessGone = "process-gone"
-    public static let reasonInactive = "inactive-24h"
+    public static let reasonInactive = "tracking-expired-30m"
+
+    /// 자동 정리한 세션은 실제 ID를 가진 새 활동으로 다시 연결할 수 있다.
+    public static func canReconnect(_ session: Session) -> Bool {
+        guard session.endedAt != nil else { return true }
+        let latest = (session.events ?? []).filter { $0.type == .sessionEnd }.max { $0.at < $1.at }
+        guard let reason = latest?.payloadValues["reason"]?.stringValue else { return false }
+        return [reasonProcessGone, reasonInactive, "inactive-24h"].contains(reason)
+    }
 
     /// 살아 있는 프로세스 정보. 없는 프로세스(좀비 포함)는 probe가 nil을 돌려준다.
     public struct ProcessStatus: Equatable, Sendable {
@@ -33,7 +41,7 @@ public enum SessionSweep {
     /// 끝나지 않은 메인 세션 하나의 판정. 순수 함수.
     /// - PID가 있으면 프로세스를 본다. 없거나, 시작 시각이 `lastSeenAt`보다(여유 포함) 늦으면 → `process-gone`.
     ///   마지막 훅 뒤에 시작한 프로세스는 그 훅을 보냈을 수 없으니 PID를 재사용한 다른 프로세스다.
-    /// - PID가 없으면 `now - lastSeenAt > inactiveLimit`일 때 → `inactive-24h`.
+    /// - PID가 없으면 `now - lastSeenAt > inactiveLimit`일 때 → `tracking-expired-30m`.
     public static func verdict(
         pid: Int?,
         lastSeenAt: Date,
@@ -66,7 +74,8 @@ extension HookProcessor {
         var ended = 0
         for session in sessions {
             let verdict = SessionSweep.verdict(
-                pid: session.claudePid, lastSeenAt: session.lastSeenAt, now: now,
+                pid: session.provider == .claude ? session.claudePid : session.processPid,
+                lastSeenAt: session.lastSeenAt, now: now,
                 inactiveLimit: inactiveLimit, probe: probe
             )
             guard case .end(let reason) = verdict else { continue }

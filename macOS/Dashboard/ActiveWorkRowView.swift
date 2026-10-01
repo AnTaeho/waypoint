@@ -78,7 +78,7 @@ struct ActiveWorkRowView: View {
     private var elapsed: some View {
         Text(SessionFormat.rowElapsed(
             state: row.workState, lastPromptAt: row.session.lastPromptAt, attachedAt: row.attachedAt,
-            lastSeenAt: row.session.lastSeenAt, now: now
+            lastSeenAt: row.session.lastSeenAt, now: now, session: row.session
         ) ?? "")
         .font(isLive ? Theme.captionLargeMedium : Theme.captionLarge)
         .foregroundStyle(isLive ? Theme.liveText : Theme.textMuted)

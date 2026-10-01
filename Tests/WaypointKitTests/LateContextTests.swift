@@ -23,7 +23,7 @@ import Testing
         let h = try HookHarness()
         h.project.rootPath = "~/dev/not-yet"
         let start = try send(h, "doc-SessionStart", at: t0)
-        #expect(start == SessionContext.unregistered)
+        #expect(start?.hasPrefix(SessionContext.unregistered) == true)
         #expect(try h.session() == nil)
 
         h.project.rootPath = "~/dev/ledger"  // 이제 등록됨
@@ -38,7 +38,7 @@ import Testing
     /// 다른(미등록) 폴더에서 시작해 등록 폴더로 옮겨 온 세션.
     @Test func sessionMovedInFromUnregisteredFolderGetsBlockOnce() throws {
         let h = try HookHarness()
-        #expect(try send(h, "doc-SessionStart", at: t0, override: ["cwd": elsewhere]) == SessionContext.unregistered)
+        #expect((try send(h, "doc-SessionStart", at: t0, override: ["cwd": elsewhere]))?.hasPrefix(SessionContext.unregistered) == true)
         #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 30, override: ["cwd": elsewhere]) == nil)
         #expect(try h.session() == nil)
         let text = try send(h, "doc-UserPromptSubmit", at: t0 + 60)
@@ -127,7 +127,8 @@ import Testing
     @Test func outboxEntryDoesNotDeliver() throws {
         let h = try HookHarness()
         for (event, name, offset) in [("SessionStart", "doc-SessionStart", 0.0), ("UserPromptSubmit", "doc-UserPromptSubmit", 30)] {
-            h.processor.handle(Outbox.Entry(event: event, receivedAt: t0 + offset, payload: try fixture(name), claudePid: nil))
+            h.processor.handle(Outbox.Entry(provider: .claude, event: event, receivedAt: t0 + offset,
+                                           payload: try fixture(name), claudePid: nil, processPid: nil))
         }
         #expect(try h.session()?.contextProjectKey == nil)
     }

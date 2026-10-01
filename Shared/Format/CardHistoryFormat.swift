@@ -52,6 +52,12 @@ public enum CardHistoryFormat {
         case .cardAttached:
             return make(.active, "세션 연결")
         case .cardDetached:
+            if [SessionSweep.reasonInactive, "inactive-24h"].contains(p["reason"]?.stringValue ?? "") {
+                return make(.neutral, "추적 만료 · 활동 확인 시간 초과")
+            }
+            if p["reason"]?.stringValue == SessionSweep.reasonProcessGone {
+                return make(.neutral, "세션 종료 · 프로세스 종료 확인")
+            }
             return make(.neutral, "세션 연결 끝")
         case .fileChanged:
             guard let path = p["path"]?.stringValue, !path.isEmpty else { return nil }

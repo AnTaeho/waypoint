@@ -30,10 +30,12 @@ public struct ProjectDraft: Identifiable, Equatable, Sendable {
     public var guideFiles: [String]
     public var seedCards: [SeedCard]
     public var createdAt: Date
+    public var provider: AgentProvider
 
     public init(
         id: UUID = UUID(), rootPath: String, name: String, key: String, summary: String = "",
-        stack: [String] = [], guideFiles: [String] = [], seedCards: [SeedCard] = [], createdAt: Date = Date()
+        stack: [String] = [], guideFiles: [String] = [], seedCards: [SeedCard] = [], createdAt: Date = Date(),
+        provider: AgentProvider = .claude
     ) {
         self.id = id
         self.rootPath = rootPath
@@ -44,6 +46,7 @@ public struct ProjectDraft: Identifiable, Equatable, Sendable {
         self.guideFiles = guideFiles
         self.seedCards = seedCards
         self.createdAt = createdAt
+        self.provider = provider
     }
 }
 

@@ -8,8 +8,8 @@ struct ProjectBoardView: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { timeline in
-            content(now: timeline.date)
+        LiveDataTimeline { now in
+            content(now: now)
         }
         .background(Theme.bg)
         .navigationTitle(project.name)

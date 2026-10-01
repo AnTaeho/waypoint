@@ -101,7 +101,7 @@ struct BoardSessionTileView: View {
     @ViewBuilder private var elapsed: some View {
         if let text = SessionFormat.rowElapsed(
             state: tile.workState, lastPromptAt: tile.session.lastPromptAt, attachedAt: nil,
-            lastSeenAt: tile.session.lastSeenAt, now: now
+            lastSeenAt: tile.session.lastSeenAt, now: now, session: tile.session
         ) {
             Text(text)
                 .font(isLive ? Theme.captionLargeMedium : Theme.captionLarge)

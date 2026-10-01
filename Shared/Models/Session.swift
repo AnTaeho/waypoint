@@ -3,8 +3,9 @@ import SwiftData
 
 @Model
 public final class Session {
-    /// Claude Code `session_id`. 중복은 코드에서 막는다.
+    /// Waypoint 세션 ID. Claude는 원본, Codex는 codex:<원본>. 중복은 코드에서 막는다.
     public var id: String = ""
+    public var providerRaw: String = AgentProvider.claude.rawValue
     public var project: Project?
     public var kindRaw: String = SessionKind.main.rawValue
     public var parent: Session?
@@ -19,6 +20,8 @@ public final class Session {
     /// 이 세션을 돌리는 Claude Code 프로세스 PID(훅 스크립트가 보낸 값). 메인 세션에만 기록한다.
     /// `SessionEnd`가 오지 않고 프로세스가 사라진 세션을 끝내는 데 쓴다(`SessionSweep`).
     public var claudePid: Int?
+    /// Codex 등 다른 로컬 도구 프로세스. 기존 claudePid는 저장소 호환을 위해 유지한다.
+    public var processPid: Int?
     /// 이 세션의 대화에 `Waypoint:` 블록을 넣어 준 프로젝트 키(`SessionStart`나 늦은 `UserPromptSubmit` 주입).
     /// nil이거나 지금 프로젝트 키와 다르면 다음 `UserPromptSubmit`에 블록을 한 번 준다(SPEC 5장 「늦은 주입」). 메인 세션만.
     public var contextProjectKey: String?
@@ -31,6 +34,12 @@ public final class Session {
     public var lastPromptAt: Date?
     /// 저장 캐시. 판정은 항상 `SessionRules.state(of:now:)`로 다시 계산한다.
     public var stateRaw: String = SessionState.live.rawValue
+    /// 이벤트 기반 상태. 빈 값은 이전 버전 세션(시간 기반 상태로 호환).
+    public var activityRaw: String = ""
+    public var activityAt: Date?
+    /// 병렬 호출을 tool_use_id로 구분한다. 명령·인자는 저장하지 않는다.
+    public var pendingToolsData: Data?
+    public var endReason: String?
 
     @Relationship(deleteRule: .cascade, inverse: \CardSession.session)
     public var cardSessions: [CardSession]? = []
@@ -44,15 +53,26 @@ public final class Session {
         cwd: String = "",
         gitBranch: String? = nil,
         startedAt: Date = Date(),
-        lastSeenAt: Date? = nil
+        lastSeenAt: Date? = nil,
+        provider: AgentProvider = .claude
     ) {
         self.id = id
+        self.providerRaw = provider.rawValue
         self.kindRaw = kind.rawValue
         self.agentName = agentName
         self.cwd = cwd
         self.gitBranch = gitBranch
         self.startedAt = startedAt
         self.lastSeenAt = lastSeenAt ?? startedAt
+    }
+
+    public var provider: AgentProvider {
+        get { AgentProvider(rawValue: providerRaw) ?? .claude }
+        set { providerRaw = newValue.rawValue }
+    }
+
+    public var sourceID: String {
+        provider == .codex && id.hasPrefix("codex:") ? String(id.dropFirst(6)) : id
     }
 
     public var kind: SessionKind {

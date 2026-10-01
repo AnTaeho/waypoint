@@ -32,7 +32,7 @@ struct BoardSessionBox: View {
         HStack(spacing: Theme.Spacing.xs + 2) {
             Image(systemName: isSubagent ? "arrow.triangle.branch" : "terminal")
                 .font(Theme.caption)
-            Text(isSubagent ? "서브에이전트" : "Claude Code")
+            Text(isSubagent ? "\(session.provider.name) · 서브에이전트" : session.provider.name)
                 .font(Theme.captionLargeMedium)
         }
         .lineLimit(1)
@@ -52,6 +52,6 @@ struct BoardSessionBox: View {
     /// 서브에이전트는 이름(없으면 세션 ID 앞 4자리), 메인 세션은 「sess·7f2a」.
     private var identifier: String {
         if isSubagent, let name = session.agentName, !name.isEmpty { return name }
-        return SessionFormat.label(kind: .main, id: session.id, agentName: nil)
+        return SessionFormat.label(kind: .main, id: session.sourceID, agentName: nil)
     }
 }

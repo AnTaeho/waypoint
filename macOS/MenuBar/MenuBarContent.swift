@@ -48,18 +48,15 @@ struct MenuBarContent: View {
 
     /// 「가계부 앱 · 작업 2 · 멈춤 1」. 끝나지 않은 메인 세션이 없으면 nil.
     private func line(for project: Project, sessions: [Session], now: Date) -> String? {
-        var live = 0, stalled = 0
-        for session in sessions {
-            switch SessionRules.state(of: session, now: now) {
-            case .live: live += 1
-            case .stalled: stalled += 1
-            case .ended: break
-            }
+        let visible = sessions.filter {
+            $0.openCardSessions.contains { $0.card != nil } || SessionRules.hasUnassignedWork($0, now: now)
         }
-        guard live + stalled > 0 else { return nil }
-        var parts = [project.name]
-        if live > 0 { parts.append("작업 \(live)") }
-        if stalled > 0 { parts.append("멈춤 \(stalled)") }
-        return parts.joined(separator: " · ")
+        let grouped = Dictionary(grouping: visible) { SessionActivityRules.activity($0, now: now) }
+        let phases: [SessionActivity] = [.toolRunning, .working, .waiting, .approval, .idle, .recent]
+        let counts = phases.compactMap { phase -> String? in
+            guard let count = grouped[phase]?.count, count > 0 else { return nil }
+            return "\(phase.title) \(count)"
+        }
+        return counts.isEmpty ? nil : ([project.name] + counts).joined(separator: " · ")
     }
 }

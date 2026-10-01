@@ -15,6 +15,16 @@ extension MCPTools {
         args[key]?.stringValue
     }
 
+    func provider(_ args: JSONValue) throws -> AgentProvider {
+        if let raw = optionalString(args, "provider") {
+            guard let provider = AgentProvider(rawValue: raw) else {
+                throw MCPToolError("provider는 claude·codex 중 하나")
+            }
+            return provider
+        }
+        return .claude
+    }
+
     func optionalStatus(_ args: JSONValue, _ key: String) throws -> CardStatus? {
         guard let raw = optionalString(args, key) else { return nil }
         guard let status = CardStatus(rawValue: raw) else {
@@ -114,8 +124,11 @@ extension MCPTools {
     func sessionJSON(_ session: Session) -> JSONValue {
         var json: [String: JSONValue] = [
             "sessionId": .string(session.id),
+            "provider": .string(session.provider.rawValue),
             "kind": .string(session.kind.rawValue),
             "state": .string(SessionRules.state(of: session, now: now(), stallTimeout: stallTimeout).rawValue),
+            "activity": .string(SessionActivityRules.activity(session, now: now(), timeout: stallTimeout).rawValue),
+            "activityLabel": .string(SessionFormat.activityText(session, now: now())),
         ]
         if let name = session.agentName { json["agentName"] = .string(name) }
         return .object(json)

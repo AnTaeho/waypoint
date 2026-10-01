@@ -54,7 +54,7 @@ import Testing
 
     @Test func sessionStartReturnsText() {
         var seen: [String] = []
-        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { event, _, _ in
+        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { _, event, _, _ in
             seen.append(event); return "컨텍스트"
         }
         #expect(r == .text("컨텍스트"))
@@ -62,23 +62,23 @@ import Testing
     }
 
     @Test func sessionStartWithoutTextIsEmpty200() {
-        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { _, _, _ in nil }
+        let r = HookRouter.respond(to: request("POST", "/hooks/SessionStart")) { _, _, _, _ in nil }
         #expect(r.status == 200)
         #expect(r.body.isEmpty)
     }
 
     @Test func otherEventsAre204() {
-        let r = HookRouter.respond(to: request("POST", "/hooks/PostToolUse")) { _, _, _ in "무시됨" }
+        let r = HookRouter.respond(to: request("POST", "/hooks/PostToolUse")) { _, _, _, _ in "무시됨" }
         #expect(r == .noContent)
     }
 
     /// 늦은 주입: UserPromptSubmit은 텍스트가 있을 때만 200, 없거나 비면 204.
     @Test func userPromptSubmitReturnsTextOnlyWhenPresent() {
-        let with = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _ in "Waypoint: LDG (가계부 앱)" }
+        let with = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _, _ in "Waypoint: LDG (가계부 앱)" }
         #expect(with == .text("Waypoint: LDG (가계부 앱)"))
-        let none = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _ in nil }
+        let none = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _, _ in nil }
         #expect(none == .noContent)
-        let empty = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _ in "" }
+        let empty = HookRouter.respond(to: request("POST", "/hooks/UserPromptSubmit")) { _, _, _, _ in "" }
         #expect(empty == .noContent)
     }
 
@@ -89,8 +89,8 @@ import Testing
             Issue.record("요청을 못 읽음"); return
         }
         var seen: [Int?] = []
-        _ = HookRouter.respond(to: parsed) { _, _, pid in seen.append(pid); return nil }
-        _ = HookRouter.respond(to: request("POST", "/hooks/Stop")) { _, _, pid in seen.append(pid); return nil }
+        _ = HookRouter.respond(to: parsed) { _, _, _, pid in seen.append(pid); return nil }
+        _ = HookRouter.respond(to: request("POST", "/hooks/Stop")) { _, _, _, pid in seen.append(pid); return nil }
         #expect(seen == [5287, nil])
         for bad in ["", "abc", "0", "1", "-3", "12x"] {
             let r = HTTPRequest(method: "POST", path: "/hooks/Stop", headers: ["x-waypoint-claude-pid": bad], body: Data())
@@ -101,7 +101,7 @@ import Testing
     @Test func wrongPathOrMethod() {
         var called = false
         func respond(_ method: String, _ path: String) -> HTTPResponse {
-            HookRouter.respond(to: request(method, path)) { _, _, _ in called = true; return nil }
+            HookRouter.respond(to: request(method, path)) { _, _, _, _ in called = true; return nil }
         }
         let mcp = respond("POST", "/mcp")
         let empty = respond("POST", "/hooks/")

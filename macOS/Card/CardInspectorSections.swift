@@ -26,13 +26,15 @@ struct ConnectedSessionBox: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
             HStack(spacing: Theme.Spacing.s) {
                 WorkStateDot(state: state == .live ? .live : .stalled)
-                Text(session.kind == .subagent ? "서브에이전트" : "Claude Code")
+                Text(session.kind == .subagent ? "\(session.provider.name) · 서브에이전트" : session.provider.name)
                     .font(Theme.bodyStrong)
                 Text(identifier(session))
                     .font(Theme.monoCaption)
                     .foregroundStyle(Theme.textMuted)
                     .lineLimit(1)
             }
+            Text(SessionFormat.activityText(session, now: now))
+                .font(Theme.captionLarge).foregroundStyle(Theme.textMuted)
             ForEach(subagentLinks) { item in
                 Button { open(item.card) } label: {
                     HStack(spacing: Theme.Spacing.s) {
@@ -65,7 +67,7 @@ struct ConnectedSessionBox: View {
 
     private func identifier(_ s: Session) -> String {
         if s.kind == .subagent, let name = s.agentName, !name.isEmpty { return name }
-        return SessionFormat.label(kind: .main, id: s.id, agentName: nil)
+        return SessionFormat.label(kind: .main, id: s.sourceID, agentName: nil)
     }
 
     /// 이 세션에서 갈라진, 아직 끝나지 않은 서브에이전트가 붙어 있는 카드들.

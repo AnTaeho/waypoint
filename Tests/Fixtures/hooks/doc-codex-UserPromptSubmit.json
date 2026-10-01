@@ -1,0 +1,9 @@
+{
+  "session_id": "same-id",
+  "cwd": "/Users/me/dev/ledger",
+  "transcript_path": null,
+  "model": "test-model",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "LDG-1 파일 변경 기록을 구현해줘",
+  "turn_id": "turn-1"
+}

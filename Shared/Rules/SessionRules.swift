@@ -21,8 +21,26 @@ public enum SessionRules {
         now: Date,
         stallTimeout: TimeInterval = defaultStallTimeout
     ) -> SessionState {
-        state(endedAt: session.endedAt, lastSeenAt: session.lastSeenAt, now: now, stallTimeout: stallTimeout)
+        let activity = SessionActivityRules.activity(session, now: now, timeout: stallTimeout)
+        if activity == .ended || activity == .expired { return .ended }
+        return activity.isBusy ? .live : .stalled
     }
+
+    /// 완료한 카드에서 떨어진 대화는 새 사용자 요청이 올 때까지 작업중 타일로 되살리지 않는다.
+    /// 대화 종료·기록 삭제와는 별개인 표시 규칙이다. 아직 도는 하위 작업은 계속 보인다.
+    public static func hasUnassignedWork(_ session: Session, now: Date,
+                                         stallTimeout: TimeInterval = defaultStallTimeout) -> Bool {
+        let links = session.cardSessions ?? []
+        guard let latest = links.compactMap(\.detachedAt).max() else { return true }
+        let lastLinks = links.filter { $0.detachedAt == latest }
+        guard lastLinks.allSatisfy({ $0.card?.status == .done }),
+              (session.lastPromptAt ?? .distantPast) <= latest
+        else { return true }
+        return (session.children ?? []).contains {
+            state(of: $0, now: now, stallTimeout: stallTimeout) != .ended
+        }
+    }
+
 }
 
 /// 카드에 붙은 세션 기준의 작업 상태(파생값).

@@ -2,6 +2,21 @@ import Foundation
 
 public enum SessionFormat {
 
+    /// 도구·대기·활동 없음의 원인을 표시한다. 오래된 세션에도 미확인 상태를 실행 중으로 단정하지 않는다.
+    public static func activityText(_ session: Session, now: Date) -> String {
+        let activity = SessionActivityRules.activity(session, now: now)
+        let since = session.activityAt ?? session.lastSeenAt
+        if activity == .toolRunning {
+            let names = Set(SessionActivityRules.tools(session).values).sorted()
+            let detail = names.isEmpty ? "하위 작업" : names.prefix(2).joined(separator: ", ")
+            return "\(activity.title) · \(detail)"
+        }
+        if activity == .waiting || activity == .approval || activity == .idle {
+            return "\(activity.title) \(TimeFormat.elapsed(from: activity == .idle ? session.lastSeenAt : since, to: now))"
+        }
+        return activity.title
+    }
+
     /// main → 「sess·7f2a」, subagent → 「↳ test-writer」(이름이 없으면 main과 같은 꼴).
     public static func label(kind: SessionKind, id: String, agentName: String?) -> String {
         if kind == .subagent, let agentName, !agentName.isEmpty {
@@ -11,7 +26,8 @@ public enum SessionFormat {
     }
 
     public static func label(for session: Session) -> String {
-        label(kind: session.kind, id: session.id, agentName: session.agentName)
+        let text = label(kind: session.kind, id: session.sourceID, agentName: session.agentName)
+        return session.provider == .codex ? "Codex · \(text)" : text
     }
 
     /// 카드 없는 세션의 제목 자리에 요청 문장이 없을 때 쓰는 글.
@@ -39,8 +55,10 @@ public enum SessionFormat {
     /// 시각부터, 카드 없는 줄은 마지막 요청 시각(`lastPromptAt`)부터 「38분」(1분 미만 「방금」). 카드 없는 줄에
     /// 요청 시각이 없으면 nil(비워 둔다). stalled면 어느 줄이든 「멈춤 22분」(`lastSeenAt`부터). none은 nil.
     public static func rowElapsed(
-        state: CardWorkState, lastPromptAt: Date?, attachedAt: Date?, lastSeenAt: Date, now: Date
+        state: CardWorkState, lastPromptAt: Date?, attachedAt: Date?, lastSeenAt: Date, now: Date,
+        session: Session? = nil
     ) -> String? {
+        if let session { return activityText(session, now: now) }
         switch state {
         case .live:
             guard let start = attachedAt ?? lastPromptAt else { return nil }

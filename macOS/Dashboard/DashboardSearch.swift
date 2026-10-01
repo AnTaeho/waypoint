@@ -8,7 +8,7 @@ struct ActiveWorkSection: Identifiable {
     var id: UUID { project.id }
 }
 
-/// 대시보드 검색: 카드 제목·displayID로 거른다.
+/// 대시보드 검색: 프로젝트 이름·키, 카드 제목·ID, 카드 없는 세션의 요청 문장.
 enum DashboardSearch {
 
     static func normalized(_ text: String) -> String? {
@@ -21,11 +21,19 @@ enum DashboardSearch {
             || card.displayID.localizedCaseInsensitiveContains(query)
     }
 
-    /// 작업중 표: 맞는 카드의 줄만 남기고 빈 묶음은 뺀다. 카드 없는 세션 줄은 검색 중에는 빠진다.
+    static func matches(_ project: Project, _ query: String) -> Bool {
+        project.name.localizedCaseInsensitiveContains(query)
+            || project.key.localizedCaseInsensitiveContains(query)
+    }
+
+    /// 프로젝트가 맞으면 모든 줄, 아니면 카드·요청 문장이 맞는 줄을 남긴다.
     static func sections(_ groups: [DashboardGroup], query: String?) -> [ActiveWorkSection] {
         groups.compactMap { group in
             let rows = query.map { q in
-                group.rows.filter { row in row.card.map { matches($0, q) } ?? false }
+                group.rows.filter { row in
+                    matches(group.project, q) || (row.card.map { matches($0, q) } ?? false)
+                        || (row.card == nil && (row.session.lastPrompt?.localizedCaseInsensitiveContains(q) ?? false))
+                }
             } ?? group.rows
             return rows.isEmpty ? nil : ActiveWorkSection(project: group.project, rows: rows)
         }

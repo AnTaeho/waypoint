@@ -75,7 +75,7 @@ struct PhoneWorkCard: View {
     @ViewBuilder private var elapsed: some View {
         if let text = SessionFormat.rowElapsed(
             state: row.workState, lastPromptAt: row.session.lastPromptAt, attachedAt: row.attachedAt,
-            lastSeenAt: row.session.lastSeenAt, now: now
+            lastSeenAt: row.session.lastSeenAt, now: now, session: row.session
         ) {
             Text(text)
                 .font(isLive ? Theme.Phone.elapsed : Theme.Phone.stalled)

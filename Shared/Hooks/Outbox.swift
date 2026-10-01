@@ -9,11 +9,13 @@ public enum Outbox {
     static let processingPrefix = "outbox.processing-"
 
     public struct Entry {
+        public let provider: AgentProvider
         public let event: String
         public let receivedAt: Date
         public let payload: Data
         /// 훅을 부른 Claude Code 프로세스 PID(스크립트가 찾았을 때만)
         public let claudePid: Int?
+        public let processPid: Int?
     }
 
     public struct DrainResult: Equatable, Sendable {
@@ -31,8 +33,15 @@ public enum Outbox {
               let payload = object["payload"] as? [String: Any],
               let payloadData = try? JSONSerialization.data(withJSONObject: payload)
         else { return nil }
-        return Entry(event: event, receivedAt: Date(timeIntervalSince1970: receivedAt), payload: payloadData,
-                     claudePid: HookParsing.pid(object["claudePid"]))
+        let provider: AgentProvider
+        if let raw = object["provider"] as? String {
+            guard let known = AgentProvider(rawValue: raw) else { return nil }
+            provider = known
+        } else {
+            provider = .claude
+        }
+        return Entry(provider: provider, event: event, receivedAt: Date(timeIntervalSince1970: receivedAt), payload: payloadData,
+                     claudePid: HookParsing.pid(object["claudePid"]), processPid: HookParsing.pid(object["processPid"]))
     }
 
     /// `directory`의 outbox를 처리하고 비운다.
@@ -74,6 +83,7 @@ extension HookProcessor {
     /// outbox 한 줄을 처리한다. 시각은 훅이 받은 시각(`receivedAt`).
     /// 이미 지난 훅이라 대화에 넣을 수 없으므로 주입 텍스트를 만들지 않고, 블록을 줬다고 적지도 않는다.
     public func handle(_ entry: Outbox.Entry) {
-        handle(event: entry.event, json: entry.payload, at: entry.receivedAt, claudePid: entry.claudePid, delivers: false)
+        handle(event: entry.event, json: entry.payload, at: entry.receivedAt,
+               claudePid: entry.claudePid, delivers: false, provider: entry.provider, processPid: entry.processPid)
     }
 }

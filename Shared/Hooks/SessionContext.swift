@@ -8,6 +8,13 @@ public enum SessionContext {
     /// 등록되지 않은 폴더에서 연 세션에 주는 한 줄.
     public static let unregistered = "Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음."
 
+    /// 미등록 시작 폴더에서도 실제 ID를 전달해 작업 대상 프로젝트를 명시적으로 연결할 수 있다.
+    public static func awaitingProject(_ input: HookInput) -> String {
+        [unregistered, "sessionId: \(input.sessionID)", "provider: \(input.provider.rawValue)",
+         "작업 대상 폴더가 정해지면 project_resolve로 확인하고 session_bind로 연결한 뒤 tracker 스킬을 따른다."]
+            .joined(separator: "\n")
+    }
+
     /// 블록 마지막 줄. 스킬이 이 블록을 보고 켜지게 한다.
     public static let skillHint = "작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 tracker 스킬을 따른다."
 
@@ -25,6 +32,7 @@ public enum SessionContext {
             "Waypoint: \(project.key) (\(project.name))",
             "sessionId: \(session.id)",
         ]
+        if session.provider == .codex { lines.append("provider: codex") }
 
         let next = cards.filter { $0.status == .next }.sorted { $0.number < $1.number }.prefix(nextLimit)
         if !next.isEmpty {
@@ -39,7 +47,7 @@ public enum SessionContext {
         if !others.isEmpty {
             lines.append("다른 세션에서 작업중:")
             lines += others.map { card, row in
-                let stalled = row.workState == .stalled ? ", 멈춤" : ""
+                let stalled = ", \(SessionActivityRules.activity(row.session, now: now, timeout: stallTimeout).title)"
                 return "- \(card.displayID) \(card.title) (\(SessionFormat.label(for: row.session))\(stalled))"
             }
         }
@@ -48,7 +56,9 @@ public enum SessionContext {
             lines.append("직전 세션 메모 (\(card.displayID) \(card.title)):")
             lines += note.split(separator: "\n", omittingEmptySubsequences: true).map { "  \($0)" }
         }
-        lines.append(skillHint)
+        lines.append(session.provider == .codex
+                     ? "작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 waypoint-tracker 스킬을 따른다."
+                     : skillHint)
         return lines.joined(separator: "\n")
     }
 

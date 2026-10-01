@@ -39,12 +39,12 @@ public enum CardLifecycle {
     /// 카드·세션의 열린 연결을 닫는다. 남은 열린 연결이 없고 카드가 여전히 active면
     /// `statusBeforeActive`(없으면 next)로 돌린다. 사용자가 그사이 옮겼으면 그대로 둔다.
     /// 여기서 done으로 바꾸는 일은 없다(기억된 상태가 done이었던 경우만 done으로 돌아간다).
-    public static func detach(_ card: Card, _ session: Session, at date: Date, in context: ModelContext) {
+    public static func detach(_ card: Card, _ session: Session, at date: Date, in context: ModelContext, reason: String? = nil) {
         let links = card.openCardSessions.filter { $0.session === session }
         guard !links.isEmpty else { return }
         for link in links { link.detachedAt = date }
         Event.record(.cardDetached, in: context, card: card, session: session, at: date,
-                     payload: ["sessionId": .string(session.id)])
+                     payload: ["sessionId": .string(session.id)].merging(reason.map { ["reason": .string($0)] } ?? [:]) { _, new in new })
 
         guard card.openCardSessions.isEmpty, card.status == .active else { return }
         let restored = card.statusBeforeActive.flatMap(CardStatus.init(rawValue:)) ?? .next
@@ -57,11 +57,11 @@ public enum CardLifecycle {
     }
 
     /// 세션의 열린 연결을 모두 닫고 세션을 끝낸다. 이벤트 `session.end`는 기록하지 않는다(훅 처리 쪽 몫).
-    public static func detachAll(_ session: Session, at date: Date, in context: ModelContext) {
+    public static func detachAll(_ session: Session, at date: Date, in context: ModelContext, reason: String? = nil) {
         let cards = session.openCardSessions.compactMap(\.card)
         var seen = Set<ObjectIdentifier>()
         for card in cards where seen.insert(ObjectIdentifier(card)).inserted {
-            detach(card, session, at: date, in: context)
+            detach(card, session, at: date, in: context, reason: reason)
         }
         session.endedAt = date
         session.cachedState = .ended

@@ -63,10 +63,10 @@ public enum ProjectRegistry {
                 guard !title.isEmpty else { continue }
                 let card = project.makeCard(
                     in: context, title: title, kind: seed.kind, status: seed.status,
-                    body: seed.body, origin: .claude, at: date
+                    body: seed.body, origin: draft.provider.cardOrigin, at: date
                 )
                 Event.record(.cardCreated, in: context, project: project, card: card, at: date,
-                             payload: ["origin": .string(CardOrigin.claude.rawValue), "status": .string(seed.status.rawValue)])
+                             payload: ["origin": .string(draft.provider.cardOrigin.rawValue), "status": .string(seed.status.rawValue)])
             }
             try context.save()
         } catch {

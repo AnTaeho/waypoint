@@ -11,7 +11,19 @@ public enum CardStatus: String, Codable, Sendable, CaseIterable {
 }
 
 public enum CardOrigin: String, Codable, Sendable, CaseIterable {
-    case claude, manual
+    case claude, codex, manual
+}
+
+/// 도구의 원본 ID를 Waypoint ID로 바꾼다. 기존 Claude 기록의 ID는 유지한다.
+public enum AgentProvider: String, Codable, Sendable, CaseIterable {
+    case claude, codex
+
+    public var name: String { self == .codex ? "Codex" : "Claude Code" }
+    public var cardOrigin: CardOrigin { self == .codex ? .codex : .claude }
+
+    public func sessionID(_ raw: String) -> String {
+        self == .codex ? "codex:\(raw)" : raw
+    }
 }
 
 public enum SessionKind: String, Codable, Sendable, CaseIterable {
