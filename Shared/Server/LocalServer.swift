@@ -80,18 +80,20 @@ public final class LocalServer {
 
     private func accept(_ connection: NWConnection) {
         connection.start(queue: .main)
-        let deadline = Date().addingTimeInterval(Self.receiveTimeout)
-        receive(on: connection, buffer: Data(), deadline: deadline)
+        let acceptedAt = Date()
+        receive(on: connection, buffer: Data(), acceptedAt: acceptedAt,
+                deadline: acceptedAt.addingTimeInterval(Self.receiveTimeout))
     }
 
-    private func receive(on connection: NWConnection, buffer: Data, deadline: Date) {
+    private func receive(on connection: NWConnection, buffer: Data, acceptedAt: Date, deadline: Date) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
             MainActor.assumeIsolated {
                 guard let self else { connection.cancel(); return }
                 var buffer = buffer
                 if let data { buffer.append(data) }
                 switch HTTPRequestParser.parse(buffer) {
-                case .request(let request):
+                case .request(var request):
+                    request.receivedAt = acceptedAt
                     self.send(self.handler(request), on: connection)
                 case .invalid:
                     self.send(.badRequest, on: connection)
@@ -99,7 +101,7 @@ public final class LocalServer {
                     if error != nil || isComplete || Date() > deadline {
                         connection.cancel()
                     } else {
-                        self.receive(on: connection, buffer: buffer, deadline: deadline)
+                        self.receive(on: connection, buffer: buffer, acceptedAt: acceptedAt, deadline: deadline)
                     }
                 }
             }

@@ -15,6 +15,8 @@ final class AppServices {
     /// 서버 포트. 평소용 47821, 개발용 47822(`AppInstance`), 환경 변수 `WAYPOINT_PORT`가 먼저.
     let port = AppInstance.current.port()
     let integration = IntegrationMonitor(port: AppInstance.current.port())
+    /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
+    let reliability = ReliabilityMonitor()
     /// 방금 등록한 프로젝트. 메인 창이 받아서 사이드바에서 고르고 비운다.
     var pendingSelection: PersistentIdentifier?
 
@@ -61,7 +63,10 @@ final class AppServices {
         }
         let mcp = MCPServer(context: container.mainContext, drafts: drafts)
         let server = LocalServer(port: port) { [weak self] request in
-            defer { self?.lastDataChange = Date() }
+            defer {
+                self?.lastDataChange = Date()
+                if let self { self.reliability.checkResumes(in: self.container.mainContext) }
+            }
             if request.path == "/integration/status" {
                 return request.method == "GET" ? (self?.integrationResponse() ?? .notFound) : .methodNotAllowed
             }
@@ -79,12 +84,18 @@ final class AppServices {
                 guard SessionActivityRules.hookEvents.contains(event),
                       let input = HookInput(event: event, json: body, provider: provider) else {
                     self?.integration.report("입력 형식 오류")
+                    self?.reliability.update { $0.failures.invalidInput += 1 }
                     return nil
                 }
                 let now = Date()
                 let result = processor.handle(event: event, json: body, at: now,
                                  claudePid: provider == .claude ? pid : nil,
                                  provider: provider, processPid: provider == .codex ? pid : nil)
+                let saved = Date()
+                if !processor.lastSaveFailed {
+                    self?.lastDataChange = saved
+                    self?.reliability.receipt(receivedAt: request.receivedAt ?? now, savedAt: saved)
+                }
                 self?.receiveHook(input, at: now, replayed: false)
                 return result
             }
@@ -92,6 +103,7 @@ final class AppServices {
         server.onStateChange = { [weak self] state in
             guard let self else { return }
             self.serverState = state
+            if case .failed = state { self.reliability.update { $0.failures.server += 1 } }
             // 흡수와 서버가 열리는 사이에 스크립트가 outbox로 보낸 것까지 받는다.
             if state == .ready { self.drainOutbox() }
         }
@@ -161,6 +173,7 @@ final class AppServices {
                 receiveHook(input, at: entry.receivedAt, replayed: true)
             } else { integration.report("누락 기록 세션 정보 읽기 실패") }
         }
+        if result.processed > 0 || result.skipped > 0 || result.retryPending { reliability.update { $0.recordAbsorb(result) } }
         if result.skipped > 0 { integration.report("누락 기록 \(result.skipped)건 형식 오류") }
         if result.retryPending { integration.report("작업 기록 저장 실패 · 미처리 기록 보존") }
         if result.processed > 0 || result.retryPending { lastDataChange = Date() }
@@ -173,8 +186,10 @@ final class AppServices {
         drainOutbox()
         let now = Date()
         defer { lastDataChange = now }
-        processor?.sweep(now: now, probe: SessionSweep.systemProbe)
+        let swept = processor?.sweep(now: now, probe: SessionSweep.systemProbe) ?? 0
+        if swept > 0 { reliability.update { $0.recovery.sessionsClosed += swept } }
         let context = container.mainContext
+        reliability.checkResumes(in: context, now: now)
         let closed = CardLifecycle.closeStrayLinks(at: now, in: context)
         var cleared = 0
         if PromptRetention.isDue(lastRun: lastPromptRetention, now: now) {
@@ -187,6 +202,7 @@ final class AppServices {
         if SessionStateCache.refresh(sessions, now: now) > 0 || closed > 0 || cleared > 0 {
             try? context.save()
         }
+        reliability.saveIfNeeded()
     }
 
     func retryIntegration() {

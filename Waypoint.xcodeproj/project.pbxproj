@@ -22,6 +22,7 @@
 		23FEADAF39A118FCDD2EF9F0 /* PhoneAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB9D4C5D904B017DB200339 /* PhoneAppDelegate.swift */; platformFilters = (ios, ); };
 		267E1888C7B1A12219D031C6 /* LiveDataTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E39F13C4DDC671983D9DB3D /* LiveDataTimeline.swift */; platformFilters = (macos, ); };
 		26E1CB786EC452F721D1A251 /* NanumSquareRoundR.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A2D3AC30512B9F9DFB6DC540 /* NanumSquareRoundR.ttf */; };
+		288E21A553649BBDF69C0C7B /* ReliabilityMetricsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C18EA4602AB47F5CA4872BB /* ReliabilityMetricsSection.swift */; platformFilters = (macos, ); };
 		2AD411287EF1574FAF303695 /* ProjectTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C3491F0AD321EA7D4856FD /* ProjectTable.swift */; platformFilters = (macos, ); };
 		2BF7A1111F6FD51BD017BD1F /* InitFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60588B3D4D8F4FFA5A1DE9AE /* InitFields.swift */; platformFilters = (macos, ); };
 		302718CFFF0EBCE13D5CDA0C /* NanumSquareRoundL.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 147DD09BAE6889ACD4D2B038 /* NanumSquareRoundL.ttf */; };
@@ -86,6 +87,7 @@
 		DC0430C6F87952400D5E0F45 /* IntegrationStatusButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799B6BB6C2822534A015D8FA /* IntegrationStatusButton.swift */; platformFilters = (macos, ); };
 		DDE9D86FA9C5AC75BC50F8D9 /* RootInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4A7D7AF9C02C92C35E3D73 /* RootInspector.swift */; platformFilters = (macos, ); };
 		DE0AB3A437643C60E16F0D6F /* DashboardSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5451E3F0EEC533B30989C6CB /* DashboardSearch.swift */; platformFilters = (macos, ); };
+		DE28790CDD3712CCE59CCB09 /* ReliabilityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD27F5CCBD4C9982D144BE6F /* ReliabilityMonitor.swift */; platformFilters = (macos, ); };
 		E6454537E01518C095097133 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CA506015F36BD8C792F971D /* RootView.swift */; platformFilters = (ios, ); };
 		E94328E02D701FFF80EF3FAD /* ProjectActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF42AA6D2A19A459A4CA690 /* ProjectActivityView.swift */; platformFilters = (macos, ); };
 		EA1C5C6DE198556E4A1C5115 /* InitWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4063ED94790ADDCAF7370C1 /* InitWindowController.swift */; platformFilters = (macos, ); };
@@ -142,6 +144,7 @@
 		63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitor.swift; sourceTree = "<group>"; };
 		648F1BD947F2221E3616CC24 /* SidebarSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSelection.swift; sourceTree = "<group>"; };
 		6A0176C4A79A86838A7FD38E /* DashboardStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardStats.swift; sourceTree = "<group>"; };
+		6C18EA4602AB47F5CA4872BB /* ReliabilityMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReliabilityMetricsSection.swift; sourceTree = "<group>"; };
 		6EB9D4C5D904B017DB200339 /* PhoneAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneAppDelegate.swift; sourceTree = "<group>"; };
 		7049F0310BC529FE9D3015DB /* CardChecksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardChecksView.swift; sourceTree = "<group>"; };
 		7579DAE684178D0E8821A0EE /* NanumSquareRoundB.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundB.ttf; sourceTree = "<group>"; };
@@ -176,6 +179,7 @@
 		C312EDE035FF55A404CC5A2A /* DashboardWorkList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWorkList.swift; sourceTree = "<group>"; };
 		C4063ED94790ADDCAF7370C1 /* InitWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitWindowController.swift; sourceTree = "<group>"; };
 		CA3ED573EF850C456FF91A39 /* SidebarProjectParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarProjectParts.swift; sourceTree = "<group>"; };
+		CD27F5CCBD4C9982D144BE6F /* ReliabilityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReliabilityMonitor.swift; sourceTree = "<group>"; };
 		CEEF1F62190715D2269F95AF /* GuideEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideEditor.swift; sourceTree = "<group>"; };
 		D1C3491F0AD321EA7D4856FD /* ProjectTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTable.swift; sourceTree = "<group>"; };
 		D1DBD11B33E77A4580CC8FF2 /* TableHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableHeader.swift; sourceTree = "<group>"; };
@@ -420,6 +424,8 @@
 				22E9CD0EB19EC76CDDFEFAFD /* IntegrationMonitor.swift */,
 				96A60BC8340B0A9F1DE531E3 /* IntegrationProviderStatus.swift */,
 				799B6BB6C2822534A015D8FA /* IntegrationStatusButton.swift */,
+				6C18EA4602AB47F5CA4872BB /* ReliabilityMetricsSection.swift */,
+				CD27F5CCBD4C9982D144BE6F /* ReliabilityMonitor.swift */,
 			);
 			path = Integration;
 			sourceTree = "<group>";
@@ -593,6 +599,8 @@
 				2AD411287EF1574FAF303695 /* ProjectTable.swift in Sources */,
 				7BCF4AB93F95F3EC62939D07 /* RecentEventRow.swift in Sources */,
 				D3DD134762B554E9BB91285B /* RecentEventsInspector.swift in Sources */,
+				288E21A553649BBDF69C0C7B /* ReliabilityMetricsSection.swift in Sources */,
+				DE28790CDD3712CCE59CCB09 /* ReliabilityMonitor.swift in Sources */,
 				DDE9D86FA9C5AC75BC50F8D9 /* RootInspector.swift in Sources */,
 				CA376468607C6C2C8159BE47 /* RootView.swift in Sources */,
 				E6454537E01518C095097133 /* RootView.swift in Sources */,

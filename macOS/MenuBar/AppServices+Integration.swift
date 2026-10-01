@@ -11,6 +11,7 @@ extension AppServices {
         // 흡수(`replayed`)의 저장 실패는 `drainOutbox`가 알린다. 실시간 처리기의 표시는 흡수가 바꾸지 않는다.
         if !replayed, processor?.lastSaveFailed == true {
             integration.report("작업 기록 저장 실패")
+            reliability.update { $0.failures.saveFailed += 1 }
         }
     }
 
@@ -22,11 +23,14 @@ extension AppServices {
     }
 
     /// 로컬 진단용 읽기 API. 입력 내용·세션 ID·설정 파일·경로를 반환하지 않는다.
+    /// `metrics`는 숫자만 담은 신뢰성 지표(측정 스크립트 `scripts/measure-latency.py`가 읽는다).
     func integrationResponse() -> HTTPResponse {
         let data = (try? JSONEncoder().encode(integration.history)) ?? Data("{}".utf8)
         let history = JSONValue.parse(data) ?? [:]
+        let metrics = (try? JSONEncoder().encode(reliability.metrics)).flatMap { JSONValue.parse($0) } ?? [:]
         return .text(JSONValue.object([
             "history": history,
+            "metrics": metrics,
             "pending": .number(Double(integration.queue.count)),
             "queueUnreadable": .bool(integration.queue.unreadable)
         ]).serializedString)
