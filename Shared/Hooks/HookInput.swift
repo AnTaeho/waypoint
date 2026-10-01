@@ -20,6 +20,10 @@ public struct HookInput {
     public let toolUseID: String?
     public let toolInput: [String: Any]
     public let toolResponse: [String: Any]
+    /// PostToolUseFailure: 실패 설명. Bash는 첫 줄이 `Exit code N`(문서·2.1.286 실측).
+    public let error: String?
+    /// PostToolUseFailure: 도구가 중단돼 실패했는지.
+    public let isInterrupt: Bool
     /// 훅을 부른 Claude Code 프로세스 PID. 본문 JSON이 아니라 HTTP 머리 `X-Waypoint-Claude-PID`나
     /// outbox 줄의 `claudePid`에서 온다. 없으면 nil.
     public var claudePid: Int?
@@ -51,6 +55,8 @@ public struct HookInput {
         self.prompt = string("prompt") ?? string("prompt_text")
         self.toolName = string("tool_name")
         self.toolUseID = string("tool_use_id")
+        self.error = string("error")
+        self.isInterrupt = object["is_interrupt"] as? Bool ?? false
         if provider == .codex {
             self.toolInput = CodexHookAdapter.toolInput(object["tool_input"])
             self.toolResponse = CodexHookAdapter.toolResponse(object["tool_response"])

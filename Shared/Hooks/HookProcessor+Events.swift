@@ -174,6 +174,35 @@ extension HookProcessor {
                              payload: ["hash": .string(commit.hash), "message": .string(commit.message)])
             }
         }
+        recordCheck(input, at: date, acting: acting, cards: cards, project: commitProject)
+    }
+
+    /// PostToolUseFailure: 활동 시각에 더해, 실패한 검증 명령을 근거로 남긴다.
+    func postToolUseFailure(_ input: HookInput, at date: Date) {
+        guard let main = mainSession(input, at: date, create: true) else { return }
+        touch(main, at: date)
+        let sub = subagentSession(input)
+        if let sub { touch(sub, at: date) }
+        let acting = sub ?? main
+        var cards = acting.openCardSessions.compactMap(\.card)
+        if cards.isEmpty, sub != nil { cards = main.openCardSessions.compactMap(\.card) }
+        let projects = (try? context.fetch(FetchDescriptor<Project>())) ?? []
+        let workdir = input.toolInput["workdir"] as? String ?? input.toolInput["cwd"] as? String
+        let project = workdir == nil ? acting.project
+            : workdir.flatMap { $0.hasPrefix("/") ? ProjectMatcher.project(for: $0, in: projects, home: home) : nil }
+        recordCheck(input, at: date, acting: acting, cards: cards, project: project)
+    }
+
+    /// 검증 명령 실행을 그 세션의 열린 카드(서브에이전트가 카드 없이 일하면 부모의 카드)에 근거로 남긴다.
+    /// 카드가 없으면 남기지 않는다(조건과 이을 곳이 없다). 같은 도구 호출은 한 번만.
+    func recordCheck(_ input: HookInput, at date: Date, acting: Session, cards: [Card], project: Project?) {
+        guard let check = HookParsing.check(input), let project else { return }
+        let record = CheckRecord(at: date, command: check.command, outcome: check.outcome, source: .hook,
+                                 exitCode: check.exitCode, provider: input.provider)
+        for card in unique(cards.filter { $0.project === project }) {
+            if let id = input.toolUseID, CardEvidence.hasRecord(card: card, toolUseID: id) { continue }
+            CardEvidence.record(record, card: card, session: acting, toolUseID: input.toolUseID, in: context)
+        }
     }
 
     /// 하위 세션 종료. 모르는 agent_id(앱 내부 에이전트 등)는 무시한다.

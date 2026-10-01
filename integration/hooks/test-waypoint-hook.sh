@@ -166,6 +166,18 @@ elif case == "patch":
     assert line["provider"] == "codex"
     assert p["tool_input"]["command"] == "*** Begin Patch\n*** Add File: new.swift\n+\n+\n*** Update File: old.swift\n-\n+\n*** End Patch", p
     assert p["tool_response"] == {"stdout": "Success. Updated the following files:\nA new.swift\nM old.swift"}, p
+elif case == "verify":
+    # 검증 명령은 원문, 출력은 없음, 종료 표시 필드는 유지
+    assert "SECRET" not in raw
+    assert p["tool_input"] == {"command": "cd /w && swift test 2>&1", "run_in_background": False}, p
+    assert p["tool_response"] == {"stdout": "", "interrupted": False}, p
+elif case == "other":
+    assert "SECRET" not in raw and "rm -rf" not in raw
+    assert "command" not in p["tool_input"], p
+elif case == "failure":
+    assert "SECRET" not in raw
+    assert p["error"] == "Exit code 3" and p["is_interrupt"] is False, p
+    assert p["tool_input"] == {"command": "bash test-fail.sh"}, p
 elif case == "minimal":
     assert "SECRET" not in raw
     assert p == {"session_id": sys.argv[3], "cwd": "/w", "hook_event_name": "PostToolUse"}, p
@@ -186,6 +198,13 @@ outbox_of PreToolUse < "$FIX/real-PreToolUse-Agent.json"
 check "Agent: 프롬프트는 카드 ID만" 'expect agent "$TMP/line"'
 WAYPOINT_AGENT=codex outbox_of PostToolUse < "$FIX/doc-codex-PostToolUse-apply_patch.json"
 check "Codex apply_patch: 머리 줄과 +/- 표시만" 'expect patch "$TMP/line"'
+
+printf '%s' '{"session_id":"s","cwd":"/w","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"cd /w && swift test 2>&1","description":"SECRET","run_in_background":false},"tool_response":{"stdout":"SECRET out","stderr":"SECRET err","interrupted":false,"isImage":false}}' | outbox_of PostToolUse
+check "검증 명령: 명령 원문 유지, 출력 없음" 'expect verify "$TMP/line"'
+printf '%s' '{"session_id":"s","cwd":"/w","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf SECRET-dir"},"tool_response":{"stdout":"SECRET"}}' | outbox_of PostToolUse
+check "다른 명령: 명령 빠짐" 'expect other "$TMP/line"'
+printf '%s' '{"session_id":"s","cwd":"/w","hook_event_name":"PostToolUseFailure","tool_name":"Bash","tool_input":{"command":"bash test-fail.sh"},"error":"Exit code 3\nSECRET failing output","is_interrupt":false}' | outbox_of PostToolUseFailure
+check "실패: error는 Exit code 줄만" 'expect failure "$TMP/line"'
 
 # jq가 없거나 실패: session_id·cwd만. 그것도 못 뽑으면 줄을 쓰지 않는다. 원문은 어느 경우에도 쓰지 않는다.
 WAYPOINT_JQ=/nonexistent/jq outbox_of PostToolUse < "$TMP/read.json"; code=$?

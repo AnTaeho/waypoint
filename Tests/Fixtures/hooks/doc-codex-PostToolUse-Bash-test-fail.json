@@ -1,0 +1,18 @@
+{
+  "session_id": "same-id",
+  "cwd": "/Users/me/dev/ledger",
+  "transcript_path": null,
+  "model": "test-model",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_use_id": "call_test_fail",
+  "tool_input": {
+    "command": "swift test"
+  },
+  "tool_response": {
+    "output": "error: 2 tests failed\nSECRET-OUTPUT",
+    "metadata": {
+      "exit_code": 1
+    }
+  }
+}
