@@ -46,6 +46,7 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 | `card_update(id, title?, body?, status?, criteria?)` | 수정. criteria는 전체를 새로 보낸다(`[{text, done}]`) |
 | `card_note(id, text)` | 결정·막힌 점 한 줄 |
 | `card_handoff(id, nextSessionNote)` | 다음 세션 메모 |
+| `card_evidence(id, criterion?, command, outcome, detail?, sessionId?)` | 완료 조건을 확인하려고 실행한 명령과 결과. criterion은 1부터, outcome은 pass·fail·skipped |
 | `project_resolve(cwd)` | 폴더 → 프로젝트(주입 블록이 없을 때 확인용) |
 | `project_init(cwd, name, key?, summary?, stack?, guideFiles?, seedCards?)` | `/tracker init`에서만. 앱에 등록 확인 창을 띄운다 |
 
@@ -65,6 +66,7 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 - 주제가 바뀌면 새 카드로 `card_start`한다. 이 세션에 붙어 있던 이전 카드는 서버가 연결을 풀고 원래 상태(next·idea 등)로 돌린다. 이전 카드를 done으로 만들지 않는다.
 - 사용자가 "나중에", "언젠가", "다음엔", "이것도 있으면 좋겠다"처럼 **지금 하지 않을 일**을 말하면 `card_create(kind: idea, status: idea, sessionId)`로 남기고 한 줄로 알린다: `PRB-5 아이디어로 남겼어요.` 지금 하던 작업은 계속한다. 당장 할 게 확실한 후속 작업은 `status: next`.
 - 의미 있는 결정이나 막힌 점은 `card_note`로 짧게.
+- 완료 조건을 확인하려고 명령(테스트·빌드 등)을 실행했으면 `card_evidence(id, criterion, command, outcome, sessionId)`로 조건 번호(1부터, `card_get`의 criteria 순서)와 결과를 남긴다. `command`는 실행한 명령 그대로, 실패면 `fail`. 실행하지 않은 조건은 남기지 않는다. `skipped`는 일부러 건너뛴 조건에만 쓴다. 특정 조건이 아닌 검증은 `criterion`을 뺀다. 앱은 실행을 직접 본 기록과 맞춰 보고, 근거 뒤에 파일이 바뀌면 다시 미검증으로 보인다.
 - 완료 조건을 달성하면 `card_update`로 criteria 전체를 체크 상태로 다시 보낸다.
 - `status: active`는 `card_update`로 줄 수 없다. 작업중은 `card_start`로만.
 

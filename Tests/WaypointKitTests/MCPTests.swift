@@ -122,7 +122,7 @@ func mcpRequest(_ body: String, method: String = "POST", headers: [String: Strin
         let tools = try #require(try body(r)["result"]?["tools"]?.arrayValue)
         let names = tools.compactMap { $0["name"]?.stringValue }
         #expect(names == ["project_resolve", "project_init", "session_bind", "card_list", "card_get", "card_create", "card_start",
-                          "card_update", "card_note", "card_handoff"])
+                          "card_update", "card_note", "card_handoff", "card_evidence"])
         for tool in tools {
             #expect(tool["description"]?.stringValue?.isEmpty == false)
             #expect(tool["inputSchema"]?["type"] == "object")
