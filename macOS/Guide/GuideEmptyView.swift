@@ -40,6 +40,14 @@ struct GuideEmptyView: View {
                 Button("파일 추가…", action: pick)
                     .font(Theme.body)
                     .disabled(project.rootPath.isEmpty)
+                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                    Text("이 프로젝트에 걸린 지침")
+                        .font(Theme.section)
+                        .foregroundStyle(Theme.text)
+                    GuidanceAppliedList(project: project)
+                }
+                .frame(maxWidth: Theme.Guide.readMaxWidth)
+                .padding(.top, Theme.Spacing.xl)
             }
             .padding(.horizontal, Theme.Spacing.pageH)
             .padding(.vertical, Theme.Spacing.pageV)

@@ -17,6 +17,8 @@ final class AppServices {
     let integration = IntegrationMonitor(port: AppInstance.current.port())
     /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
     let reliability = ReliabilityMonitor()
+    /// 지침·기억 출처 목록(메모리에만). 서비스를 시작하면 생긴다.
+    private(set) var guidance: GuidanceMonitor?
     /// 방금 등록한 프로젝트. 메인 창이 받아서 사이드바에서 고르고 비운다.
     var pendingSelection: PersistentIdentifier?
 
@@ -120,6 +122,11 @@ final class AppServices {
         let guides = GuideMonitor(context: container.mainContext)
         self.guides = guides
         guides.start()
+
+        // 지침·기억 출처: 읽기만 하고 바뀌면 다시 모은다.
+        let guidance = GuidanceMonitor(context: container.mainContext)
+        self.guidance = guidance
+        guidance.start()
 
         observeCloudKitImports()
 

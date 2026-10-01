@@ -449,7 +449,7 @@ Claude·Codex 사용량(한도별 사용 비율과 초기화 시각)을 사이�
 
 ## 10. 화면
 
-`docs/DESIGN.md` 참조. 대시보드 / 프로젝트 보드 / 카드 상세 / 지침 문서 / 새 프로젝트 등록 창 / iPhone 작업중.
+`docs/DESIGN.md` 참조. 대시보드 / 지침(출처 목록) / 프로젝트 보드 / 카드 상세 / 지침 문서 / 새 프로젝트 등록 창 / iPhone 작업중.
 
 ## 11. 열린 질문 (구현 중 결정)
 
@@ -488,3 +488,48 @@ macOS 대시보드의 AI 연동 요약과 모든 화면의 툴바 버튼에서 �
 - 입력·승인 대기는 작업 실패를 뜻하지 않는다. PID가 없는 세션의 30분 추적 유효기간은 그대로 적용한다.
 
 훅은 관찰만 하며 승인 허용/거절 결정을 출력하지 않는다. Claude·Codex 공식 훅 문서를 확인하여 tool_use_id·PermissionRequest와 전체 matcher를 사용한다. Codex 훅 정의를 바꾸면 /hooks에서 재신뢰가 필요하다.
+
+## 지침·기억 출처 (2026-10-01, TRK-37)
+
+Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다. 읽기만 하고 아무것도 쓰지 않으며, 모은 결과는 저장하지 않는다(SwiftData 모델 없음). 수집은 `GuidanceCollector`(입력: 홈, Claude 홈, Codex 홈, 등록 프로젝트 `(key, rootPath)`, 파일 시스템 `GuidanceFileSystem`) → `GuidanceSnapshot`(출처: 종류·도구·경로·묶음·걸리는 프로젝트 키·크기·수정 시각·항목 수).
+
+### 찾는 곳
+
+| 묶음 | Claude | Codex |
+|---|---|---|
+| 전역 | `/Library/Application Support/ClaudeCode/CLAUDE.md`(관리 정책), `~/.claude/CLAUDE.md`, `~/.claude/rules/**/*.md` | `~/.codex/AGENTS.override.md`, `~/.codex/AGENTS.md`, `~/.codex/rules/*.rules`(명령 규칙), `~/.codex/memories_1.sqlite`(내부 기억) |
+| 상위 폴더 | `CLAUDE.md`, `CLAUDE.local.md`, `.claude/CLAUDE.md`, 저장소 밖 `AGENTS.md` | 저장소 안 `AGENTS.md`·`AGENTS.override.md` |
+| 프로젝트 | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`(개인), `.claude/rules/**/*.md` | `AGENTS.md`, `AGENTS.override.md` |
+| 자동 기억 | `~/.claude/projects/<폴더 이름>/memory/*.md`(`MEMORY.md`는 기억 목록) | — |
+
+- `CLAUDE_CONFIG_DIR`가 있으면 그 경로를 Claude 홈으로, `CODEX_HOME`이 있으면 그 경로를 Codex 홈으로 본다(빈 값은 없는 것으로).
+- 항목 수: 기억 목록은 `- `·`* ` 줄 수, 명령 규칙은 `#`로 시작하지 않는 줄 수, Codex 기억은 행 수, 그 밖은 비지 않은 줄 수(앞 1MB만 센다).
+- 같은 파일이 여러 프로젝트에 걸리면(공통 상위 폴더, 프로젝트 안의 프로젝트) 한 줄로 두고 걸리는 키를 합친다.
+
+### 상위 폴더 규칙
+
+- 문서(code.claude.com memory 「How CLAUDE.md files load」, 2026-10-01): Claude Code는 작업 폴더와 **그 위 모든 폴더**의 `CLAUDE.md`·`CLAUDE.local.md`를 시작할 때 읽는다(파일 시스템 뿌리부터 작업 폴더 순으로 이어 붙임). `.claude/CLAUDE.md`는 「작업 폴더 또는 그 위에 있으면 AGENTS.md 대신 읽는 파일」 목록에 있어 함께 본다. `AGENTS.md`는 위 폴더 어디에도 CLAUDE 계열 파일이 없을 때만 읽는다(기본 설정). 하위 폴더의 CLAUDE.md는 그 폴더 파일을 읽을 때 불려 이번 목록에 넣지 않는다.
+- 문서(Codex AGENTS.md 안내): Codex는 프로젝트 뿌리(보통 git 뿌리)에서 작업 폴더까지 내려오며 폴더마다 `AGENTS.override.md` → `AGENTS.md` 중 하나를 읽는다. git 뿌리 위는 읽지 않는다.
+- Waypoint의 결정: 등록 프로젝트 폴더(심볼릭 링크를 푼 경로)의 부모부터 **홈까지(홈 포함)** 올라간다. 홈 밖 프로젝트는 `/` 바로 아래 폴더까지. 홈의 `.claude/`는 전역 지침이라 상위 폴더로 치지 않는다. 위 폴더의 `AGENTS.md`는 그 폴더가 프로젝트의 git 저장소 안이면 Codex, 밖이면 Claude 쪽으로 표시하고, `AGENTS.override.md`는 저장소 안에서만 본다.
+
+### 기억 폴더 이름과 짝짓기
+
+- 이름 규칙(문서 sessions 「Where transcripts are stored」): 경로의 영문자·숫자가 아닌 글자를 모두 `-`로 바꾼다. 200자를 넘으면 200자로 자르고 경로 해시를 붙인다. 실제 폴더로 확인: `~/workspace/projects/credit_system` → `-Users-antaeho-workspace-projects-credit-system`. 글자는 UTF-16 단위로 바꾼다(한글 한 글자 → `-` 하나). `MemoryFolderName.encode`.
+- 문서(memory 「Storage location」): 기억 폴더는 git 저장소 기준이라 작업 트리와 하위 폴더가 한 기억 폴더를 같이 쓰고, 저장소 밖이면 프로젝트 뿌리를 쓴다.
+- 짝짓기: 폴더 이름을 ① 등록 프로젝트의 등록 경로·푼 경로·git 저장소 뿌리(`.git`이 파일이면 `gitdir:`이 가리키는 원래 저장소) → ② 상위 폴더 순으로 맞춘다. 같은 이름으로 바뀌는 프로젝트가 여럿이면(예: `a_b`와 `a-b`) 모두에 건다 — Claude Code도 한 폴더를 같이 쓴다. 200자를 넘는 경로는 해시를 다시 만들 수 없어 앞 200자 + `-`로만 맞춘다(실제 긴 경로로는 확인하지 못함).
+- 맞는 곳이 없으면 「다른 폴더」에 모은다. 이름만으로는 `-`가 `/`·`_`·`.`·공백 중 무엇이었는지 알 수 없으므로 `/`부터 실제 하위 폴더를 하나씩 읽어(최대 64개 폴더) 이름이 맞는 경로를 찾고, 없으면 `-`를 `/`로 바꾼 추정에 「없는 폴더」를 붙인다(표시용).
+- 빈 기억 폴더(`.md` 없음)는 보이지 않는다. 대화 기록(`*.jsonl`)은 열지 않는다.
+
+### Codex 내부 기억 DB
+
+- `memories_1.sqlite`의 표 `stage1_outputs`에서 행 수와 최근 50개(`source_updated_at` 내림차순)의 `thread_id`·`raw_memory` 앞 240자·시각을 읽는다. 시스템 SQLite(`import SQLite3`)로 `file:…?mode=ro` URI, `SQLITE_OPEN_READONLY`, `PRAGMA query_only = 1`. 열지 못하거나 표·열이 다르면 「읽을 수 없음」.
+- Codex가 WAL로 쓰고 있어 `immutable=1`은 쓰지 않는다(WAL에만 있는 행을 놓친다). WAL을 읽을 때 SQLite가 `-shm`(공유 메모리 색인)의 읽기 표시를 고친다. 본문·`-wal`은 바뀌지 않고 새 파일도 생기지 않는다(`GuidanceReadOnlyTests`).
+
+### 갱신
+
+- macOS 앱(`GuidanceMonitor`)이 시작할 때, 등록 프로젝트가 바뀔 때(저장 알림), 앱이 앞으로 올 때, 지침 화면을 열 때, 감시 폴더에서 출처 파일이 바뀔 때 다시 모은다(백그라운드, 이 Mac에서 약 70 ms).
+- 감시는 M4 `GuideWatcher`(FSEvents)에 경로 거르기를 더해 쓴다. 감시 폴더: Claude 홈, Codex 홈, 등록 프로젝트 폴더, 상위 폴더 — 다른 폴더 안에 든 것은 빼고, **홈 자체는 감시하지 않는다**(홈 바로 아래 `CLAUDE.md` 등은 앱이 앞으로 올 때·화면을 열 때만 다시 본다). 받는 경로: 이름이 `CLAUDE.md`·`CLAUDE.local.md`·`AGENTS.md`·`AGENTS.override.md`·`memories_1.sqlite`(·`-wal`)·`*.rules`, `memory/` 안 `.md`, `rules/` 안 `.md`, 폴더 `memory`·`rules`·`.claude`, `~/.claude/projects` 바로 아래 폴더. 대화 기록·로그·`-shm`은 디바운스 전에 버려 갱신을 미루지 않는다. 디바운스 0.5초.
+
+### 다루지 않는 것
+
+`autoMemoryDirectory` 설정, `CLAUDE_CODE_PROJECT_DIR_NAME`, `claudeMdExcludes`, 지침 파일 고르기 설정(`instructionFiles`), Codex `project_doc_fallback_filenames`, `@path` 가져오기, 하위 폴더 CLAUDE.md, 상위 폴더의 `.claude/rules/`, `~/.codex/skills`·Claude 스킬. 편집·삭제는 없다(TRK-36의 다음 단계).

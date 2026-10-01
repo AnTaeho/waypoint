@@ -9,17 +9,21 @@ import Foundation
 /// 부모 폴더를 넘기므로, 받는 쪽은 그 폴더에 있는 문서를 모두 다시 확인한다.
 public final class GuideWatcher: @unchecked Sendable {
     public typealias Handler = @Sendable (_ directories: Set<String>) -> Void
+    /// 이벤트가 난 경로 중 받을 것. 거른 경로는 디바운스를 다시 걸지 않는다(쉬지 않고 쓰이는 파일이 넘기기를 미루지 않게).
+    public typealias Filter = @Sendable (_ path: String) -> Bool
 
     private let queue = DispatchQueue(label: "dev.antaeho.waypoint.guide-watcher")
     private let debounce: TimeInterval
     private let handler: Handler
+    private let accept: Filter
     // 아래 상태는 `queue`에서만 만진다.
     private var stream: FSEventStreamRef?
     private var pending: Set<String> = []
     private var flush: DispatchWorkItem?
 
-    public init(debounce: TimeInterval = 0.4, handler: @escaping Handler) {
+    public init(debounce: TimeInterval = 0.4, accept: @escaping Filter = { _ in true }, handler: @escaping Handler) {
         self.debounce = debounce
+        self.accept = accept
         self.handler = handler
     }
 
@@ -74,9 +78,10 @@ public final class GuideWatcher: @unchecked Sendable {
         let watcher = Unmanaged<GuideWatcher>.fromOpaque(info).takeUnretainedValue()
         let list = unsafeBitCast(paths, to: NSArray.self)
         var dirs: Set<String> = []
-        for case let path as String in list.prefix(count) {
+        for case let path as String in list.prefix(count) where watcher.accept(path) {
             dirs.insert((path as NSString).deletingLastPathComponent)
         }
+        guard !dirs.isEmpty else { return }
         watcher.received(dirs)
     }
 
