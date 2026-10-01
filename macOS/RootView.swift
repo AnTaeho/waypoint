@@ -59,6 +59,10 @@ struct RootView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) { IntegrationStatusButton() }
+            if #available(macOS 26.0, *) {
+                // 서로 다른 기능의 버튼을 하나의 유리 배경으로 묶지 않는다.
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+            }
             if selectedProjectID != nil, path.isEmpty {
                 ToolbarItem(placement: .principal) {
                     Picker("화면", selection: $projectMode) {
