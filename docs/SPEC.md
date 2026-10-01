@@ -256,7 +256,17 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 
 스크립트는 `SessionStart`·`UserPromptSubmit`이 `200`이고 본문이 있을 때만 stdout으로 찍는다. 다른 이벤트는 본문이 와도 찍지 않는다.
 
-outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID>,"payload":<원본 JSON>}`. `claudePid`는 PID를 찾았을 때만 있다. `payload`는 원본 그대로 둔다. 앱은 실행 시 순서대로 흡수하고 파일을 비운다.
+outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID>,"trimmed":true,"payload":<줄인 JSON>}`. `claudePid`는 PID를 찾았을 때만 있다(Codex는 `"provider":"codex"`, `processPid`). 앱은 실행 시 순서대로 흡수하고 파일을 비운다(흡수한 파일은 지운다).
+
+`payload`는 앱이 읽는 필드만 남긴다(2026-10-01, 스크립트 안 jq 필터 `OUTBOX_FILTER`, `/usr/bin/jq`). 실시간 POST와 로깅 모드(`hook-log/`)는 원본 그대로다. 앱이 세는 값은 같은 결과가 나오는 자리표시로 바꿔서 앱 코드는 그대로 읽는다.
+
+| 자리 | 남기는 것 |
+|---|---|
+| 최상위 | `session_id`, `cwd`, `hook_event_name`, `agent_id`, `agent_type`, `source`, `reason`, `tool_name`, `tool_use_id`, `prompt`·`prompt_text`(앞 600자 — 앱은 공백·붙여넣기 태그를 벗긴 뒤 300자) |
+| `tool_input` | `file_path`, `subagent_type`, `agent_type`, `workdir`, `cwd`. `old_string`·`new_string`·`content`·`edits[]`는 줄 수만큼의 `\n`. `prompt`·`message`는 `[KEY-n]` 카드 ID만. `command`는 `git commit`이 들어 있으면 `"git commit"`(또는 `"git -c commit"`), 아니면 뺀다. Codex `apply_patch`의 `command`는 `*** ` 머리 줄과 `+`/`-` 한 글자 줄만 |
+| `tool_response` | `structuredPatch[].lines`·`bashEditDiff.files[].hunks[].lines`는 `+`/`-` 한 글자만(조각 개수 유지), `bashEditDiff.files[].filePath`·`changedFiles`, `gitOperation.commit.{sha,branch}`, `stdout`은 커밋 줄 `[브랜치 해시] 메시지` 첫 줄과 Codex `Success. Updated the following files:`·`A/M/D 경로` 줄만, `metadata.exit_code`, `exit_code`. Codex의 문자열 응답·`output`·`text`는 `stdout`으로 합친 뒤 줄인다 |
+
+그 밖의 필드(`transcript_path`, `permission_mode`, `description`, 파일 내용, 명령 출력 등)는 쓰지 않는다. jq가 없거나 실패하면 `session_id`·`cwd`만 남기고(값에 따옴표·역슬래시가 없을 때), 그것도 못 찾으면 줄을 쓰지 않는다. 원문은 어느 경우에도 outbox에 쓰지 않는다. 앱이 꺼진 경로 한 번에 약 5~8 ms가 는다(중앙값 21 → 26~27 ms, 2026-10-01 측정).
 
 Claude Code PID 찾기(스크립트): 조상 프로세스를 4단계까지 올라가며(`ps -o ppid=,comm= -p`) 실행 파일 이름(`comm`의 마지막 경로 조각)이 `claude`인 첫 프로세스. 인자(`args`)로는 비교하지 않는다 — 이 스크립트 경로 `~/.claude/waypoint/…`가 셸 인자에 들어 있다. 2.1.283 실측에서는 스크립트 바로 위 부모가 `claude`라 `ps`를 한 번 부르고, 훅 한 번에 약 3 ms가 늘었다(중앙값 15.9 → 18.7 ms).
 
