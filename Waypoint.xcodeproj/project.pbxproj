@@ -18,6 +18,7 @@
 		1B152AC5393D77BCB3C9C238 /* InitPathStackRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5F681EF62D7092B4EB128F /* InitPathStackRow.swift */; platformFilters = (macos, ); };
 		1B3C2B52416D7A03CA3C779F /* Theme+Resume.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFBC70A24D83A2CD05CE0935 /* Theme+Resume.swift */; };
 		1D00E2E080072CCD331C1AAC /* DashboardStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A0176C4A79A86838A7FD38E /* DashboardStats.swift */; platformFilters = (macos, ); };
+		220722DD4903A23E97124187 /* CardChecksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7049F0310BC529FE9D3015DB /* CardChecksView.swift */; platformFilters = (macos, ); };
 		23FEADAF39A118FCDD2EF9F0 /* PhoneAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB9D4C5D904B017DB200339 /* PhoneAppDelegate.swift */; platformFilters = (ios, ); };
 		267E1888C7B1A12219D031C6 /* LiveDataTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E39F13C4DDC671983D9DB3D /* LiveDataTimeline.swift */; platformFilters = (macos, ); };
 		26E1CB786EC452F721D1A251 /* NanumSquareRoundR.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A2D3AC30512B9F9DFB6DC540 /* NanumSquareRoundR.ttf */; };
@@ -125,6 +126,7 @@
 		2EF3CC91475AFCB54D6E49BE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		330BEB710FEA0D0239C8E18B /* CardResumeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardResumeSheet.swift; sourceTree = "<group>"; };
 		3C30269DEA92A22D30679441 /* GuideInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideInspector.swift; sourceTree = "<group>"; };
+		3F3BE9B8CD1A8C96EBD9A09E /* waypoint */ = {isa = PBXFileReference; lastKnownFileType = folder; name = waypoint; path = .; sourceTree = SOURCE_ROOT; };
 		3F79E43D0AD5525DEAADCE1F /* CardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
 		410C8FC8610805C122D0DAFE /* ActivitySessionSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySessionSection.swift; sourceTree = "<group>"; };
 		4806246D0F1AC28DE90C507A /* WaypointApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointApp.swift; sourceTree = "<group>"; };
@@ -141,6 +143,7 @@
 		648F1BD947F2221E3616CC24 /* SidebarSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSelection.swift; sourceTree = "<group>"; };
 		6A0176C4A79A86838A7FD38E /* DashboardStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardStats.swift; sourceTree = "<group>"; };
 		6EB9D4C5D904B017DB200339 /* PhoneAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneAppDelegate.swift; sourceTree = "<group>"; };
+		7049F0310BC529FE9D3015DB /* CardChecksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardChecksView.swift; sourceTree = "<group>"; };
 		7579DAE684178D0E8821A0EE /* NanumSquareRoundB.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundB.ttf; sourceTree = "<group>"; };
 		7589B21E222DC5DBB867A617 /* MarkdownBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBlockView.swift; sourceTree = "<group>"; };
 		786633AF6FAB07F8719504A1 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -170,7 +173,6 @@
 		B9DAD89B809522AC369D3FCB /* LiveDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDot.swift; sourceTree = "<group>"; };
 		BA0E993CFF4FC1F5EB46A65E /* Waypoint.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Waypoint.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BBB730665453005307C7DE13 /* IntegrationDiagnosticButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationDiagnosticButton.swift; sourceTree = "<group>"; };
-		BFD6FC9FE084BA6757339507 /* agent-a1f59f4361c11dbd2 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "agent-a1f59f4361c11dbd2"; path = .; sourceTree = SOURCE_ROOT; };
 		C312EDE035FF55A404CC5A2A /* DashboardWorkList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWorkList.swift; sourceTree = "<group>"; };
 		C4063ED94790ADDCAF7370C1 /* InitWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitWindowController.swift; sourceTree = "<group>"; };
 		CA3ED573EF850C456FF91A39 /* SidebarProjectParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarProjectParts.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 		07F427DBEB282E23B44EFB60 /* Card */ = {
 			isa = PBXGroup;
 			children = (
+				7049F0310BC529FE9D3015DB /* CardChecksView.swift */,
 				5A86041D8ABF749C806E93C1 /* CardCriteriaView.swift */,
 				8BF6E481CC8CB742C64E4F3A /* CardDetailHeader.swift */,
 				3F79E43D0AD5525DEAADCE1F /* CardDetailView.swift */,
@@ -357,7 +360,7 @@
 		5A050900D5A0A9BEC0FD86AF /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				BFD6FC9FE084BA6757339507 /* agent-a1f59f4361c11dbd2 */,
+				3F3BE9B8CD1A8C96EBD9A09E /* waypoint */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -534,6 +537,7 @@
 				EC5A09AE5A861570A3ACEC27 /* BoardColumnView.swift in Sources */,
 				A6AFC6300AD9C9F662C6BCE0 /* BoardSessionBox.swift in Sources */,
 				678C65EC66445DBD7A7F916E /* BoardSessionTileView.swift in Sources */,
+				220722DD4903A23E97124187 /* CardChecksView.swift in Sources */,
 				918DC6BAC3856EA398646C6E /* CardCriteriaView.swift in Sources */,
 				417ADEC51642A897722BF325 /* CardDetailHeader.swift in Sources */,
 				8DDDF628EB44D6378567C942 /* CardDetailView.swift in Sources */,

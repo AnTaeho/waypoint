@@ -76,8 +76,10 @@ public final class HookProcessor {
         case "UserPromptSubmit":
             userPromptSubmit(input, at: date)
             return delivers ? lateContext(input, at: date) : nil
-        case "Stop", "Interrupt", "PostToolUseFailure", "PermissionRequest":
+        case "Stop", "Interrupt", "PermissionRequest":
             heartbeat(input, at: date)
+        case "PostToolUseFailure":
+            postToolUseFailure(input, at: date)
         case "PreToolUse":
             preToolUse(input, at: date)
         case "SubagentStart":

@@ -121,6 +121,19 @@ extension MCPTools {
                 "nextSessionNote": string("다음 세션 메모"),
             ], required: ["id", "nextSessionNote"])
         ),
+        MCPToolDefinition(
+            name: "card_evidence",
+            description: "완료 조건을 확인하려고 실행한 검증 명령과 결과를 카드에 남긴다. 실행하지 않은 조건은 남기지 않는다(skipped는 일부러 건너뛴 경우만). 앱이 명령 실행을 직접 본 기록과 맞으면 확인됨으로 보인다.",
+            inputSchema: schema([
+                "id": cardIdProperty,
+                "criterion": ["type": "integer", "minimum": 1,
+                              "description": "완료 조건 번호(1부터, card_get의 criteria 순서). 카드 전체 검증이면 생략"],
+                "command": string("실행한 명령 그대로(예: swift test)"),
+                "outcome": ["type": "string", "enum": ["pass", "fail", "skipped"], "description": "명령 결과"],
+                "detail": string("짧은 사실(200자까지, 예: 42개 통과)"),
+                "sessionId": string("주입된 sessionId"),
+            ], required: ["id", "command", "outcome"])
+        ),
     ]
 
     static let projectProperty: JSONValue = [

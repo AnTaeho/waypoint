@@ -41,6 +41,10 @@ public enum ActivityEntryFormat {
             guard let status = p["to"]?.stringValue.flatMap(CardStatus.init(rawValue:)) else { return nil }
             text = CardFormat.statusName(status)
             if status == .done { kind = "done" }
+        case .check:
+            guard let record = CheckRecord(event: event) else { return nil }
+            text = record.command
+            detail = EvidenceFormat.historyText(record)
         case .cardCreated: text = "카드 생성"
         case .cardAttached: text = "세션 연결"
         case .cardDetached: text = CardHistoryFormat.line(for: event)?.text ?? "세션 연결 끝"

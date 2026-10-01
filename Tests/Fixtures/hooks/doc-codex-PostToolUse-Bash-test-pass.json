@@ -1,0 +1,11 @@
+{
+  "session_id": "same-id",
+  "cwd": "/Users/me/dev/ledger",
+  "transcript_path": null,
+  "model": "test-model",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_use_id": "call_test_pass",
+  "tool_input": "{\"command\": \"cd /Users/me/dev/ledger && swift test\"}",
+  "tool_response": "Process exited with code 0\nOutput:\nSECRET-OUTPUT all tests passed"
+}

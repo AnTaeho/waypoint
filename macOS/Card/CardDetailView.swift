@@ -20,8 +20,12 @@ struct CardDetailView: View {
                             CardMarkdownText(markdown: card.body)
                         }
                         if !card.criteria.isEmpty {
-                            CardCriteriaView(card: card) { setCriterion($0, $1) }
+                            CardCriteriaView(card: card, evidence: CardEvidence.criteria(for: card), now: now) {
+                                setCriterion($0, $1)
+                            }
                         }
+                        CardChecksView(records: CardEvidence.records(for: card),
+                                       changes: CardEvidence.changeTimes(for: card), now: now)
                         CardHistoryView(lines: CardHistoryFormat.lines(for: card), now: now)
                     }
                     .padding(.horizontal, Theme.Spacing.pageH)

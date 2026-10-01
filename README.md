@@ -63,6 +63,7 @@ cp integration/skills/tracker/SKILL.md ~/.claude/skills/tracker/
 ```
 
 훅 설치는 `integration/hooks/settings.example.json`. 도구 이름은 `mcp__waypoint__card_start` 꼴이라, 권한을 미리 주려면 `mcp__waypoint__*`.
+MCP 도구: `project_resolve`, `project_init`, `session_bind`, `card_list`, `card_get`, `card_create`, `card_start`, `card_update`, `card_note`, `card_handoff`, `card_evidence`(완료 조건별 검증 명령·결과 보고). 입력은 `docs/SPEC.md` 7장.
 되돌리기: `claude mcp remove waypoint -s user`, `rm -r ~/.claude/skills/tracker`.
 
 ## 프로젝트 등록 (`/tracker init`)
@@ -101,6 +102,10 @@ python3 scripts/install-codex.py        # 평소용(47821)
 ### 작업 이어가기
 
 카드 상세의 **작업 이어가기 → 재개 문맥 준비**에서 Claude Code 또는 Codex를 선택하고 미리보기 내용을 복사한다. Waypoint가 연결된 해당 도구의 새 대화에 붙여넣으면, 현재 대화의 실제 세션 ID로 프로젝트와 카드를 연결하도록 안내한다. 목표·마지막 메모·남은 완료 조건·최근 변경 파일·커밋이 포함된다. 복사만으로 카드 상태는 바뀌지 않으며, 새 세션이 `card_start`에 성공하면 작업중으로 표시된다. 완료·보관된 카드는 재개 전에 상태를 변경해야 한다.
+
+### 완료 근거
+
+카드 상세의 완료 조건 줄마다 근거 상태(통과·실패·미검증·변경 후 미검증)와 출처를 보인다. 「확인됨」은 Waypoint가 테스트·빌드 명령의 실제 실행과 종료 코드를 본 것, 「보고」는 에이전트가 `card_evidence`로 알린 것이다. 근거 뒤에 그 카드의 파일이 바뀌면 다시 미검증으로 보인다. 체크 상자는 사용자 판단으로 따로 두고, 세션 종료나 체크만으로 통과가 되지 않는다. 「검증 기록」에 카드에서 돌린 검증 명령이 최근 순으로 남는다.
 
 ### 연동 상태 점검
 

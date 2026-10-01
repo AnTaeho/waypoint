@@ -43,6 +43,7 @@ public final class MCPTools {
         case "card_update": return try cardUpdate(args)
         case "card_note": return try cardNote(args)
         case "card_handoff": return try cardHandoff(args)
+        case "card_evidence": return try cardEvidence(args)
         default: throw MCPToolError("알 수 없는 도구: \(name)")
         }
     }

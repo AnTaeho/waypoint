@@ -222,6 +222,22 @@ PreToolUse·PostToolUse matcher를 `*`로 넓힌 뒤 앱이 꺼진 동안 outbox
 - 요청 이벤트(`user.prompt`)의 문장과 끝난 세션의 `lastPrompt`를 30일 뒤 지운다. 이벤트·시각·세션·카드 연결은 남긴다. 모든 요청 문장이 기한 없이 쌓이고 동기화되던 것을 줄인다. 되돌리거나 기간을 바꾸려면 `PromptRetention.days`만 고친다(이미 지운 문장은 돌아오지 않는다).
 - 요청 문장도 iCloud(개인 Private DB) 동기화를 유지한다. 문장만 동기화에서 빼려면 저장소 구성을 둘로 나눠야 해 범위가 크다. 대신 30일 보관으로 노출 기간을 줄인다. 동기화를 빼려면 로컬 전용 구성을 따로 만들어 문장을 옮겨야 한다.
 
+## 2026-10-01 — 완료 근거: 검증 명령·결과·출처를 조건에 잇는다 (TRK-10)
+
+| 무엇을 | 왜 | 대안 | 되돌리는 방법 |
+|---|---|---|---|
+| 근거는 새 이벤트 종류 `check`(payload `CheckRecord`)로 남기고 모델 필드는 늘리지 않는다. payload에 `text` 키를 두지 않는다 | 기존 카드·CloudKit 스키마를 그대로 두고 마이그레이션 없이 동작. 옛 앱은 모르는 종류를 `note`로 읽는데 `text` 없는 메모는 숨겨 근거가 메모로 새지 않는다 | `Criterion`에 결과 필드 추가(조건을 통째로 바꾸는 `card_update`에 지워지고 동기화 스키마가 바뀐다), `note` + `kind: check` | `EventType.check`와 기록 경로(`HookProcessor.recordCheck`, `card_evidence`) 삭제. 남은 이벤트는 옛 앱처럼 숨는다 |
+| Claude 성공·실패 구분: `PostToolUse` = 종료 코드 0, `PostToolUseFailure`의 `error` 첫 줄 `Exit code N` | 문서(「A Bash command … fails」·`Exit code N` 첫 줄)와 실측 2.1.286(`bash test-fail.sh` → `PostToolUseFailure` `"Exit code 3\n1 test failed"`, 성공 `PostToolUse`에는 종료 코드 필드 없음)이 같다 | 출력 글로 추정 | `HookParsing.exitCode` |
+| 결과를 모르면 `unknown`으로 남기고 통과로 보지 않는다: 중단, `Exit code` 없는 실패, 백그라운드 실행(실측: 시작 때 `PostToolUse` + `backgroundTaskId`, 끝난 코드는 훅으로 오지 않음), `| tail`·`; echo`·`|| true`·`&`처럼 다른 명령의 결과가 남는 꼴 | `swift test | tail`은 pipefail이 없으면 실패해도 0이다. 「검증 이후 변경과 세션 종료만으로 검증 완료를 오인하지 않는다」 | 파이프는 통과로 보기 | `VerificationCommand.Parsed.decidesExitStatus` |
+| 조건 상태 기준은 조건에 직접 붙은 에이전트 보고, 훅 기록은 같은 검증 조각·보고 전 15분 안이면 「확인됨」으로 올린다. 다르면 훅 결과, 보고 뒤 같은 명령을 다시 돌렸으면 그 결과 | 훅은 어느 조건의 검증인지 모른다. 실행을 직접 본 기록이 보고보다 믿을 만하다. 명령 문자열 완전 일치는 `cd … &&`·`2>&1` 때문에 거의 맞지 않아 검증 조각으로 비교한다 | 문자열 완전 일치, 창 없이 아무 때나 | `CardEvidence.confirmWindow`, `decide` |
+| 오래된 근거는 그 카드의 `file.changed`만 본다(커밋은 보지 않음). 같은 시각은 오래되지 않음 | 테스트 → 커밋은 흔한 순서이고 커밋은 코드를 바꾸지 않는다. `swift test`가 같은 호출에서 `Package.resolved`를 바꿀 수 있다 | 커밋도 변경으로 보기 | `CardEvidence.evaluate`의 `latestChange` |
+| 카드가 붙지 않은 세션의 검증 실행은 기록하지 않는다 | 조건과 이을 곳이 없고 프로젝트 이벤트로 쌓이면 활동 탭만 시끄럽다 | 프로젝트 이벤트로 기록 | `recordCheck`의 카드 조건 |
+| `card_evidence.criterion`은 1부터(저장은 0부터 + 조건 글) | 사람과 에이전트가 「조건 1」로 말한다. 조건 글을 함께 저장해 조건을 바꾸면 옛 보고가 엉뚱한 조건에 붙지 않는다 | 0부터 | `MCPTools+Evidence` |
+| 검증 명령 패턴은 Swift 상수 한 곳(`VerificationCommand.pattern`)과 훅 스크립트 `verify_pattern`에 같은 문자열로 두고 테스트로 비교한다. outbox는 패턴에 맞는 명령의 원문을 남긴다(출력은 여전히 남기지 않음) | 앱이 꺼진 동안의 검증 실행도 근거가 되게. 셸·앱 판정이 어긋나면 outbox 근거가 사라진다 | 스크립트가 판정 결과만 남기기(앱 코드와 판정이 둘로 갈린다) | 스크립트 `command_shape`의 `verify_pattern` 줄 삭제 |
+| 실패 색은 새 색 대신 `liveText` | 팔레트가 따뜻한 계열만 쓴다(DESIGN). 빨강은 처음 등장 | 새 빨강 토큰 | `Theme.Evidence.fail` |
+
+실측(Dev, Claude Code 2.1.286, `~/workspace/waypoint-probe`, PRB-6 조건 3개): `card_start` → `bash test-pass.sh`(0) → `bash test-fail.sh`(3) → `card_evidence` 조건 1 pass·조건 2 fail. 저장소에 훅 근거 `pass`/`exitCode 0`, `fail`/`exitCode 3`(`source: hook`)과 보고 2건(`criterion` 0·1). 두 `card_evidence` 결과 모두 `confirmed: true`. 세션 종료 뒤 PRB-6은 next(done 아님). 다음 세션에서 같은 카드에 `note.txt`를 고치자 `file.changed`(06:25:50)가 근거(06:25:16) 뒤에 생겨 조건 1은 「변경 후 미검증」 조건이 된다. 조건 3은 근거 없음(미검증).
+
 ## 2026-10-01 — Codex 사용량은 대화 기록 파일 끝에서 읽는다
 
 Codex 한도는 `~/.codex/sessions`의 최근 기록 파일 끝부분에서 마지막 `limit_id: "codex"` 줄을 읽는다(네트워크 없이, 큰 파일 전체를 읽지 않게). 다른 한도(`premium`·`base_model_inference`)가 같은 파일에 섞여 오므로 걸러 낸다. 사용량 표시는 설정 창에서 도구별로 끌 수 있다(기본 켬). 대안: Codex 앱 서버·API 조회(네트워크·프로세스 의존이라 버림). 되돌리려면 설정에서 Codex를 끄거나 `UsageMonitor.reloadCodex`를 빼면 된다.
