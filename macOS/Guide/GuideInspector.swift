@@ -44,6 +44,11 @@ struct GuideInspector: View {
                 .font(Theme.body)
                 .foregroundStyle(Theme.text)
             }
+            if let project = doc.project {
+                InspectorSection("이 프로젝트에 걸린 지침") {
+                    GuidanceAppliedList(project: project)
+                }
+            }
             InspectorSection("버전 기록") {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(versions, id: \.persistentModelID) { version in

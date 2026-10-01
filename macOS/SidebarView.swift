@@ -21,6 +21,13 @@ struct SidebarView: View {
             }
             .tag(SidebarSelection.dashboard)
 
+            Label {
+                Text("지침").font(Theme.body)
+            } icon: {
+                Image(systemName: "text.book.closed").foregroundStyle(Theme.liveText)
+            }
+            .tag(SidebarSelection.guidance)
+
             Section {
                 ForEach(projects) { project in
                     LiveDataTimeline { now in

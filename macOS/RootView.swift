@@ -4,7 +4,7 @@ import WaypointKit
 
 /// macOS 창 틀: 사이드바 | 본문(NavigationStack) + 오른쪽 인스펙터.
 struct RootView: View {
-    @State private var selection: SidebarSelection? = .dashboard
+    @State private var selection: SidebarSelection? = RootView.launchSelection
     /// 본문 스택. 쌓이는 화면은 카드 상세뿐이라 카드 배열로 들고, 맨 위 카드를 인스펙터에 보인다.
     @State private var path: [Card] = []
     /// 프로젝트를 골랐을 때 보드와 지침 문서 중 무엇을 보나. 프로젝트를 바꿔도 유지한다.
@@ -121,6 +121,17 @@ struct RootView: View {
     private var selectedProjectID: PersistentIdentifier? {
         if case .project(let id) = selection { id } else { nil }
     }
+}
+
+extension RootView {
+    #if DEBUG
+    /// 손 없이 화면을 확인할 때만: 실행 인자 `-WaypointSidebar guidance`로 지침 화면에서 시작한다(Debug만).
+    static var launchSelection: SidebarSelection {
+        UserDefaults.standard.string(forKey: "WaypointSidebar") == "guidance" ? .guidance : .dashboard
+    }
+    #else
+    static let launchSelection: SidebarSelection = .dashboard
+    #endif
 }
 
 /// 프로젝트 화면 종류.

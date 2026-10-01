@@ -16,6 +16,8 @@ struct DetailRootView: View {
         case .dashboard:
             DashboardView(searchText: searchText, selectProject: selectProject)
                 .navigationTitle("대시보드")
+        case .guidance:
+            GuidanceView(searchText: searchText)
         case .project(let id):
             if let project = context.model(for: id) as? Project {
                 switch mode {

@@ -242,3 +242,16 @@ import Testing
         #expect(GuidanceFormat.otherFolderTitle(path: "/Users/me/job", onDisk: true, home: "/Users/me") == "~/job")
     }
 }
+
+@Suite struct GuidanceTextTests {
+    @Test func headerIsSplitOff() {
+        let (header, body) = GuidanceText.splitHeader("---\nname: a\ntype: user\n---\n\n본문\n")
+        #expect(header == "name: a\ntype: user")
+        #expect(body == "본문")
+    }
+
+    @Test func noHeaderKeepsContent() {
+        #expect(GuidanceText.splitHeader("# 제목\n---\n").header == nil)
+        #expect(GuidanceText.splitHeader("---\n열기만\n").body == "---\n열기만\n")
+    }
+}
