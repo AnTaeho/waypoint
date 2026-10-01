@@ -77,7 +77,7 @@ struct GuidanceMarkdownSplitter {
             } else if case .heading(let level, let title)? = MarkdownParser.heading(trimmed) {
                 blocks.append(Block(kind: .heading, first: i, last: i, headingLevel: level, headingText: title))
                 i += 1
-            } else if MarkdownParser.isRule(trimmed) {
+            } else if MarkdownParser.isRule(trimmed) || Self.isLineComment(trimmed) {
                 i += 1
             } else if trimmed.hasPrefix(">") {
                 var j = i + 1
@@ -164,6 +164,13 @@ struct GuidanceMarkdownSplitter {
         return trimmed.isEmpty || MarkdownParser.fence(trimmed) != nil || MarkdownParser.heading(trimmed) != nil
             || MarkdownParser.isRule(trimmed) || trimmed.hasPrefix(">")
             || MarkdownParser.listItem(text.contents[j]) != nil || isTable(at: j, hi)
+    }
+
+    /// 한 줄 안에서 열고 닫는 HTML 주석 하나(`<!-- … -->`). 구분선처럼 항목 밖 줄로 둔다.
+    /// 문단에 붙어 있거나 여러 줄에 걸친 주석은 여전히 HTML 블록이다.
+    static func isLineComment(_ trimmed: String) -> Bool {
+        guard trimmed.hasPrefix("<!--"), trimmed.hasSuffix("-->"), trimmed.count >= 7 else { return false }
+        return trimmed.dropFirst(4).dropLast(3).range(of: "-->") == nil
     }
 
     static func isHTMLStart(_ trimmed: String) -> Bool {

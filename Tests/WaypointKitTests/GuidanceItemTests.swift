@@ -155,6 +155,9 @@ import Testing
         ("# 가\n```\n- 닫히지 않음\n", "닫히지 않은 코드 블록"),
         ("<details>\n<summary>열기</summary>\n</details>\n", "HTML 블록"),
         ("문단 첫 줄\n<!-- 주석 -->\n", "HTML 블록"),
+        ("<!--\n여러 줄 주석\n-->\n", "HTML 블록"),
+        ("<!-- 주석 --> 뒤에 글\n", "HTML 블록"),
+        ("<!-- 하나 --> <!-- 둘 -->\n", "HTML 블록"),
         ("- 가\n  - 공백\n- 나\n\t- 탭\n", "탭과 공백"),
         ("- 1\n  - 2\n    - 3\n      - 4\n        - 5\n          - 6\n", "목록 중첩"),
         ("---\nname: 닫히지 않음\n\n본문\n", "frontmatter가 닫히지 않음"),
@@ -165,6 +168,16 @@ import Testing
         #expect(document.ambiguity?.contains(reason) == true, "\(document.ambiguity ?? "nil")")
         #expect(document.items[0].text + document.items[0].terminator == text)
         #expect(try document.delete(document.items[0]) == "")
+    }
+
+    @Test func lineCommentIsKeptOutsideItems() throws {
+        let text = "<!-- BEGIN:rules -->\n\n# 절\n\n- 가\n  <!-- 항목 안 -->\n- 나\n\n<!-- END:rules -->\n"
+        let document = parse(text)
+        #expect(document.ambiguity == nil)
+        #expect(document.items.map(\.kind) == [.heading, .bullet, .bullet])
+        #expect(document.items[1].text == "- 가\n  <!-- 항목 안 -->")
+        let deleted = try document.delete(document.items[2])
+        #expect(deleted == "<!-- BEGIN:rules -->\n\n# 절\n\n- 가\n  <!-- 항목 안 -->\n\n<!-- END:rules -->\n")
     }
 
     @Test func fiveLevelsAreStillSplit() {

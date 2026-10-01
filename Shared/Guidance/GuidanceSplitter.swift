@@ -28,7 +28,10 @@ extension GuidanceDocument {
             items = splitter.split()
             reasons = splitter.reasons
             if format == .memoryIndex { items = items.map(indexEntry) }
-            allowedTrivia = { lines.isBlank($0) || MarkdownParser.isRule(lines.trimmed($0)) }
+            allowedTrivia = {
+                lines.isBlank($0) || MarkdownParser.isRule(lines.trimmed($0))
+                    || GuidanceMarkdownSplitter.isLineComment(lines.trimmed($0))
+            }
         case .memory:
             items = [memoryItem(lines)]
             allowedTrivia = { _ in false }
