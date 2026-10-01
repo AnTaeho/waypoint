@@ -291,3 +291,19 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 재개 시간은 첫 복사부터 연결 시각까지(도구를 바꿔 다시 복사해도 시작은 처음 복사) | 로드맵의 재개는 「작업을 고른 시점」부터다. 앱이 아는 가장 이른 시점이 첫 복사다 | 마지막 복사부터 | `ResumeTracker.copied` |
 
 관측(Dev Debug, M4, 500건·세션 6): 앱 수신→화면 p95 442 ms, 왕복 p95 417 ms. 부하(세션 12)에서도 p95 729 ms. 목표 2초 통과. 자세한 표는 docs/RELIABILITY.md.
+
+## 2026-10-01 — 재개 요약·준비/복사/연결 상태·도구 열기 (TRK-12)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 목표·남은 조건·미검증·메모 시점 요약은 재개 창 위쪽에 둔다. 카드 상세 재개 영역에는 상태 한 줄과 메모만 | 카드 상세는 바로 아래에 본문·완료 조건·근거가 있어 같은 내용이 겹친다. 재개 창은 재개할 때 여는 곳이다 | 카드 상세 영역에 요약 | `CardResumeSheet`의 `CardResumeSummaryView` |
+| 미검증 = 근거 상태 미검증·실패·변경 후 미검증. 건너뜀은 넣지 않는다 | 건너뜀은 에이전트가 이유를 남긴 판단이다. 복사 문맥에는 건너뜀도 그대로 실린다 | 건너뜀 포함 | `CardResumeSummary.needsVerification` |
+| 상태 이름은 준비됨·복사함·연결됨(+연결 끊김·재개 불가). 연결 판정은 TRK-31 `CardResumeAttempt`를 그대로 쓴다 | 복사·도구 열기만으로 연결됨이 되지 않게. 판정 규칙을 두 군데 두지 않는다 | 새 판정 | `CardResumeStatus` |
+| 연결 뒤 그 세션이 다른 프로젝트로 `session_bind`하면 상태는 복사함으로 돌아간다 | TRK-31 판정이 세션의 현재 프로젝트를 본다. 옮겨 간 세션은 이 프로젝트의 재개로 치지 않는다 | 연결 끊김으로 표시 | `CardResumeAttempt.newLinks`의 `session.project` 조건 |
+| 복사 뒤 이 카드에 처음 붙은 세션이면 복사 전에 시작한 대화도 연결로 친다 | 이미 열어 둔 대화창에 붙여넣는 경우가 흔하다. 복사 전에 이 카드에 붙었던 세션(과거 ID)만 뺀다 | 복사 뒤 시작한 세션만 | `CardResumeAttempt.newLinks` |
+| 도구 열기는 임시 `.command` 파일(0700, 실행되자마자 스스로 지움)을 `NSWorkspace.open(_:withApplicationAt:)`으로 Terminal.app에 넘긴다 | Apple Events(AppleScript `do script`)를 쓰지 않아 자동화 권한 창이 뜨지 않는다. 앱은 샌드박스를 쓰지 않아 격리 표시가 붙지 않는다. Terminal은 `.command`를 사용자 로그인 셸 안에서 실행하므로 PATH(node 등)가 사용자 환경과 같다 | AppleScript로 Terminal 조종(권한 창), `Process`로 직접 실행(창 없음·launchd PATH) | `ToolLauncher`와 재개 창의 열기 버튼 |
+| 실행 파일은 흔한 설치 폴더(`~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.volta/bin`) → 앱 PATH 순으로 찾는다. 로그인 셸을 띄워 `command -v`를 묻지 않는다 | 앱은 launchd PATH(`/usr/bin:/bin:…`)로 뜬다. 셸을 띄우면 사용자 설정 파일이 실행되고 느리다 | `zsh -lc 'command -v claude'` | `ToolLaunch.searchDirectories` |
+| 지원 환경 = macOS + Terminal.app + 실행 파일 + 작업 폴더. 하나라도 없으면 버튼 없이 복사만 | 카드의 「지원이 검증된 실행 환경에 한해」. iTerm 등은 확인하지 않았다 | 기본 터미널 앱 자동 선택 | `ToolLauncher.plan` |
+| 도구는 인자 없이 실행한다. 문맥은 클립보드로만 | 대화 내용을 명령 인자로 넘기면 셸 기록·프로세스 목록에 남는다. `--resume`/`--continue`는 과거 세션 ID를 다시 쓰게 된다 | 첫 메시지를 인자로 | `ToolLaunch.script` |
+
+알아 둘 것: 실제 Terminal.app 열기는 테스트에서 하지 않는다(`ToolLaunchTests`는 스크립트를 `/bin/sh`로 돌려 `cd`·따옴표만 확인). 도구 열기도 재개 시간 지표에서 복사와 같은 시도로 센다.
