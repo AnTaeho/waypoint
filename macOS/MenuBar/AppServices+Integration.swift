@@ -9,7 +9,7 @@ extension AppServices {
         let session = try? context.fetch(FetchDescriptor<Session>(predicate: #Predicate { $0.id == id })).first
         integration.receive(input.provider, sessionID: id, at: at, project: session?.project?.key, replayed: replayed)
         if processor?.lastSaveFailed == true {
-            integration.report("훅은 받았지만 작업 기록을 저장하지 못했습니다. 저장 공간과 권한을 확인하세요.")
+            integration.report("작업 기록 저장 실패")
         }
     }
 

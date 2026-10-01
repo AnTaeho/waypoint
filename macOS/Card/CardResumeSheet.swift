@@ -16,10 +16,6 @@ struct CardResumeSheet: View {
             Picker("이어갈 도구", selection: $provider) {
                 ForEach(AgentProvider.allCases, id: \.self) { Text($0.name).tag($0) }
             }.pickerStyle(.segmented)
-            Text("1. 문맥 복사   2. 선택한 도구의 새 대화에 붙여넣기   3. 카드 연결 확인")
-                .font(Theme.bodyStrong).foregroundStyle(Theme.textSecondary)
-            Text("Waypoint가 연결된 \(provider.name)에서 사용하세요. 현재 프로젝트 폴더를 열면 바로 이어가기 편합니다.")
-                .font(Theme.body).foregroundStyle(Theme.textMuted)
             if let project = card.project {
                 Text((project.rootPath as NSString).expandingTildeInPath)
                     .font(Theme.mono).textSelection(.enabled)
@@ -34,14 +30,12 @@ struct CardResumeSheet: View {
                     .font(Theme.body).foregroundStyle(Theme.liveText)
                 Spacer()
             }
-            Text("복사만으로 작업중으로 바뀌지는 않습니다. 새 대화가 카드에 연결되면 보드에 표시됩니다.")
-                .font(Theme.captionLarge).foregroundStyle(Theme.textMuted)
             HStack {
                 if copyFailed {
-                    Text("복사하지 못했습니다. 미리보기 내용을 선택해 복사해 주세요.")
+                    Text("복사 실패")
                         .font(Theme.captionLarge).foregroundStyle(Theme.liveText)
                 } else if let prompt, copiedText == prompt {
-                    Label("복사됨 · 새 대화에 붙여넣으세요", systemImage: "checkmark")
+                    Label("복사됨", systemImage: "checkmark")
                         .font(Theme.captionLarge).foregroundStyle(Theme.done)
                 }
                 Spacer()

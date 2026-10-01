@@ -20,7 +20,7 @@ final class IntegrationMonitor {
             if FileManager.default.fileExists(atPath: url.path) {
                 if let data = try? Data(contentsOf: url), let stored = try? JSONDecoder().decode(IntegrationHistory.self, from: data) {
                     history = stored
-                } else { history.issue = "연동 진단 기록을 읽을 수 없습니다. 다음 수신 때 다시 저장합니다." }
+                } else { history.issue = "진단 기록 읽기 실패" }
             }
         }
         refresh()
@@ -60,6 +60,6 @@ final class IntegrationMonitor {
             try data.write(to: url, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         }
-        catch { history.issue = "연동 진단 기록을 저장하지 못했습니다. 저장 폴더의 권한과 여유 공간을 확인하세요." }
+        catch { history.issue = "진단 기록 저장 실패" }
     }
 }

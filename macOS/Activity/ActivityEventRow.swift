@@ -23,7 +23,6 @@ struct ActivityEventRow: View {
                         Text("\(card.displayID) · \(card.title) →")
                             .font(Theme.captionLargeMedium).foregroundStyle(Theme.liveText).lineLimit(2)
                     }.buttonStyle(.plain)
-                    if entry.kind == "handoff" { Text("카드를 열어 이어갈 메모와 작업 내용을 확인하세요.").font(Theme.caption).foregroundStyle(Theme.textMuted) }
                 }
             }
             Spacer(minLength: 0)

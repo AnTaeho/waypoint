@@ -12,14 +12,12 @@ struct IntegrationDiagnosticButton: View {
             Button("진단 정보 복사", systemImage: "doc.on.doc", action: copy)
                 .font(Theme.captionLarge)
             if failed {
-                Text("클립보드에 복사하지 못했습니다. 다시 시도해 주세요.")
+                Text("복사 실패")
                     .foregroundStyle(Theme.liveText)
             } else if let copiedAt {
                 Text("\(copiedAt.formatted(date: .omitted, time: .standard)) 기준 복사됨")
                     .foregroundStyle(Theme.done)
             }
-            Text("버전·연동 상태·수신 시각만 복사합니다. 프로젝트명과 대화 내용은 포함하지 않습니다.")
-                .foregroundStyle(Theme.textMuted)
         }.font(Theme.caption)
     }
 

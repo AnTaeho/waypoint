@@ -76,7 +76,7 @@ final class AppServices {
             return HookRouter.respond(to: request) { provider, event, body, pid in
                 guard SessionActivityRules.hookEvents.contains(event),
                       let input = HookInput(event: event, json: body, provider: provider) else {
-                    self?.integration.report("훅 입력 형식을 읽을 수 없습니다. Waypoint 훅 설치를 확인하세요.")
+                    self?.integration.report("입력 형식 오류")
                     return nil
                 }
                 let now = Date()
@@ -156,9 +156,9 @@ final class AppServices {
             processor.handle(entry)
             if let input = HookInput(event: entry.event, json: entry.payload, provider: entry.provider) {
                 receiveHook(input, at: entry.receivedAt, replayed: true)
-            } else { integration.report("누락 기록의 세션 정보를 읽지 못했습니다. 훅 설치를 확인하세요.") }
+            } else { integration.report("누락 기록 세션 정보 읽기 실패") }
         }
-        if result.skipped > 0 { integration.report("누락 기록 중 \(result.skipped)건은 입력 형식 오류로 읽지 못했습니다. 훅 설치를 확인하세요.") }
+        if result.skipped > 0 { integration.report("누락 기록 \(result.skipped)건 형식 오류") }
         integration.refresh()
     }
 

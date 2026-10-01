@@ -14,9 +14,9 @@ struct CardResumeSection: View {
                     .buttonStyle(.bordered)
                     .disabled(CardResumeContext.unavailableReason(card) != nil)
             }
-            Text(CardResumeContext.unavailableReason(card)
-                 ?? "목표·인수인계 메모·남은 조건·변경 파일을 모아 Claude Code 또는 Codex에서 이어가세요.")
-                .font(Theme.body).foregroundStyle(Theme.textMuted)
+            if let reason = CardResumeContext.unavailableReason(card) {
+                Text(reason).font(Theme.body).foregroundStyle(Theme.textMuted)
+            }
             if let note = card.nextSessionNote, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(note).font(Theme.body).foregroundStyle(Theme.textSecondary).lineLimit(3)
             }
