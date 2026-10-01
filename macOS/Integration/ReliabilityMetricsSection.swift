@@ -22,7 +22,7 @@ struct ReliabilityMetricsSection: View {
                         .foregroundStyle(Theme.liveText)
                 }
                 if !metrics.recovery.isEmpty {
-                    Text("복구 · 흡수 \(metrics.recovery.absorbed) · 보존 \(metrics.recovery.preserved) · 격리 \(metrics.recovery.quarantined) · 세션 정리 \(metrics.recovery.sessionsClosed)")
+                    Text("누락 기록 다시 받음 \(metrics.recovery.absorbed) · 다시 시도 \(metrics.recovery.preserved) · 못 읽음 \(metrics.recovery.quarantined) · 끝난 세션 정리 \(metrics.recovery.sessionsClosed)")
                 }
             }
             .font(Theme.captionLarge).foregroundStyle(Theme.textMuted)
