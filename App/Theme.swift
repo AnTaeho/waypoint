@@ -162,6 +162,20 @@ enum Theme {
         static let columnPaddingV: CGFloat = 12
     }
 
+    /// 검증 근거(카드 상세 완료 조건 상태·검증 기록)
+    enum Evidence {
+        /// 통과
+        static let pass = Theme.done
+        /// 실패: 따뜻한 계열을 유지하려고 진한 클레이
+        static let fail = Theme.liveText
+        /// 미검증·변경 후 미검증·건너뜀·결과 모름
+        static let muted = Theme.textMuted
+        /// 검증 기록에 처음 보이는 수
+        static let listLimit = 8
+        /// 검증 기록 줄의 결과 열 너비
+        static let outcomeWidth: CGFloat = 64
+    }
+
     /// 지침 문서
     enum Guide {
         /// 제목 1·2·3단계(4단계부터는 3단계와 같게) 크기. 굵기는 B.

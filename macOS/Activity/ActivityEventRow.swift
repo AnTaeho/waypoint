@@ -39,6 +39,7 @@ struct ActivityEventRow: View {
         case .commit: return "point.3.connected.trianglepath.dotted"
         case .note: return "note.text"
         case .sessionStart, .sessionEnd: return "clock"
+        case .check: return "checkmark.seal"
         default: return "circle"
         }
     }
