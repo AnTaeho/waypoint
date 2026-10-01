@@ -1,7 +1,7 @@
 import Foundation
 
 /// 앱이 꺼져 있는 동안 훅 스크립트가 쌓은 `outbox.jsonl` 흡수(SPEC 6장).
-/// 한 줄: `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID, 없을 수 있음>,"payload":<원본 JSON>}`
+/// 한 줄: `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID, 없을 수 있음>,"trimmed":true,"payload":<앱이 읽는 필드만 남긴 JSON>}`
 public enum Outbox {
 
     public static let fileName = "outbox.jsonl"

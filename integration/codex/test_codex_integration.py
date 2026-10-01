@@ -151,14 +151,15 @@ class BridgeTests(unittest.TestCase):
             self.assertEqual(result.stdout, '')
         self.assertFalse((self.home / 'support/outbox.jsonl').exists())
 
-    def test_failure_buffers_original_with_provider(self):
+    def test_failure_buffers_trimmed_with_provider(self):
         with self.server(status=503):
             result = self.run_hook('Stop')
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, '')
         data = json.loads((self.home / 'support/outbox.jsonl').read_text())
         self.assertEqual(data['provider'], 'codex')
-        self.assertEqual(data['payload'], self.payload)
+        self.assertEqual(data['payload'], self.payload)  # 세 필드 모두 앱이 읽는 필드라 그대로 남는다
+        self.assertTrue(data['trimmed'])
         self.assertEqual(data['event'], 'Stop')
         self.assertNotIn('claudePid', data)
 
