@@ -44,6 +44,13 @@ import Testing
     @Test func displayMasksAssignmentValuesAndLimitsLength() {
         #expect(VerificationCommand.display("  API_TOKEN=abc123 swift test ") == "API_TOKEN=… swift test")
         #expect(VerificationCommand.display(String(repeating: "a", count: 400)).count == VerificationCommand.commandLimit)
+        // 따옴표 안 `a=b`는 문자열이라 그대로, 값의 따옴표·${…}는 한 덩어리로 가린다
+        let loop = #"S=/tmp/x; for c in "Debug|platform=macOS" "Release"; do cfg=${c%%|*}; xcodebuild -configuration $cfg build > $S/b.log; done"#
+        #expect(VerificationCommand.display(loop)
+                == #"S=…; for c in "Debug|platform=macOS" "Release"; do cfg=…; xcodebuild -configuration $cfg build > $S/b.log; done"#)
+        #expect(VerificationCommand.display(#"KEY="a b" OTHER='c d' swift test"#) == "KEY=… OTHER=… swift test")
+        #expect(VerificationCommand.display("xcodebuild -destination 'platform=macOS' build") == "xcodebuild -destination 'platform=macOS' build")
+        #expect(VerificationCommand.display("swift test --filter=Hook") == "swift test --filter=Hook")
     }
 
     @Test func patternCompiles() {

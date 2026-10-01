@@ -67,11 +67,71 @@ public enum VerificationCommand {
 
     /// 화면·저장용 명령: 앞뒤 공백 정리, 변수 대입 값 가림(`TOKEN=…`), 300자까지.
     public static func display(_ command: String) -> String {
-        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        let masked = trimmed.replacing(/(^|[\s;&|(])([A-Za-z_][A-Za-z0-9_]*)=("[^"]*"|'[^']*'|[^\s;&|]*)/) { match in
-            "\(match.output.1)\(match.output.2)=…"
-        }
+        let masked = maskingAssignments(command.trimmingCharacters(in: .whitespacesAndNewlines))
         return masked.count > commandLimit ? String(masked.prefix(commandLimit - 1)) + "…" : masked
+    }
+
+    /// 따옴표 밖, 단어 처음의 `NAME=값`에서 값을 `…`로 바꾼다. 값은 따옴표·`${…}`·`$(…)`를 한 덩어리로 보고
+    /// 따옴표 밖의 공백·`;` `&` `|`에서 끝난다. 따옴표 안의 `a=b`(문자열)는 그대로 둔다.
+    static func maskingAssignments(_ text: String) -> String {
+        let chars = Array(text)
+        var result = ""
+        var i = 0
+        var quote: Character?
+        func isNameStart(_ c: Character) -> Bool { c == "_" || (c.isASCII && c.isLetter) }
+        func isName(_ c: Character) -> Bool { isNameStart(c) || (c.isASCII && c.isNumber) }
+        while i < chars.count {
+            let c = chars[i]
+            if let q = quote {
+                result.append(c)
+                if c == "\\" && q == "\"", i + 1 < chars.count { result.append(chars[i + 1]); i += 2; continue }
+                if c == q { quote = nil }
+                i += 1; continue
+            }
+            if c == "'" || c == "\"" { quote = c; result.append(c); i += 1; continue }
+            if c == "\\", i + 1 < chars.count { result.append(c); result.append(chars[i + 1]); i += 2; continue }
+            let atWordStart = i == 0 || " \t\n;&|(".contains(chars[i - 1])
+            if atWordStart, isNameStart(c) {
+                var j = i
+                while j < chars.count, isName(chars[j]) { j += 1 }
+                if j < chars.count, chars[j] == "=" {
+                    result += String(chars[i...j]) + "…"
+                    i = skipValue(chars, from: j + 1)
+                    continue
+                }
+            }
+            result.append(c)
+            i += 1
+        }
+        return result
+    }
+
+    /// 대입 값의 끝(다음 글자 위치).
+    private static func skipValue(_ chars: [Character], from start: Int) -> Int {
+        var i = start
+        var quote: Character?
+        var depth = 0
+        while i < chars.count {
+            let c = chars[i]
+            if let q = quote {
+                if c == "\\" && q == "\"" { i += 2; continue }
+                if c == q { quote = nil }
+                i += 1; continue
+            }
+            if c == "'" || c == "\"" {
+                quote = c
+            } else if c == "\\" {
+                i += 1
+            } else if c == "$", i + 1 < chars.count, chars[i + 1] == "{" || chars[i + 1] == "(" {
+                depth += 1; i += 1
+            } else if depth > 0 {
+                if c == "}" || c == ")" { depth -= 1 }
+            } else if " \t\n;&|)".contains(c) {
+                return i
+            }
+            i += 1
+        }
+        return chars.count
     }
 
     /// 짝짓기용 조각: 리다이렉션(`2>&1`, `> out.txt`)·앞 변수 대입·괄호를 빼고 공백을 하나로.
