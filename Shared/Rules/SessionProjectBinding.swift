@@ -15,7 +15,7 @@ public enum SessionProjectBinding {
         }
         let previous = session.project?.key
         session.project = project
-        session.contextProjectKey = nil
+        session.confirmContext(nil)
         session.gitBranch = GitInfo.branch(at: project.rootPath)
         if date > session.lastSeenAt { session.lastSeenAt = date }
         Event.record(.note, in: context, project: project, session: session, at: date,

@@ -25,7 +25,7 @@ extension MCPTools {
                 SessionActivityRules.reset(session)
                 session.claudePid = nil
                 session.processPid = nil
-                session.contextProjectKey = nil
+                session.confirmContext(nil)
                 Event.record(.sessionStart, in: context, project: project, session: session, at: date,
                              payload: ["source": .string("tracking-reconnect")])
             }
@@ -37,7 +37,7 @@ extension MCPTools {
         }
         let detached = SessionProjectBinding.bind(session, to: project, at: date, in: context)
         if date > session.lastSeenAt { session.lastSeenAt = date }
-        session.contextProjectKey = project.key
+        session.confirmContext(project.key)
         return ["project": projectJSON(project), "sessionId": .string(session.id),
                 "provider": .string(provider.rawValue), "detached": .array(detached.map { .string($0) }),
                 "context": .string(SessionContext.text(project: project, session: session, now: date))]

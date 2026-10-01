@@ -25,6 +25,13 @@ public final class Session {
     /// 이 세션의 대화에 `Waypoint:` 블록을 넣어 준 프로젝트 키(`SessionStart`나 늦은 `UserPromptSubmit` 주입).
     /// nil이거나 지금 프로젝트 키와 다르면 다음 `UserPromptSubmit`에 블록을 한 번 준다(SPEC 5장 「늦은 주입」). 메인 세션만.
     public var contextProjectKey: String?
+    /// 보냈지만 훅 스크립트가 출력했다는 확인(`POST /hooks/ack`)을 아직 받지 못한 블록의 프로젝트 키(TRK-35).
+    /// 확인을 받으면 `contextProjectKey`로 옮기고 비운다. 확인을 보내는 스크립트(`X-Waypoint-Context-Ack: 1`)에만 쓴다.
+    public var contextPendingKey: String?
+    /// 대기 중인 블록의 응답 ID(`X-Waypoint-Context-ID`). 스크립트가 확인에 그대로 돌려보낸다.
+    public var contextPendingID: String?
+    /// 같은 프로젝트 블록을 확인 없이 보낸 횟수. `HookProcessor.maxContextAttempts`에 닿으면 더 보내지 않는다.
+    public var contextPendingCount: Int = 0
     /// 메인 세션의 마지막 사용자 요청 문장(`UserPromptSubmit`의 `prompt`, 앞뒤 공백 정리 후 300자까지).
     /// 자동으로 들어온 메시지(`<agent-message …>` 등)와 서브에이전트 훅은 넣지 않는다(`HookParsing.userPrompt`).
     /// 카드 없는 세션 줄·타일의 제목 자리에 쓴다.
@@ -88,6 +95,14 @@ public final class Session {
 
     public var openCardSessions: [CardSession] {
         (cardSessions ?? []).filter { $0.detachedAt == nil }
+    }
+
+    /// 블록을 받은 프로젝트 키를 확정하고(nil이면 다음 프롬프트에 다시 준다) 대기 중인 블록을 지운다.
+    public func confirmContext(_ key: String?) {
+        contextProjectKey = key
+        contextPendingKey = nil
+        contextPendingID = nil
+        contextPendingCount = 0
     }
 }
 
