@@ -81,7 +81,7 @@ Session      id(= Claude Code session_id), project, kind: main | subagent,
              parent: Session?, agentName?, cwd, gitBranch?,
              startedAt, lastSeenAt, endedAt?, claudePid:Int?,   // claudePid: 메인 세션만, 훅 스크립트가 보낸 Claude Code PID
              contextProjectKey:String?,          // 대화에 Waypoint 블록을 준 프로젝트 키(5장 「늦은 주입」)
-             lastPrompt:String?,                 // 메인 세션의 마지막 사용자 요청 문장, 300자까지(5장 「마지막 요청 문장」)
+             lastPrompt:String?,                 // 메인 세션의 마지막 사용자 요청 문장, 300자까지(5장 「마지막 요청 문장」). 끝난 세션은 30일 뒤 비운다
              lastPromptAt:Date?,                 // lastPrompt를 적은 훅 시각, lastPrompt와 함께 바뀐다
              state: live | stalled | ended          // 파생값, 저장 캐시
 
@@ -126,6 +126,8 @@ Mac 카드 상세에서 재개 문맥을 준비하고 Claude Code·Codex를 선�
 사용자가 새 대화에 붙여넣으면 `project_resolve → session_bind → card_get → card_start` 순서로 연결하도록 안내한다. 복사한 과거 ID 대신 현재 대화의 실제 ID를 사용하며, 최신 카드가 완료·보관된 경우 자동으로 재개하지 않는다. 기존 세션 연결이 있으면 `otherSessions`를 통해 알려 작업 범위를 확인한다. 연결이 성공한 뒤에만 작업중으로 표시된다. 앱에서 AI 프로그램을 실행하거나 작업을 자동 실행하지 않는다.
 
 활동 탭의 사용자 요청은 `note`의 `kind: user.prompt`로 최대 300자씩 저장한다. 이 버전 이전의 전체 요청 이력은 복원하지 않는다. 재수신된 동일 시각·내용의 요청은 중복 저장하지 않으며, 지연 수신은 세션 시작·프로젝트 연결 이력과 당시 카드 연결 구간으로 소속을 결정한다.
+
+요청 문장 보관(`PromptRetention`): 요청 이벤트의 문장(`text`)은 기록 시각부터 30일이 지나면 지운다. 이벤트·시각·세션·카드 연결은 남고 활동 탭·카드 기록에는 문장 없이 「요청」으로 보인다(세션 묶음 제목은 세션 이름). 끝난 세션의 `lastPrompt`도 `lastPromptAt`(없으면 `endedAt`)부터 30일이 지나면 비운다(`lastPromptAt`은 남긴다). 끝나지 않은 세션의 `lastPrompt`는 두지만, 그 세션의 요청 이벤트 문장은 같은 30일 규칙으로 지운다. Mac 앱이 시작 직후 점검에서 한 번, 그 뒤 하루에 한 번 정리하고 지운 결과는 iCloud로 iPhone에 간다. 30일이 지난 요청이 outbox로 늦게 들어오면 다음 정리 때까지 문장이 남는다.
 
 설정 예시: `integration/hooks/settings.example.json`. 사용자 전역(`~/.claude/settings.json`)에 둔다.
 **이벤트 이름과 입력 JSON 필드는 구현 시점의 Claude Code hooks 문서로 반드시 확인할 것.**
@@ -197,6 +199,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - 메인 세션의 `UserPromptSubmit`에서 `prompt`(실측·문서. 옛 문서 예시 이름 `prompt_text`도 받는다)를 앞뒤 공백 정리 후 앞 300자(문자 단위)만 `Session.lastPrompt`에 적고, 그 훅 시각을 `lastPromptAt`에 적는다(`HookParsing.userPrompt`). 세션당 마지막 하나만 둔다. 두 값은 아래 규칙대로 늘 함께 바뀐다.
 - 넣지 않는 것: 서브에이전트 안의 훅(`agent_id` 있음), 빈 문장, `<`로 시작하는 자동 메시지(서브에이전트 완료 알림 `<agent-message from=…>` — 실측 `real-UserPromptSubmit-agent-message.json`, 백그라운드 작업 알림 `<task-notification>` 등). 그때는 앞 값을 그대로 둔다. 슬래시 명령(`/tracker init`)은 그대로 적는다. 붙여 넣은 글(`<pasted_content id=…>…</pasted_content>`, 전사에서 확인)은 태그만 벗겨 적는다.
 - outbox로 흡수한 훅도 적는다. 단 비어 있지 않으면 이 훅이 지금까지 받은 것 중 가장 새것(`at >= lastSeenAt`)일 때만 바꿔서, 늦게 들어온 옛 프롬프트가 더 최근 값을 덮지 않는다(`claudePid`와 같은 규칙).
+- 보관: 끝난 세션은 `lastPromptAt`(없으면 `endedAt`)부터 30일이 지나면 `lastPrompt`를 비운다(위 「요청 문장 보관」).
 - 화면(`SessionFormat.promptPreview`): 줄바꿈·연속 공백을 공백 하나로 모아 한 줄로 만들고 앞 160자(넘으면 「…」). 대시보드·iPhone은 흐리게 한 줄(iPhone 두 줄), 보드 타일은 두 줄. Mac은 마우스를 올리면 저장된 문장 전체.
 
 등록되지 않은 폴더의 세션은 무시한다 (단, `SessionStart` 컨텍스트로 "이 폴더는 Waypoint에 없음, `/tracker init` 가능"을 한 줄 알린다). 하위 폴더에서 연 세션은 가장 가까운 상위 `rootPath` 프로젝트로 매칭한다.
