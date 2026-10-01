@@ -62,7 +62,12 @@ final class AppServices {
             Task { @MainActor in initWindow.show() }
         }
         let mcp = MCPServer(context: container.mainContext, drafts: drafts)
-        let server = LocalServer(port: port) { [weak self] request in
+        // 블록 수신 확인은 서버 큐에서 받아 두기만 한다(메인 큐·저장·화면 갱신을 기다리지 않게). 확정은 다음 훅에서.
+        let acks = processor.contextAcks
+        let server = LocalServer(port: port, fastHandler: { request in
+            guard request.path == HookRouter.ackPath else { return nil }
+            return HookRouter.respondAck(to: request) { acks.insert($0) }
+        }) { [weak self] request in
             defer {
                 self?.lastDataChange = Date()
                 if let self { self.reliability.checkResumes(in: self.container.mainContext) }
@@ -80,7 +85,7 @@ final class AppServices {
                     return response
                 }
             }
-            return HookRouter.respond(to: request) { provider, event, body, pid in
+            return HookRouter.respond(to: request, handle: { provider, event, body, pid in
                 guard SessionActivityRules.hookEvents.contains(event),
                       let input = HookInput(event: event, json: body, provider: provider) else {
                     self?.integration.report("입력 형식 오류")
@@ -90,7 +95,8 @@ final class AppServices {
                 let now = Date()
                 let result = processor.handle(event: event, json: body, at: now,
                                  claudePid: provider == .claude ? pid : nil,
-                                 provider: provider, processPid: provider == .codex ? pid : nil)
+                                 provider: provider, processPid: provider == .codex ? pid : nil,
+                                 acknowledges: HookRouter.acknowledges(request))
                 let saved = Date()
                 if !processor.lastSaveFailed {
                     self?.lastDataChange = saved
@@ -98,7 +104,7 @@ final class AppServices {
                 }
                 self?.receiveHook(input, at: now, replayed: false)
                 return result
-            }
+            }, contextID: { processor.lastContextID })
         }
         server.onStateChange = { [weak self] state in
             guard let self else { return }

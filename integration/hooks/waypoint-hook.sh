@@ -1,7 +1,9 @@
 #!/bin/bash
 # Waypoint 훅 브리지. Claude Code 훅 입력(JSON, stdin)을 로컬 앱으로 전달한다.
 # 원칙: 절대 세션을 막지 않는다. 항상 exit 0. stdout은 SessionStart, 그리고 블록을 받지 못한 세션의
-# UserPromptSubmit에서 한 번만(앱이 200 + 본문을 돌려줄 때. 둘 다 평문 stdout이 대화 컨텍스트에 들어간다).
+# UserPromptSubmit에서만(앱이 200 + 본문을 돌려줄 때. 둘 다 평문 stdout이 대화 컨텍스트에 들어간다).
+# 본문을 stdout에 출력한 뒤에만 응답 ID(X-Waypoint-Context-ID)를 /hooks/ack로 돌려보낸다. 앱은 이 확인을 받아야
+# 블록을 받은 것으로 적고, 확인이 없으면(시간 초과 등) 다음 UserPromptSubmit에 블록을 다시 준다(TRK-35).
 # 설치: ~/.claude/waypoint/waypoint-hook.sh 에 두고 chmod +x
 #
 # 사용: waypoint-hook.sh <EventName>   (stdin: 훅 입력 JSON)
@@ -136,6 +138,16 @@ outbox_payload() {
   printf '{"session_id":"%s","cwd":"%s","hook_event_name":"%s"}' "$sid" "$cwd" "$event"
 }
 
+# 블록 수신 확인. $1 포트, $2 응답 ID. ID 꼴(소문자 UUID)이 아니면 보내지 않는다(옛 앱은 머리가 없어 빈 값).
+# 실패해도 아무것도 하지 않는다(outbox에 쓰지 않는다. 확인이 없으면 앱이 다음 프롬프트에 블록을 다시 준다).
+send_ack() {
+  [[ "$2" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || return 0
+  curl -sS --noproxy '*' --max-time 1 --connect-timeout 1 -o /dev/null \
+    -X POST -H 'Content-Type: application/json' --data-binary "{\"contextId\":\"$2\"}" \
+    "http://127.0.0.1:$1/hooks/ack" >/dev/null 2>&1
+  return 0
+}
+
 main() {
   local event="${1:-Unknown}"
   local port="${WAYPOINT_PORT:-47821}"
@@ -146,8 +158,10 @@ main() {
     *) return 0 ;;
   esac
   local dir="${WAYPOINT_SUPPORT_DIR:-$HOME/Library/Application Support/Waypoint}"
-  local payload now line response status body pid pidfield=""
-  local -a pidheader=()
+  local payload now line response status rest body ctxid pid pidfield=""
+  local -a pidheader=() ackheader=()
+  # 블록을 줄 수 있는 이벤트: 이 스크립트는 출력 뒤 확인을 보낸다고 알린다(없으면 앱은 옛 스크립트로 보고 바로 확정).
+  case "$event" in SessionStart|UserPromptSubmit) ackheader=(-H 'X-Waypoint-Context-Ack: 1') ;; esac
 
   payload="$(cat)"
   [ -z "$payload" ] && return 0
@@ -166,18 +180,24 @@ main() {
   fi
 
   response="$(printf '%s' "$payload" | curl -sS --noproxy '*' --max-time 1 --connect-timeout 1 \
-    -X POST -H 'Content-Type: application/json' "${pidheader[@]}" \
-    --data-binary @- -w '\n%{http_code}' \
+    -X POST -H 'Content-Type: application/json' "${pidheader[@]}" "${ackheader[@]}" \
+    --data-binary @- -w '\n%header{x-waypoint-context-id}\n%{http_code}' \
     "http://127.0.0.1:${port}${path}" 2>/dev/null)"
+  # 응답 = 본문 \n 응답 ID(없으면 빈 줄) \n 상태 코드
   status="${response##*$'\n'}"
-  body="${response%$'\n'*}"
+  rest="${response%$'\n'*}"
+  ctxid="${rest##*$'\n'}"
+  body="${rest%$'\n'*}"
+  [ "$rest" = "$response" ] && body="" && ctxid=""
 
   if [ "$status" = "200" ] || [ "$status" = "204" ]; then
     # SessionStart·UserPromptSubmit 응답 본문은 대화 컨텍스트로 주입된다(UserPromptSubmit은 늦은 주입일 때만 200)
     case "$event" in
       SessionStart|UserPromptSubmit)
-        if [ "$status" = "200" ] && [ -n "$body" ] && [ "$body" != "$status" ]; then
-          printf '%s\n' "$body"
+        if [ "$status" = "200" ] && [ -n "$body" ]; then
+          # 출력에 실패하면(stdout이 닫힘 등) 확인을 보내지 않는다
+          printf '%s\n' "$body" || return 0
+          send_ack "$port" "$ctxid"
         fi
         ;;
     esac

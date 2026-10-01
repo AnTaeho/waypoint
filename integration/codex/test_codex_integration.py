@@ -100,15 +100,21 @@ class BridgeTests(unittest.TestCase):
         self.payload = {'session_id': 'thread-1', 'cwd': '/tmp/project', 'prompt': '작업 시작'}
 
     @contextlib.contextmanager
-    def server(self, status=200, delay=0):
+    def server(self, status=200, delay=0, context_id=None):
         requests = []
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(inner):
                 data = inner.rfile.read(int(inner.headers.get('Content-Length', 0)))
                 requests.append((inner.path, dict(inner.headers), json.loads(data)))
+                if inner.path == '/hooks/ack':
+                    inner.send_response(204)
+                    inner.end_headers()
+                    return
                 time.sleep(delay)
                 body = 'Waypoint: TST (테스트)\nsessionId: codex:thread-1'.encode()
                 inner.send_response(status)
+                if context_id and status == 200:
+                    inner.send_header('X-Waypoint-Context-ID', context_id)
                 inner.send_header('Content-Length', str(len(body)) if status != 204 else '0')
                 inner.end_headers()
                 if status != 204:
@@ -150,6 +156,26 @@ class BridgeTests(unittest.TestCase):
             result = self.run_hook('UserPromptSubmit')
             self.assertEqual(result.stdout, '')
         self.assertFalse((self.home / 'support/outbox.jsonl').exists())
+
+    def test_context_ack_after_output_only(self):
+        context_id = '0f1e2d3c-4b5a-6978-8a9b-acbdcedf0123'
+        with self.server(context_id=context_id) as requests:
+            for event in ('SessionStart', 'UserPromptSubmit', 'Stop'):
+                result = self.run_hook(event)
+                self.assertEqual(result.returncode, 0)
+            acks = [payload for path, _, payload in requests if path == '/hooks/ack']
+            self.assertEqual(acks, [{'contextId': context_id}] * 2)
+            hooks = {path: headers for path, headers, _ in requests if path != '/hooks/ack'}
+            self.assertEqual(hooks['/hooks/codex/SessionStart'].get('X-Waypoint-Context-Ack'), '1')
+            self.assertEqual(hooks['/hooks/codex/UserPromptSubmit'].get('X-Waypoint-Context-Ack'), '1')
+            self.assertNotIn('X-Waypoint-Context-Ack', hooks['/hooks/codex/Stop'])
+        self.assertFalse((self.home / 'support/outbox.jsonl').exists())
+
+    def test_context_timeout_sends_no_ack(self):
+        with self.server(delay=2, context_id='0f1e2d3c-4b5a-6978-8a9b-acbdcedf0123') as requests:
+            result = self.run_hook('SessionStart')
+            self.assertEqual((result.returncode, result.stdout), (0, ''))
+            self.assertFalse([path for path, _, _ in requests if path == '/hooks/ack'])
 
     def test_failure_buffers_trimmed_with_provider(self):
         with self.server(status=503):

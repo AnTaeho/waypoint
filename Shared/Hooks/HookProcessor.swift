@@ -7,6 +7,10 @@ public final class HookProcessor {
     public let context: ModelContext
     /// 최근 처리의 저장 실패. 진단 화면은 오류 원문이나 사용자 입력을 노출하지 않는다.
     public private(set) var lastSaveFailed = false
+    /// 최근 처리에서 대기로 둔 블록의 응답 ID(`X-Waypoint-Context-ID`). 블록을 주지 않았거나 확인 없는 스크립트면 nil.
+    public internal(set) var lastContextID: String?
+    /// 서버 큐가 받아 둔 블록 수신 확인. 다음 훅 처리 때 그 세션의 대기 블록을 확정한다(`applyAcknowledgement`).
+    public let contextAcks: ContextAckInbox
     public var stallTimeout: TimeInterval
     /// 프로젝트 매칭에 쓰는 홈 폴더(`~` 펼치기). 테스트에서 바꾼다.
     public var home: String
@@ -38,36 +42,45 @@ public final class HookProcessor {
         context: ModelContext,
         stallTimeout: TimeInterval = SessionRules.defaultStallTimeout,
         home: String = NSHomeDirectory(),
-        gitBranch: @escaping (String) -> String? = { GitInfo.branch(at: $0) }
+        gitBranch: @escaping (String) -> String? = { GitInfo.branch(at: $0) },
+        contextAcks: ContextAckInbox = ContextAckInbox()
     ) {
         self.context = context
+        self.contextAcks = contextAcks
         self.stallTimeout = stallTimeout
         self.home = home
         self.gitBranch = gitBranch
     }
 
     /// 훅 본문(JSON)을 처리하고 저장한다. 대화에 주입할 텍스트가 있으면 그것을, 아니면 nil.
-    /// 주입 텍스트: `SessionStart`는 늘(빈 문자열일 수 있다), `UserPromptSubmit`은 블록을 받지 못한 세션에 한 번(`lateContext`).
+    /// 주입 텍스트: `SessionStart`는 늘(빈 문자열일 수 있다), `UserPromptSubmit`은 블록을 받지 못한 세션에(`lateContext`).
     /// 읽을 수 없는 본문은 무시한다(nil). `claudePid`는 훅을 부른 Claude Code 프로세스(머리·outbox 필드).
     /// `delivers`가 false면(outbox 흡수 — 이미 지난 훅) 텍스트를 만들지 않고 블록을 줬다고 적지도 않는다.
+    /// `acknowledges`면 스크립트가 출력 뒤 확인(`POST /hooks/ack`)을 보낸다: 블록을 대기로 두고 `lastContextID`를 준다.
+    /// 아니면(옛 스크립트) 블록을 주는 즉시 받은 것으로 적는다(TRK-35).
     @discardableResult
     public func handle(event: String?, json: Data, at date: Date, claudePid: Int? = nil,
-                       delivers: Bool = true, provider: AgentProvider = .claude, processPid: Int? = nil) -> String? {
+                       delivers: Bool = true, provider: AgentProvider = .claude, processPid: Int? = nil,
+                       acknowledges: Bool = false) -> String? {
         lastSaveFailed = false
+        lastContextID = nil
         guard var input = HookInput(event: event, json: json, provider: provider) else { return nil }
         input.claudePid = provider == .claude ? claudePid : nil
         input.processPid = processPid
-        return handle(input, at: date, delivers: delivers)
+        return handle(input, at: date, delivers: delivers, acknowledges: acknowledges)
     }
 
     @discardableResult
-    public func handle(_ input: HookInput, at date: Date, delivers: Bool = true) -> String? {
+    public func handle(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {
         lastSaveFailed = false
+        lastContextID = nil
         // 저장에 실패하면 DB와 함께 메모리의 대기 항목도 되돌린다. 같은 훅을 다시 처리해도 대기 항목이 겹치거나 사라지지 않게.
         // rollback이 되돌리지 못한 메모리 값은 저장소 값으로 다시 읽는다(`ContextReload`). 그대로 두면 다음 저장에 섞인다.
         let spawns = pendingSpawns
         let seen = seenSpawns
-        let result = process(input, at: date, delivers: delivers)
+        // 받아 둔 확인을 늦은 주입 판단 전에 반영한다.
+        let acknowledged = applyAcknowledgement(input)
+        let result = process(input, at: date, delivers: delivers, acknowledges: acknowledges)
         if let main = fetchSession(input.sessionID), main.project?.archivedAt == nil {
             let target = input.event == "SubagentStart" ? subagentSession(input) : (subagentSession(input) ?? main)
             SessionActivityRules.observe(input, session: target ?? main, at: date)
@@ -76,6 +89,10 @@ public final class HookProcessor {
             try saveContext(context)
         } catch {
             lastSaveFailed = true
+            // 대기로 적지 못한 블록의 ID는 돌려주지 않는다(확인이 와도 찾을 곳이 없다).
+            lastContextID = nil
+            // 저장하지 못한 확정은 확인을 되돌려 다음 훅에서 다시 쓴다.
+            if let acknowledged { contextAcks.insert(acknowledged) }
             context.rollback()
             ContextReload.apply(context)
             pendingSpawns = spawns
@@ -84,14 +101,14 @@ public final class HookProcessor {
         return result
     }
 
-    func process(_ input: HookInput, at date: Date, delivers: Bool = true) -> String? {
+    func process(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {
         switch input.event {
         case "SessionStart":
-            let text = sessionStart(input, at: date, delivers: delivers)
+            let text = sessionStart(input, at: date, delivers: delivers, acknowledges: acknowledges)
             return delivers ? text : nil
         case "UserPromptSubmit":
             userPromptSubmit(input, at: date)
-            return delivers ? lateContext(input, at: date) : nil
+            return delivers ? lateContext(input, at: date, acknowledges: acknowledges) : nil
         case "Stop", "Interrupt", "PermissionRequest":
             heartbeat(input, at: date)
         case "PostToolUseFailure":
