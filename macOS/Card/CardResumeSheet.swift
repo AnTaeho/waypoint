@@ -6,6 +6,7 @@ struct CardResumeSheet: View {
     let card: Card
     @Binding var resumeAttempt: CardResumeAttempt?
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var services: AppServices?
     @AppStorage("resumeProvider") private var provider: AgentProvider = .codex
     @State private var copiedText: String?
     @State private var copyFailed = false
@@ -65,6 +66,9 @@ struct CardResumeSheet: View {
         let success = NSPasteboard.general.setString(text, forType: .string)
         copiedText = success ? text : nil
         copyFailed = !success
-        if success { resumeAttempt = CardResumeAttempt(card: card, provider: provider, at: Date()) }
+        guard success else { return }
+        let attempt = CardResumeAttempt(card: card, provider: provider, at: Date())
+        resumeAttempt = attempt
+        services?.reliability.copied(attempt)
     }
 }

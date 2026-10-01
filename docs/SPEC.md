@@ -172,6 +172,8 @@ Mac 카드 상세에서 재개 문맥을 준비하고 Claude Code·Codex를 선�
 
 모든 훅: 스크립트가 보낸 Claude Code PID(6장)가 있으면 메인 세션 `claudePid`에 적는다. 비어 있거나 이 훅이 지금까지 받은 것 중 가장 새것(`at >= lastSeenAt`)일 때만 바꾼다(`--resume`은 같은 `session_id`를 새 프로세스로 이어 가고, outbox로 늦게 온 옛 훅은 되돌리지 않는다). 서브에이전트 훅의 PID는 부모와 같은 프로세스라 메인 세션에만 적는다.
 
+재수신(TRK-11, docs/RELIABILITY.md): 실시간 응답이 1초를 넘으면 같은 훅이 outbox에도 쓰여 두 번 들어온다. 같은 세션에 같은 `tool_use_id`의 파일 변경·커밋 기록이 10분 안에 있으면 다시 남기지 않는다(기록 payload에 `toolUseId`). 요청 문장은 `prompt_id`(Claude 2.1.196+)·`turn_id`(Codex)가 같으면 같은 요청이고, ID가 없으면(옛 outbox 줄) 같은 문장이 10초 안에 있을 때 같은 요청으로 본다(payload에 `promptId`). `PreToolUse(Agent)`는 부모 세션·`tool_use_id`마다 대기 목록에 한 번만 올린다. 끝난 세션보다 이른 시각의 늦은 `PostToolUse`는 같은 ID의 세션을 새로 만들지 않는다.
+
 ### SessionStart 주입
 
 `Waypoint:`로 시작하는 블록. tracker 스킬(`integration/skills/tracker/SKILL.md`)이 같은 형식을 적어 두고 읽는다. 바꾸면 둘을 같이 고친다.
@@ -291,7 +293,7 @@ outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid
 
 | 자리 | 남기는 것 |
 |---|---|
-| 최상위 | `session_id`, `cwd`, `hook_event_name`, `agent_id`, `agent_type`, `source`, `reason`, `tool_name`, `tool_use_id`, `prompt`·`prompt_text`(앞 600자 — 앱은 공백·붙여넣기 태그를 벗긴 뒤 300자), `error`(첫 줄이 `Exit code N`일 때 그 줄만), `is_interrupt` |
+| 최상위 | `session_id`, `cwd`, `hook_event_name`, `agent_id`, `agent_type`, `source`, `reason`, `tool_name`, `tool_use_id`, `prompt_id`, `turn_id`(재수신 판정, TRK-11), `prompt`·`prompt_text`(앞 600자 — 앱은 공백·붙여넣기 태그를 벗긴 뒤 300자), `error`(첫 줄이 `Exit code N`일 때 그 줄만), `is_interrupt` |
 | `tool_input` | `file_path`, `subagent_type`, `agent_type`, `workdir`, `cwd`. `old_string`·`new_string`·`content`·`edits[]`는 줄 수만큼의 `\n`. `prompt`·`message`는 `[KEY-n]` 카드 ID만. `command`는 검증 명령 패턴(5장 「검증 근거」, `verify_pattern`)에 맞으면 원문, 아니면 `git commit`이 들어 있으면 `"git commit"`(또는 `"git -c commit"`), 아니면 뺀다. `run_in_background`는 셸 도구만. Codex `apply_patch`의 `command`는 `*** ` 머리 줄과 `+`/`-` 한 글자 줄만 |
 | `tool_response` | `structuredPatch[].lines`·`bashEditDiff.files[].hunks[].lines`는 `+`/`-` 한 글자만(조각 개수 유지), `bashEditDiff.files[].filePath`·`changedFiles`, `gitOperation.commit.{sha,branch}`, `stdout`은 커밋 줄 `[브랜치 해시] 메시지` 첫 줄, Codex 종료 코드 줄(`Process exited with code N`·`Exit code: N`) 첫 줄과 Codex `Success. Updated the following files:`·`A/M/D 경로` 줄만, `metadata.exit_code`, `exit_code`, `exitCode`, `interrupted`, `backgroundTaskId`. Codex의 문자열 응답·`output`·`text`는 `stdout`으로 합친 뒤 줄인다 |
 
@@ -433,7 +435,7 @@ Claude·Codex 사용량(한도별 사용 비율과 초기화 시각)을 사이�
 
 프로젝트 전환은 기존 메인 세션의 카드 연결을 풀어 이전 상태로 돌리고, 세션의 현재 프로젝트와 컨텍스트 키를 바꾼다. 이전 카드·이벤트·이미 실행 중인 하위 세션의 프로젝트는 바꾸지 않는다. 종료된 세션·다른 도구의 ID·보관 프로젝트 연결은 거절한다.
 
-PostToolUse 파일 기록은 변경 파일의 가장 가까운 등록 프로젝트로 귀속한다. 현재 카드의 소속과 같을 때만 해당 카드에도 기록한다. 여러 프로젝트를 한 번에 수정해도 파일별로 나누고 임의의 프로젝트를 기본값으로 고르지 않는다. 등록 밖 절대 경로와 보관 프로젝트에는 기록하지 않는다. 명시적 tool_input.workdir/cwd가 있으면 커밋은 그 폴더의 프로젝트에 기록한다.
+PostToolUse 파일 기록은 변경 파일의 가장 가까운 등록 프로젝트로 귀속한다. 현재 카드의 소속과 같을 때만 해당 카드에도 기록한다. 여러 프로젝트를 한 번에 수정해도 파일별로 나누고 임의의 프로젝트를 기본값으로 고르지 않는다. 등록 밖 절대 경로와 보관 프로젝트에는 기록하지 않는다. 명시적 tool_input.workdir/cwd가 있으면 커밋은 그 폴더의 프로젝트에 기록한다. 없으면 훅의 `cwd`(Claude가 `cd`하면 따라 바뀐다 — hooks 문서 「cwd follows Claude」)가 속한 등록 프로젝트에, 등록 밖이면 세션 프로젝트에 기록한다(미등록 상위 폴더에서 시작해 `session_bind`한 경우). 검증 근거도 같다(TRK-11). 세션의 프로젝트와 요청 문장의 소속은 `cwd`가 바뀌어도 그대로다.
 
 ### 로컬 연동 상태 (2026-09-30)
 
@@ -442,6 +444,10 @@ macOS 대시보드의 AI 연동 요약과 모든 화면의 툴바 버튼에서 �
 패널에는 마지막 훅 활동·실제 수신 시각·수신 당시 프로젝트, 현재 연결된 프로젝트, MCP 마지막 요청, 미처리 outbox 수와 읽기·처리 오류, 원인에 맞는 복구 안내를 표시한다. 미등록 폴더 수신은 프로젝트 미연결로 표시한다. 10초 점검·활성화·잠자기 복귀·다시 점검 때 설정과 대기 기록을 갱신한다. 「다시 점검」은 실패한 로컬 서버의 시작도 재시도한다.
 
 수신 이력은 이 기기의 저장 폴더 `integration-health.json`에만 남고 CloudKit 모델을 변경하지 않는다. 사용자 대화·파일 경로·세션 ID·설정 원문은 저장하지 않는다. 지연 재수신은 원래 활동 시각으로 비교해 더 최신 상태를 덮어쓰지 않는다. 누락 기록은 활동과 실제 재수신 시각을 따로 표시한다. `/integration/status`는 루프백 서버의 읽기 전용 진단 정보다.
+
+### 기록 지표와 진단 내보내기 (2026-10-01, TRK-11)
+
+이 기기에서만 숫자와 시각을 모은다(`ReliabilityMetrics`, 저장 폴더 `metrics.json` 0600, 10초 점검 때 저장, CloudKit 아님): 실시간 훅의 수신(서버가 연결을 받은 시각)→저장·화면 반영 지연 최근 1000건, 재개 시간(재개 문맥을 처음 복사한 시각 → 그 카드에 같은 도구의 새 메인 세션이 연결된 시각, 최근 100건), 연동 실패(서버 시작·형식 오류·저장 실패), 복구(outbox 흡수·보존·격리, 세션 정리) 횟수. 연동 상태 패널에 짧게 보이고, 「진단 정보 복사」를 누를 때만 같은 숫자를 내보낸다. 프로젝트명·경로·세션 ID·대화는 담지 않는다. `/integration/status`가 `metrics`로 돌려준다. 기준·측정 방법·관측값은 docs/RELIABILITY.md.
 
 ### 이벤트 기반 작업 상태 (2026-09-30)
 

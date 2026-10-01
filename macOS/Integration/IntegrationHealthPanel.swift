@@ -25,6 +25,7 @@ struct IntegrationHealthPanel: View {
                             connectedProjects: Array(Set(sessions.filter { $0.provider == provider && $0.project?.archivedAt == nil }
                                 .compactMap { $0.project.map { "\($0.name) (\($0.key))" } })).sorted())
                     }
+                    ReliabilityMetricsSection(metrics: services.reliability.metrics)
                     VStack(alignment: .leading, spacing: Theme.Spacing.s) {
                         Text("미처리 기록 · \(services.integration.queue.count)건").font(Theme.bodyMedium)
                         if services.integration.queue.unreadable { Text("기록 폴더 읽기 실패") }

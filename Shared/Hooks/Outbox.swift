@@ -152,12 +152,14 @@ extension HookProcessor {
         let worker = HookProcessor(context: scratch, stallTimeout: stallTimeout, home: home, gitBranch: gitBranch)
         worker.saveContext = saveContext
         worker.pendingSpawns = pendingSpawns
+        worker.seenSpawns = seenSpawns
         let result = Outbox.drain(directory: directory, fileManager: fileManager) { entry in
             worker.handle(entry)
             guard !worker.lastSaveFailed else { throw Outbox.SaveFailed() }
             received(entry)
         }
         pendingSpawns = worker.pendingSpawns
+        seenSpawns = worker.seenSpawns
         if result.processed > 0 || result.retryPending { ContextReload.apply(context) }
         return result
     }

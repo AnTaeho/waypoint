@@ -28,7 +28,7 @@ struct IntegrationDiagnosticButton: View {
             operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
             port: services.port, serverReady: services.serverState == .ready,
             history: monitor.history, installations: monitor.installations,
-            queue: monitor.queue, checkedAt: monitor.checkedAt)
+            queue: monitor.queue, checkedAt: monitor.checkedAt, metrics: services.reliability.metrics)
         NSPasteboard.general.clearContents()
         let success = NSPasteboard.general.setString(report, forType: .string)
         copiedAt = success ? Date() : nil

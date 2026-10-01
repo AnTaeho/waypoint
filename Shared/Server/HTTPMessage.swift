@@ -8,6 +8,8 @@ public struct HTTPRequest: Sendable, Equatable {
     /// 머리 이름은 소문자
     public let headers: [String: String]
     public let body: Data
+    /// 서버가 이 연결을 받은 시각(`LocalServer`가 적는다). 수신 지연 지표(TRK-11)의 출발점.
+    public var receivedAt: Date?
 }
 
 public enum HTTPParseResult: Sendable, Equatable {
