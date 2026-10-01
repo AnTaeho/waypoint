@@ -58,7 +58,7 @@
 
 ### 관측값 (2026-10-01)
 
-환경: MacBook(Apple M4, 16 GB), macOS 26.6.2, Xcode 27.0, Waypoint Dev Debug 빌드(`trk-11-reliability`), Dev 저장소 이벤트 약 1천~2.5천 건. 평소용 앱은 47821에서 그대로 돌고 있었다.
+환경: MacBook(Apple M4, 16 GB), macOS 26.6.2, Xcode 27.0, Waypoint Dev Debug 빌드(`trk-11-reliability`), Dev 저장소 이벤트는 첫 실행 전 54건, 넷째 실행 전 1,072건, 끝난 뒤 1,635건(세션 51개, 모두 닫힘). 평소용 앱은 47821에서 그대로 돌고 있었다.
 
 | 실행 | 앱 수신→저장 p50 / p95 / 최대 | 앱 수신→화면 p50 / p95 / 최대 | 스크립트 왕복 p50 / p95 / 최대 |
 |---|---|---|---|
