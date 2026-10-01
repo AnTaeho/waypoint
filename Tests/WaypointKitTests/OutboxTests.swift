@@ -210,8 +210,25 @@ import Testing
         #expect(try quarantined(dir) == ["깨진 줄"])
     }
 
-    /// 저장 실패로 되돌린 줄을 다시 처리해도 서브에이전트 대기 항목이 겹치거나 사라지지 않는다.
-    @Test func retriedSubagentLinesKeepPendingSpawnConsistent() throws {
+    /// 저장에 실패한 훅은 메모리의 서브에이전트 대기 항목도 처리 전으로 되돌린다(실시간 경로 포함).
+    @Test func failedSaveRestoresPendingSpawns() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        h.processor.saveContext = { _ in throw SaveFailure.diskUnavailable }
+        try h.send("doc-PreToolUse-Agent", at: t0 + 10)
+        #expect(h.processor.lastSaveFailed)
+        #expect(h.processor.pendingSpawns[HookHarness.sessionID, default: []].isEmpty)
+        h.processor.saveContext = { try $0.save() }
+        try h.send("doc-PreToolUse-Agent", at: t0 + 10)
+        #expect(h.processor.pendingSpawns[HookHarness.sessionID]?.count == 1)
+        h.processor.saveContext = { _ in throw SaveFailure.diskUnavailable }
+        try h.send("doc-SubagentStart", at: t0 + 11)
+        #expect(h.processor.pendingSpawns[HookHarness.sessionID]?.count == 1)
+    }
+
+    /// 앱은 저장 실패로 남긴 줄을 같은 실행에서 다시 흡수하지 않는다(`AppServices.drainOutbox`).
+    /// rollback이 되돌리지 못한 메모리 값이 섞이지 않게, 다음 실행의 새 context로 다시 처리하면 깨끗하게 들어간다.
+    @Test func preservedLineRetriedWithFreshContextLeavesNoStaleRecords() throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let h = try HookHarness()
@@ -223,33 +240,30 @@ import Testing
                      try line("SubagentStart", "doc-SubagentStart", at: t0 + 11)]
         try (lines.joined(separator: "\n") + "\n").write(
             to: dir.appendingPathComponent(Outbox.fileName), atomically: true, encoding: .utf8)
-        var failing: Set<String> = ["PreToolUse", "SubagentStart"]
-        let apply: (Outbox.Entry) throws -> Void = { entry in
-            h.processor.saveContext = { context in
-                if failing.remove(entry.event) != nil { throw SaveFailure.diskUnavailable }
-                try context.save()
+        func apply(_ processor: HookProcessor) -> (Outbox.Entry) throws -> Void {
+            { entry in
+                processor.handle(entry)
+                if processor.lastSaveFailed { throw SaveFailure.diskUnavailable }
             }
-            h.processor.handle(entry)
-            if h.processor.lastSaveFailed { throw SaveFailure.diskUnavailable }
         }
-        #expect(Outbox.drain(directory: dir, handle: apply).retryPending)
-        #expect(h.processor.pendingSpawns[HookHarness.sessionID, default: []].isEmpty)
-        #expect(Outbox.drain(directory: dir, handle: apply).retryPending)
-        #expect(h.processor.pendingSpawns[HookHarness.sessionID]?.count == 1)
-        #expect(try h.session(HookHarness.agentID) == nil)
-        let recovered = Outbox.drain(directory: dir, handle: apply)
+        h.processor.saveContext = { context in
+            if context.insertedModelsArray.contains(where: { ($0 as? Session)?.kind == .subagent }) {
+                throw SaveFailure.diskUnavailable
+            }
+            try context.save()
+        }
+        let first = Outbox.drain(directory: dir, handle: apply(h.processor))
+        #expect(first.processed == 2 && first.retryPending)
+        #expect(IntegrationQueue.inspect(directory: dir).count == 1)
+
+        // 다음 실행: 새 context와 처리기
+        let next = HookProcessor(context: ModelContext(h.container), home: "/Users/me", gitBranch: { _ in nil })
+        let recovered = Outbox.drain(directory: dir, handle: apply(next))
         #expect(recovered.processed == 1 && !recovered.retryPending)
-        let sub = try #require(try h.session(HookHarness.agentID))
-        #expect(sub.agentName == "test-writer")
-        #expect(card.openCardSessions.contains { $0.session === sub })
-        // SwiftData rollback은 메모리의 모델 값을 되돌리지 않는다. 실패한 SubagentStart가 붙인 연결이 기본값만 남은 채
-        // 카드 관계에 남았다가 재시도 저장 때 함께 들어간다(세션 id "", 연결 session nil). DECISIONS 2026-10-01 참고.
-        let sessions = try h.context.fetchCount(FetchDescriptor<Session>())
-        withKnownIssue("rollback 뒤 남은 모델이 재시도 저장에 섞인다") {
-            #expect(card.openCardSessions.count == 1)
-            #expect(sessions == 2)
-        }
-        #expect(h.processor.pendingSpawns[HookHarness.sessionID, default: []].isEmpty)
+        let fresh = ModelContext(h.container)
+        let ids = try fresh.fetch(FetchDescriptor<Session>()).map(\.id).sorted()
+        #expect(ids == [HookHarness.agentID, HookHarness.sessionID].sorted())
+        #expect(try fresh.fetch(FetchDescriptor<CardSession>()).allSatisfy { $0.session != nil })
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
     }
 
