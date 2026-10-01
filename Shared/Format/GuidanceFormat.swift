@@ -44,7 +44,9 @@ public enum GuidanceFormat {
 
     /// 「Claude · 기억 목록 · 항목 3 · 1.2KB」
     public static func facts(_ source: GuidanceSource) -> String {
-        var parts = [toolName(source.tool), kindName(source.kind), count(source)]
+        // Codex 기억은 종류 이름에 도구가 들어 있다.
+        var parts = source.kind == .codexMemory ? [kindName(source.kind), count(source)]
+            : [toolName(source.tool), kindName(source.kind), count(source)]
         if source.kind != .codexMemory || source.entryCount != nil { parts.append(size(source.size)) }
         return parts.joined(separator: " · ")
     }

@@ -235,7 +235,7 @@ import Testing
 
     @Test func factsAndFolders() {
         #expect(GuidanceFormat.facts(source(.memoryIndex, "/m/MEMORY.md")) == "Claude · 기억 목록 · 항목 3 · 2.0KB")
-        #expect(GuidanceFormat.facts(source(.codexMemory, "/c/m.sqlite", count: nil)) == "Codex · Codex 기억 · 읽을 수 없음")
+        #expect(GuidanceFormat.facts(source(.codexMemory, "/c/m.sqlite", count: nil)) == "Codex 기억 · 읽을 수 없음")
         #expect(GuidanceFormat.size(900) == "900B")
         #expect(GuidanceFormat.size(45_056) == "44KB")
         #expect(GuidanceFormat.otherFolderTitle(path: "/Users/me/old/app", onDisk: false, home: "/Users/me") == "~/old/app · 없는 폴더")
