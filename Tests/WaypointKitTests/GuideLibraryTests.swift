@@ -158,12 +158,40 @@ import Testing
         watcher.stop()
     }
 
+    /// 거르는 규칙: 쉬지 않고 쓰이는 파일은 넘기지 않고 디바운스도 미루지 않는다(지침 출처 감시).
+    @Test func filteredPathsDoNotDelayFlush() async throws {
+        let dir = try TempDir()
+        let real = try #require(realpath(dir.url.path, nil).map { p in defer { free(p) }; return String(cString: p) })
+        try FileManager.default.createDirectory(at: dir.url.appendingPathComponent("busy"), withIntermediateDirectories: true)
+        let received = Received()
+        let watcher = GuideWatcher(debounce: 0.3, accept: { !$0.hasSuffix(".jsonl") }) { dirs in received.add(dirs) }
+        watcher.watch([real])
+        try await Task.sleep(for: .milliseconds(500))
+        received.reset()
+
+        // 대화 기록처럼 0.1초마다 쓰이는 파일이 있어도 CLAUDE.md 변경은 넘어온다.
+        let log = dir.url.appendingPathComponent("busy/log.jsonl")
+        let busy = Task { [log] in
+            for i in 0..<60 {
+                try? Data("\(i)\n".utf8).write(to: log)
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        try dir.write("CLAUDE.md", "지침")
+        #expect(await received.wait(for: real, timeout: 3))
+        busy.cancel()
+        #expect(!received.contains(real + "/busy"))
+        watcher.stop()
+    }
+
     final class Received: @unchecked Sendable {
         private let lock = NSLock()
         private var dirs: Set<String> = []
 
         func add(_ d: Set<String>) { lock.withLock { dirs.formUnion(d) } }
         func reset() { lock.withLock { dirs = [] } }
+        func contains(_ dir: String) -> Bool { lock.withLock { dirs.contains(dir) } }
 
         /// `dir`이 들어올 때까지 기다린다.
         func wait(for dir: String, timeout: TimeInterval) async -> Bool {

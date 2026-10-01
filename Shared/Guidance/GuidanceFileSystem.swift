@@ -51,7 +51,10 @@ public struct DiskGuidanceFileSystem: GuidanceFileSystem {
         return try? handle.read(upToCount: maxBytes) ?? Data()
     }
 
+    /// `realpath`(FSEvents가 알려 주는 경로와 같게 `/private/tmp`처럼 푼다). 없는 경로는 정리만.
     public func resolve(_ path: String) -> String {
-        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+        guard let resolved = realpath(path, nil) else { return URL(fileURLWithPath: path).standardizedFileURL.path }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 }
