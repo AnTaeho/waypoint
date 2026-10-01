@@ -137,14 +137,20 @@ enum Theme {
         static let gaugeLabelWidth: CGFloat = 34
         /// 사용량 게이지 숫자(「100%」) 열
         static let gaugeValueWidth: CGFloat = 34
+        /// 설정 창 너비
+        static let settingsWidth: CGFloat = 380
     }
 
     /// 사이드바 사용량 게이지
     enum Usage {
         /// 이 값(%) 이상이면 막대·숫자를 `liveText`로 진하게
         static let highPercent = 80
-        /// 기록이 오래됐을 때 게이지 불투명도
+        /// 기록이 오래됐을 때 묶음 불투명도
         static let staleOpacity: Double = 0.45
+        /// 도구 묶음(Claude·Codex) 사이
+        static let groupSpacing: CGFloat = Spacing.l
+        /// 초기화 시각 앞 아이콘
+        static let resetSymbol = "arrow.clockwise"
     }
 
     /// 표 열 너비. 제목·이름 열은 남는 폭을 모두 쓰고, 경로 열은 범위 안에서 줄어든다. 좁으면 `TableWidth`가 열을 숨긴다.

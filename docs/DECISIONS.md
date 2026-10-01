@@ -238,3 +238,6 @@ PreToolUse·PostToolUse matcher를 `*`로 넓힌 뒤 앱이 꺼진 동안 outbox
 
 실측(Dev, Claude Code 2.1.286, `~/workspace/waypoint-probe`, PRB-6 조건 3개): `card_start` → `bash test-pass.sh`(0) → `bash test-fail.sh`(3) → `card_evidence` 조건 1 pass·조건 2 fail. 저장소에 훅 근거 `pass`/`exitCode 0`, `fail`/`exitCode 3`(`source: hook`)과 보고 2건(`criterion` 0·1). 두 `card_evidence` 결과 모두 `confirmed: true`. 세션 종료 뒤 PRB-6은 next(done 아님). 다음 세션에서 같은 카드에 `note.txt`를 고치자 `file.changed`(06:25:50)가 근거(06:25:16) 뒤에 생겨 조건 1은 「변경 후 미검증」 조건이 된다. 조건 3은 근거 없음(미검증).
 
+## 2026-10-01 — Codex 사용량은 대화 기록 파일 끝에서 읽는다
+
+Codex 한도는 `~/.codex/sessions`의 최근 기록 파일 끝부분에서 마지막 `limit_id: "codex"` 줄을 읽는다(네트워크 없이, 큰 파일 전체를 읽지 않게). 다른 한도(`premium`·`base_model_inference`)가 같은 파일에 섞여 오므로 걸러 낸다. 사용량 표시는 설정 창에서 도구별로 끌 수 있다(기본 켬). 대안: Codex 앱 서버·API 조회(네트워크·프로세스 의존이라 버림). 되돌리려면 설정에서 Codex를 끄거나 `UsageMonitor.reloadCodex`를 빼면 된다.
