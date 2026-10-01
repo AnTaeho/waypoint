@@ -117,15 +117,35 @@ import Testing
         calendar.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: minute))!
     }
 
-    @Test func menuLine() {
-        let both = UsageSnapshot(
+    @Test func windowLabel() {
+        #expect(UsageFormat.windowLabel(minutes: 300) == "5시간")
+        #expect(UsageFormat.windowLabel(minutes: 10080) == "7일")
+        #expect(UsageFormat.windowLabel(minutes: 43200) == "30일")
+        #expect(UsageFormat.windowLabel(minutes: 90) == "90분")
+        #expect(UsageFormat.fiveHourLabel == "5시간")
+        #expect(UsageFormat.sevenDayLabel == "7일")
+    }
+
+    @Test func menuLines() {
+        let claude = UsageSnapshot(
             fiveHour: .init(usedPercent: 41.6, resetsAt: nil),
             sevenDay: .init(usedPercent: 18, resetsAt: nil),
             capturedAt: now
+        ).group
+        #expect(UsageFormat.menuLines([claude], now: now) == ["사용량 Claude 5시간 42% · 7일 18%"])
+        let codexWeek = UsageGroup(
+            tool: .codex, limits: [.init(minutes: 10080, window: .init(usedPercent: 12, resetsAt: nil))], capturedAt: now
         )
-        #expect(UsageFormat.menuLine(both, now: now) == "사용량 5시간 42% · 7일 18%")
-        let weekOnly = UsageSnapshot(fiveHour: nil, sevenDay: .init(usedPercent: 3, resetsAt: nil), capturedAt: now)
-        #expect(UsageFormat.menuLine(weekOnly, now: now) == "사용량 7일 3%")
+        #expect(UsageFormat.menuLines([claude, codexWeek], now: now) == ["사용량 Claude 5시간 42% · 7일 18% / Codex 7일 12%"])
+        let codexBoth = UsageGroup(tool: .codex, limits: [
+            .init(minutes: 10080, window: .init(usedPercent: 39, resetsAt: nil)),
+            .init(minutes: 300, window: .init(usedPercent: 95, resetsAt: nil)),
+        ], capturedAt: now)
+        #expect(UsageFormat.menuLines([claude, codexBoth], now: now) == [
+            "사용량 Claude 5시간 42% · 7일 18%", "Codex 5시간 95% · 7일 39%",
+        ])
+        #expect(UsageFormat.menuLines([codexWeek], now: now) == ["사용량 Codex 7일 12%"])
+        #expect(UsageFormat.menuLines([], now: now).isEmpty)
     }
 
     @Test func resetTime() {
@@ -136,16 +156,19 @@ import Testing
         #expect(UsageFormat.resetTime(at(10, 2, 15, 20), now: now, calendar: calendar) == "10월 2일 오후 3:20")
     }
 
-    @Test func help() {
-        let window = UsageSnapshot.Window(usedPercent: 42, resetsAt: at(9, 28, 15, 20))
-        #expect(UsageFormat.help(window, capturedAt: now - minutes(2), now: now, calendar: calendar) == "오후 3:20에 초기화")
-        #expect(
-            UsageFormat.help(window, capturedAt: now - minutes(45), now: now, calendar: calendar)
-                == "오후 3:20에 초기화 · 45분 전 기준"
-        )
-        let noReset = UsageSnapshot.Window(usedPercent: 42, resetsAt: nil)
-        #expect(UsageFormat.help(noReset, capturedAt: now, now: now, calendar: calendar) == nil)
-        let passed = UsageSnapshot.Window(usedPercent: 42, resetsAt: now - 60)
-        #expect(UsageFormat.help(passed, capturedAt: now - minutes(40), now: now, calendar: calendar) == "40분 전 기준")
+    @Test func resetShort() {
+        func short(_ date: Date?) -> String? {
+            UsageFormat.resetShort(.init(usedPercent: 1, resetsAt: date), now: now, calendar: calendar)
+        }
+        #expect(short(at(9, 28, 15, 20)) == "오후 3:20")
+        #expect(short(at(9, 29, 9, 0)) == "내일 오전 9:00")
+        #expect(short(at(10, 7, 15, 20)) == "10월 7일")
+        #expect(short(nil) == nil)
+        #expect(short(now - 60) == nil)
+    }
+
+    @Test func basis() {
+        #expect(UsageFormat.basis(capturedAt: now - 10, now: now, calendar: calendar) == "방금 기준")
+        #expect(UsageFormat.basis(capturedAt: now - minutes(45), now: now, calendar: calendar) == "45분 전 기준")
     }
 }

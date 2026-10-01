@@ -221,3 +221,7 @@ PreToolUse·PostToolUse matcher를 `*`로 넓힌 뒤 앱이 꺼진 동안 outbox
 
 - 요청 이벤트(`user.prompt`)의 문장과 끝난 세션의 `lastPrompt`를 30일 뒤 지운다. 이벤트·시각·세션·카드 연결은 남긴다. 모든 요청 문장이 기한 없이 쌓이고 동기화되던 것을 줄인다. 되돌리거나 기간을 바꾸려면 `PromptRetention.days`만 고친다(이미 지운 문장은 돌아오지 않는다).
 - 요청 문장도 iCloud(개인 Private DB) 동기화를 유지한다. 문장만 동기화에서 빼려면 저장소 구성을 둘로 나눠야 해 범위가 크다. 대신 30일 보관으로 노출 기간을 줄인다. 동기화를 빼려면 로컬 전용 구성을 따로 만들어 문장을 옮겨야 한다.
+
+## 2026-10-01 — Codex 사용량은 대화 기록 파일 끝에서 읽는다
+
+Codex 한도는 `~/.codex/sessions`의 최근 기록 파일 끝부분에서 마지막 `limit_id: "codex"` 줄을 읽는다(네트워크 없이, 큰 파일 전체를 읽지 않게). 다른 한도(`premium`·`base_model_inference`)가 같은 파일에 섞여 오므로 걸러 낸다. 사용량 표시는 설정 창에서 도구별로 끌 수 있다(기본 켬). 대안: Codex 앱 서버·API 조회(네트워크·프로세스 의존이라 버림). 되돌리려면 설정에서 Codex를 끄거나 `UsageMonitor.reloadCodex`를 빼면 된다.

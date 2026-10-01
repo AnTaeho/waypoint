@@ -55,6 +55,10 @@ struct WaypointApp: App {
                 .modelContainer(container)
                 .environment(usage)
         }
+
+        Settings {
+            SettingsView()
+        }
         #endif
     }
 
