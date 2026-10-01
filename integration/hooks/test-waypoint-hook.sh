@@ -44,13 +44,35 @@ PY'
 # 4) 앱 있음: SessionStart·UserPromptSubmit(200일 때)은 본문을 stdout으로, 나머지는 stdout 없음, outbox 안 씀
 export WAYPOINT_PORT=47998
 cat > "$TMP/server.py" <<'PY'
-import http.server, sys
+import http.server, os, sys, time
 ups = 0
+tmp = os.path.dirname(sys.argv[2])
+def flag(name):
+    try:
+        return open(os.path.join(tmp, name)).read().strip()
+    except OSError:
+        return None
 class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
-        self.rfile.read(int(self.headers.get('Content-Length', 0)))
+        data = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+        # 블록 수신 확인: 본문을 acks.txt에 남긴다. ackdelay 파일이 있으면 그만큼 늦게 답한다
+        if self.path == '/hooks/ack':
+            with open(os.path.join(tmp, 'acks.txt'), 'a') as f:
+                f.write(data.decode() + '\n')
+            if flag('ackdelay'):
+                time.sleep(float(flag('ackdelay')))
+            try:
+                self.send_response(204); self.end_headers()
+            except BrokenPipeError:
+                pass
+            return
         with open(sys.argv[2], 'a') as f:
             f.write('%s %s\n' % (self.path, self.headers.get('X-Waypoint-Claude-PID', '-')))
+        with open(os.path.join(tmp, 'capability.txt'), 'a') as f:
+            f.write('%s %s\n' % (self.path, self.headers.get('X-Waypoint-Context-Ack', '-')))
+        # SessionStart가 늦게 답하는 경우(시간 초과): startdelay 파일
+        if self.path == '/hooks/SessionStart' and flag('startdelay'):
+            time.sleep(float(flag('startdelay')))
         # UserPromptSubmit: 늦은 주입 흉내 — 첫 번째만 200 + 본문, 다음부터 204
         # PostToolUse: 200 + 본문을 줘도 스크립트가 찍지 않아야 한다
         global ups
@@ -64,13 +86,19 @@ class H(http.server.BaseHTTPRequestHandler):
             body = '찍히면 안 됨'.encode()
         else:
             body = None
-        if body is not None:
-            self.send_response(200); self.send_header('Content-Type', 'text/plain; charset=utf-8')
-            self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
-        else:
-            self.send_response(204); self.end_headers()
+        try:
+            if body is not None:
+                self.send_response(200); self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                # 응답 ID: ctxid 파일 내용(없으면 머리를 싣지 않는다 — 옛 앱). 다른 이벤트에 실려도 스크립트는 쓰지 않는다
+                if flag('ctxid'):
+                    self.send_header('X-Waypoint-Context-ID', flag('ctxid'))
+                self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+            else:
+                self.send_response(204); self.end_headers()
+        except BrokenPipeError:
+            pass
     def log_message(self, *a): pass
-http.server.HTTPServer(('127.0.0.1', int(sys.argv[1])), H).serve_forever()
+http.server.ThreadingHTTPServer(('127.0.0.1', int(sys.argv[1])), H).serve_forever()
 PY
 python3 "$TMP/server.py" "$WAYPOINT_PORT" "$TMP/headers.txt" & SERVER=$!
 sleep 1
@@ -84,6 +112,41 @@ check "앱 있음: UserPromptSubmit 200 본문 출력" '[ $code -eq 0 ] && [ "$o
 out="$(bash "$HOOK" UserPromptSubmit < "$FIX/doc-UserPromptSubmit.json")"; code=$?
 check "앱 있음: UserPromptSubmit 204는 stdout 없음" '[ $code -eq 0 ] && [ -z "$out" ]'
 check "앱 있음: outbox 안 씀" '[ ! -e "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" ]'
+check "앱 있음: 응답 ID가 없으면(옛 앱) 확인 안 보냄" '[ ! -e "$TMP/acks.txt" ]'
+check "확인 머리: SessionStart·UserPromptSubmit에만" '[ "$(cat "$TMP/capability.txt")" = "$(printf "/hooks/SessionStart 1\n/hooks/PostToolUse -\n/hooks/UserPromptSubmit 1\n/hooks/UserPromptSubmit 1")" ]'
+
+# 4-1) 블록 수신 확인(TRK-35): 본문을 출력한 뒤에만 응답 ID를 /hooks/ack로 돌려보낸다
+ID=0f1e2d3c-4b5a-6978-8a9b-acbdcedf0123
+acks() { [ -e "$TMP/acks.txt" ] && wc -l < "$TMP/acks.txt" | tr -d ' ' || echo 0; }
+printf '%s' "$ID" > "$TMP/ctxid"
+out="$(bash "$HOOK" SessionStart < "$FIX/doc-SessionStart.json")"; code=$?
+check "확인: SessionStart 본문 출력, exit 0" '[ $code -eq 0 ] && [ "$out" = "Waypoint: LDG 가계부 앱" ]'
+check "확인: 출력 뒤 응답 ID를 한 번 돌려보냄" '[ "$(cat "$TMP/acks.txt")" = "{\"contextId\":\"$ID\"}" ]'
+out="$(bash "$HOOK" UserPromptSubmit < "$FIX/doc-UserPromptSubmit.json")"
+check "확인: UserPromptSubmit 204면 확인 없음" '[ -z "$out" ] && [ "$(acks)" -eq 1 ]'
+out="$(bash "$HOOK" PostToolUse < "$FIX/doc-PostToolUse-Edit.json")"
+check "확인: 다른 이벤트는 ID가 와도 확인 없음" '[ -z "$out" ] && [ "$(acks)" -eq 1 ]'
+bash "$HOOK" SessionStart < "$FIX/doc-SessionStart.json" >&-; code=$?
+check "확인: stdout에 쓰지 못하면 확인 안 보냄, exit 0" '[ $code -eq 0 ] && [ "$(acks)" -eq 1 ]'
+printf 'not-an-id' > "$TMP/ctxid"
+out="$(bash "$HOOK" SessionStart < "$FIX/doc-SessionStart.json")"
+check "확인: ID 꼴이 아니면 출력만" '[ "$out" = "Waypoint: LDG 가계부 앱" ] && [ "$(acks)" -eq 1 ]'
+printf '%s' "$ID" > "$TMP/ctxid"
+printf '1.5' > "$TMP/startdelay"
+out="$(bash "$HOOK" SessionStart < "$FIX/doc-SessionStart.json")"; code=$?
+check "확인: 시간 초과면 출력·확인 없음, exit 0" '[ $code -eq 0 ] && [ -z "$out" ] && [ "$(acks)" -eq 1 ]'
+check "확인: 시간 초과는 outbox로" '[ "$(wc -l < "$WAYPOINT_SUPPORT_DIR/outbox.jsonl")" -eq 1 ]'
+rm -f "$TMP/startdelay" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
+sleep 1  # 늦게 답하던 SessionStart 처리가 끝나게
+printf '3' > "$TMP/ackdelay"
+start=$(python3 -c 'import time; print(time.time())')
+out="$(bash "$HOOK" SessionStart < "$FIX/doc-SessionStart.json")"; code=$?
+elapsed=$(python3 -c "import time; print(time.time() - $start)")
+check "확인: 확인 응답이 늦어도 출력 유지, exit 0" '[ $code -eq 0 ] && [ "$out" = "Waypoint: LDG 가계부 앱" ] && [ "$(acks)" -eq 2 ]'
+check "확인: 확인은 1초에서 끊는다(전체 2.5초 안)" 'python3 -c "import sys; sys.exit(0 if $elapsed < 2.5 else 1)"'
+check "확인: 확인 실패는 outbox에 쓰지 않음" '[ ! -e "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" ]'
+rm -f "$TMP/ackdelay" "$TMP/ctxid"
+sleep 2  # 늦게 답하던 확인 처리가 끝나게
 
 # 5) Claude Code PID: 조상 중 실행 파일 이름이 claude인 프로세스를 찾아 헤더·outbox 필드로 보낸다
 #    가짜 claude(= bash 심볼릭 링크. 실제 설치도 ~/.local/bin/claude 링크다)가 훅을 부른다. 명령이 둘이라 bash가 exec로 바꾸지 않는다.
