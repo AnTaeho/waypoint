@@ -324,3 +324,22 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 측정(Dev Debug, 세션 사이 1.5초 쉼, 20회씩 두 번, 옛 → 새 스크립트): 훅 전체 중앙값 `SessionStart` 267 → 289 ms·251 → 263 ms, 늦은 주입 258 → 303 ms·241 → 254 ms, 최대 522 ms. SessionStart 바로 뒤의 확인 요청은 중앙값 1.7 ms(최대 5.5 ms). `LocalServerTests`가 메인 액터를 1초 막은 동안 빠른 경로가 답하는지 고정한다. Dev에 새·옛 스크립트로 보낸 82개 확인(확인 뒤 다음 프롬프트에 블록 없음, 출력 못 한 블록은 다음 프롬프트에 다시)이 모두 맞았다.
 
 알아 둘 것: 서버 큐로 옮기면서 수신 지연 지표(TRK-11)의 출발점이 서버 큐가 연결을 받은 시각이 되어, 그전에 놓치던 메인 큐 대기가 지표에 들어간다.
+
+## 2026-10-01 — 지침·기억 출처 목록 (TRK-37)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 상위 폴더는 프로젝트 폴더의 부모부터 홈까지(홈 포함)만 찾는다. 홈 밖 프로젝트는 `/` 바로 아래까지 | Claude Code는 뿌리까지 읽지만 홈 위(`/Users`)에 지침을 두는 경우는 드물고, 카드가 「홈까지」로 정했다 | 뿌리까지 | `GuidanceCollector.ancestors(of:home:)` |
+| 같은 이름으로 바뀌는 기억 폴더(`a_b`·`a-b`)는 맞는 등록 프로젝트 모두에 건다 | Claude Code도 두 폴더를 같은 기억 폴더로 쓴다. 하나를 고르면 다른 쪽에서 실제로 읽히는 기억이 안 보인다 | 짝짓지 못한 것으로 따로 | `GuidanceCollector.match` |
+| 기억 폴더는 등록 경로·심볼릭 링크를 푼 경로·git 저장소 뿌리(작업 트리는 원래 저장소) 셋 중 하나와 맞으면 그 프로젝트 | 문서상 기억은 저장소 기준이고, 예전 대화 기록 폴더는 작업 폴더 기준이었다 | 등록 경로만 | `Root.memoryPaths` |
+| 짝짓지 못한 폴더의 경로는 `/`부터 실제 폴더를 읽어 되돌리고, 못 찾으면 `-`→`/` 추정에 「없는 폴더」 | `-`가 `/`·`_`·`.`·공백 중 무엇이었는지 이름만으로 알 수 없다. 실제 폴더가 있으면 틀릴 일이 없다 | 늘 단순 치환 | `MemoryFolderName.locate` |
+| 빈 기억 폴더는 보이지 않는다. 보관한 프로젝트도 등록 프로젝트로 친다 | 빈 폴더는 읽을 것이 없다. 보관해도 폴더와 지침은 그대로라 「다른 폴더」로 떨어지면 헷갈린다 | 빈 폴더도 표시, 보관 제외 | `collectMemory`의 `files.isEmpty`, `GuidanceMonitor.currentProjects` |
+| Codex 기억 DB는 `mode=ro` + `SQLITE_OPEN_READONLY` + `query_only`로 연다. `immutable=1`은 쓰지 않는다 | 실제 DB가 WAL로 쓰이고 있어(`-wal` 8 KB) `immutable`은 WAL에만 있는 행을 놓친다. 대신 SQLite가 `-shm` 읽기 표시를 고친다(본문·WAL·파일 목록은 그대로, 테스트로 고정) | `immutable=1`, 임시 폴더로 복사해 열기(복사 중 쓰기와 엇갈리면 깨진 사본) | `CodexMemoryStore.read` |
+| 홈 자체는 감시하지 않는다. 홈 바로 아래 지침은 앱이 앞으로 올 때·화면을 열 때 다시 본다 | 홈 전체를 FSEvents로 보면 모든 파일 변경이 들어온다 | 홈 감시 + 거르기 | `GuidanceWatchPlan.init` |
+| `GuideWatcher`에 경로 거르기(`accept`)를 더했다. 거른 경로는 디바운스를 다시 걸지 않는다 | `~/.claude/projects/*/*.jsonl`·`~/.codex/logs_2.sqlite`가 쉬지 않고 쓰여 디바운스가 끝나지 않는다. 기본값은 모두 받기라 지침 문서 감시는 그대로 | 출처 파일이 든 폴더만 따로 감시(기억 폴더·rules 폴더가 새로 생기는 것을 놓친다) | `GuideWatcher.init(accept:)` |
+| `-shm`은 감시에서 거른다 | 이 앱이 DB를 읽어도 바뀔 수 있어 다시 모으기가 끝없이 돌 수 있다. 쓰기는 `-wal`로 드러난다 | — | `GuidanceWatchPlan.accepts` |
+| 위 폴더의 `AGENTS.md`는 프로젝트의 git 저장소 안이면 Codex, 밖이면 Claude 쪽으로 표시한다. 프로젝트 폴더의 `AGENTS.md`는 Codex | Codex는 git 뿌리 위를 읽지 않고, Claude는 CLAUDE 계열 파일이 없을 때 읽는다 | 도구 둘 다 표시 | `GuidanceCollector.collect` |
+| Codex 스킬(`~/.codex/skills`)·Claude 스킬은 넣지 않았다 | 지침·기억 범위 밖. 스킬은 부를 때만 읽힌다 | 목록에 넣기 | — |
+| Debug 실행 인자 `-WaypointSidebar guidance`로 지침 화면에서 시작한다 | 손 없이 창 하나만 캡처해 화면을 확인하려고. Release에는 없다 | — | `RootView.launchSelection` |
+
+검증: 이 Mac에서 등록 프로젝트 셋(TRK·CHM·NHG)으로 수집 약 70 ms, 출처 46개. 기억 폴더 8개 중 짝지은 것 3(TRK·NHG 프로젝트, `~/workspace` 상위 폴더), 다른 폴더 5. Dev 앱을 임시 `CLAUDE_CONFIG_DIR`·`CODEX_HOME`으로 띄워 기억 파일·규칙 줄을 더하자 2초 안에 목록이 바뀌었다.
