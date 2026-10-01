@@ -20,7 +20,7 @@ check "앱 없음: exit 0" '[ $code -eq 0 ]'
 check "앱 없음: stdout 없음" '[ -z "$out" ]'
 check "앱 없음: 2초 안에 끝남" '[ $elapsed -le 2 ]'
 check "outbox 한 줄" '[ "$(wc -l < "$WAYPOINT_SUPPORT_DIR/outbox.jsonl")" -eq 1 ]'
-check "outbox 형식" 'python3 -c "import json,sys; l=json.loads(open(sys.argv[1]).readline()); assert l[\"event\"]==\"SessionStart\" and isinstance(l[\"receivedAt\"],int) and l[\"payload\"][\"source\"]==\"startup\"" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"'
+check "outbox 형식" 'python3 -c "import json,sys; l=json.loads(open(sys.argv[1]).readline()); assert l[\"event\"]==\"SessionStart\" and isinstance(l[\"receivedAt\"],int) and l[\"payload\"][\"source\"]==\"startup\" and l[\"trimmed\"] is True" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"'
 
 # 2) 빈 입력: 아무것도 안 함
 rm -f "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
@@ -30,6 +30,16 @@ check "빈 입력: exit 0, outbox 없음" '[ $code -eq 0 ] && [ ! -e "$WAYPOINT_
 # 3) 로깅 모드: hook-log에도 남김
 WAYPOINT_HOOK_LOG=1 bash "$HOOK" Stop < "$FIX/doc-Stop.json"
 check "로깅 모드: hook-log 파일" '[ "$(cat "$WAYPOINT_SUPPORT_DIR"/hook-log/*.jsonl | wc -l)" -eq 1 ]'
+rm -rf "$WAYPOINT_SUPPORT_DIR"
+WAYPOINT_HOOK_LOG=1 bash "$HOOK" PostToolUse < "$FIX/real-PostToolUse-Edit.json"
+check "로깅 모드: hook-log는 원본 그대로, outbox는 줄인 것" 'python3 - "$WAYPOINT_SUPPORT_DIR" "$FIX/real-PostToolUse-Edit.json" <<"PY"
+import glob, json, sys
+original = json.load(open(sys.argv[2]))
+log = json.loads(open(glob.glob(sys.argv[1] + "/hook-log/*.jsonl")[0]).readline())
+box = json.loads(open(sys.argv[1] + "/outbox.jsonl").readline())
+assert log["payload"] == original and "trimmed" not in log
+assert "originalFile" not in box["payload"]["tool_response"] and box["trimmed"] is True
+PY'
 
 # 4) 앱 있음: SessionStart·UserPromptSubmit(200일 때)은 본문을 stdout으로, 나머지는 stdout 없음, outbox 안 씀
 export WAYPOINT_PORT=47998
@@ -93,7 +103,7 @@ export WAYPOINT_PORT=47999
 rm -f "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
 run_as_claude Stop doc-Stop; code=$?
 check "PID outbox: exit 0" '[ $code -eq 0 ]'
-check "PID outbox: 최상위 claudePid, payload 원본 그대로" 'python3 -c "import json,sys; l=json.loads(open(sys.argv[1]).readline()); o=json.load(open(sys.argv[3])); assert l[\"claudePid\"]==int(sys.argv[2]) and l[\"payload\"]==o and l[\"event\"]==\"Stop\"" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" "$(cat "$TMP/pid")" "$FIX/doc-Stop.json"'
+check "PID outbox: 최상위 claudePid, payload는 허용 필드만" 'python3 -c "import json,sys; l=json.loads(open(sys.argv[1]).readline()); o=json.load(open(sys.argv[3])); keep={\"session_id\",\"cwd\",\"hook_event_name\"}; assert l[\"claudePid\"]==int(sys.argv[2]) and l[\"payload\"]=={k:v for k,v in o.items() if k in keep} and l[\"event\"]==\"Stop\"" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" "$(cat "$TMP/pid")" "$FIX/doc-Stop.json"'
 
 # 6) 8단계 안에 claude가 없으면 PID를 보내지 않는다(셸 9겹으로 감싼다. 이 테스트를 Claude Code 안에서 돌려도 실제 claude가 범위 밖에 있게)
 rm -f "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
@@ -104,5 +114,85 @@ nest_hook() {  # $1 남은 겹 수. `; true`로 bash가 exec로 바꾸지 않게
 export -f nest_hook; export HOOK FIX
 bash -c 'nest_hook 8; true'
 check "PID 없음: outbox 줄에 claudePid 없음" 'python3 -c "import json,sys; l=json.loads(open(sys.argv[1]).readline()); assert \"claudePid\" not in l and l[\"event\"]==\"Stop\"" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"'
+
+# 7) outbox 줄이기: 앱이 읽는 필드만 남고 파일 내용·명령·출력 원문은 없다(SPEC 6장)
+export WAYPOINT_PORT=47999
+outbox_of() {  # $1 이벤트, stdin 훅 입력 → outbox 줄을 $TMP/line에(없으면 빈 파일)
+  rm -f "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
+  bash "$HOOK" "$1"; local code=$?
+  cat "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" > "$TMP/line" 2>/dev/null || : > "$TMP/line"
+  return $code
+}
+cat > "$TMP/read.py" <<'PY'
+import json, sys
+body = "\n".join("SECRET-LINE-%d 비밀 내용" % i for i in range(3000))
+json.dump({"session_id": "s-read", "transcript_path": "/x/t.jsonl", "cwd": "/w", "permission_mode": "auto",
+           "hook_event_name": "PostToolUse", "tool_name": "Read", "tool_use_id": "toolu_R",
+           "tool_input": {"file_path": "/w/secret.txt", "limit": 9000},
+           "tool_response": {"type": "text", "file": {"filePath": "/w/secret.txt", "content": body, "numLines": 3000}}},
+          open(sys.argv[1], "w"))
+PY
+python3 "$TMP/read.py" "$TMP/read.json"
+# 사례별 기대값. 사용: python3 expect.py <사례> <outbox 줄 파일> [원본 픽스처]
+cat > "$TMP/expect.py" <<'PY'
+import json, sys
+case, raw = sys.argv[1], open(sys.argv[2]).read()
+line = json.loads(raw)
+p = line["payload"]
+assert line["trimmed"] is True
+probe = "/Users/antaeho/workspace/waypoint-probe"
+if case == "read":
+    assert "SECRET" not in raw and len(raw) < 400, len(raw)
+    assert p == {"session_id": "s-read", "cwd": "/w", "hook_event_name": "PostToolUse", "tool_name": "Read",
+                 "tool_use_id": "toolu_R", "tool_input": {"file_path": "/w/secret.txt"}, "tool_response": {}}, p
+elif case == "edit":
+    assert "B1" not in raw
+    assert p["tool_input"] == {"file_path": probe + "/notes.txt", "old_string": "\n", "new_string": "\n\n"}, p
+    assert p["tool_response"] == {"structuredPatch": [{"lines": ["-", "+", "+"]}]}, p
+elif case == "write":
+    content = json.load(open(sys.argv[3]))["tool_input"]["content"]
+    assert p["tool_input"] == {"file_path": probe + "/notes.txt", "content": "\n" * len(content.rstrip("\n").split("\n"))}, p
+    assert p["tool_response"] == {"structuredPatch": []}, p
+elif case == "commit":
+    assert p["tool_input"] == {"command": "git commit"}, p
+    r = p["tool_response"]
+    assert r["stdout"] == "[master c5a688e] probe", r
+    assert r["gitOperation"] == {"commit": {"sha": "c5a688e", "branch": "master"}}, r
+    assert r["bashEditDiff"] == {"files": [{"filePath": probe + "/hello.txt", "hunks": [{"lines": ["+"]}]}],
+                                 "changedFiles": [probe + "/hello.txt"]}, r
+elif case == "agent":
+    assert p["tool_input"] == {"prompt": "[PRB-1]", "subagent_type": "general-purpose"}, p
+elif case == "patch":
+    assert line["provider"] == "codex"
+    assert p["tool_input"]["command"] == "*** Begin Patch\n*** Add File: new.swift\n+\n+\n*** Update File: old.swift\n-\n+\n*** End Patch", p
+    assert p["tool_response"] == {"stdout": "Success. Updated the following files:\nA new.swift\nM old.swift"}, p
+elif case == "minimal":
+    assert "SECRET" not in raw
+    assert p == {"session_id": sys.argv[3], "cwd": "/w", "hook_event_name": "PostToolUse"}, p
+else:
+    raise SystemExit("모르는 사례 " + case)
+PY
+expect() { python3 "$TMP/expect.py" "$@"; }
+
+outbox_of PostToolUse < "$TMP/read.json"
+check "Read: 파일 내용 없음, 허용 필드만" 'expect read "$TMP/line"'
+outbox_of PostToolUse < "$FIX/real-PostToolUse-Edit.json"
+check "Edit: 경로·diff 줄 수 유지, 문자열 원문 없음" 'expect edit "$TMP/line"'
+outbox_of PostToolUse < "$FIX/real-PostToolUse-Write.json"
+check "Write: content는 줄 수만" 'expect write "$TMP/line" "$FIX/real-PostToolUse-Write.json"'
+outbox_of PostToolUse < "$FIX/real-PostToolUse-Bash-commit.json"
+check "Bash 커밋: 커밋 줄·gitOperation·bashEditDiff 유지, 다른 출력 없음" 'expect commit "$TMP/line"'
+outbox_of PreToolUse < "$FIX/real-PreToolUse-Agent.json"
+check "Agent: 프롬프트는 카드 ID만" 'expect agent "$TMP/line"'
+WAYPOINT_AGENT=codex outbox_of PostToolUse < "$FIX/doc-codex-PostToolUse-apply_patch.json"
+check "Codex apply_patch: 머리 줄과 +/- 표시만" 'expect patch "$TMP/line"'
+
+# jq가 없거나 실패: session_id·cwd만. 그것도 못 뽑으면 줄을 쓰지 않는다. 원문은 어느 경우에도 쓰지 않는다.
+WAYPOINT_JQ=/nonexistent/jq outbox_of PostToolUse < "$TMP/read.json"; code=$?
+check "jq 없음: exit 0, 최소 정보만" '[ $code -eq 0 ] && expect minimal "$TMP/line" s-read'
+printf '%s' '{"session_id":"s-bad","cwd":"/w","tool_response":{"stdout":"SECRET' | outbox_of PostToolUse
+check "깨진 JSON: 최소 정보만" 'expect minimal "$TMP/line" s-bad'
+printf '%s' 'not json SECRET' | outbox_of Stop; code=$?
+check "session_id 없음: exit 0, 줄 안 씀" '[ $code -eq 0 ] && [ ! -s "$TMP/line" ]'
 
 exit $FAIL
