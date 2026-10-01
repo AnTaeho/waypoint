@@ -23,7 +23,7 @@ public final class Session {
     /// Codex 등 다른 로컬 도구 프로세스. 기존 claudePid는 저장소 호환을 위해 유지한다.
     public var processPid: Int?
     /// 이 세션의 대화에 `Waypoint:` 블록을 넣어 준 프로젝트 키(`SessionStart`나 늦은 `UserPromptSubmit` 주입).
-    /// nil이거나 지금 프로젝트 키와 다르면 다음 `UserPromptSubmit`에 블록을 한 번 준다(SPEC 5장 「늦은 주입」). 메인 세션만.
+    /// nil이거나 지금 프로젝트 키와 다르면 다음 `UserPromptSubmit`에 블록을 준다(SPEC 5장 「늦은 주입」·「수신 확인」). 메인 세션만.
     public var contextProjectKey: String?
     /// 보냈지만 훅 스크립트가 출력했다는 확인(`POST /hooks/ack`)을 아직 받지 못한 블록의 프로젝트 키(TRK-35).
     /// 확인을 받으면 `contextProjectKey`로 옮기고 비운다. 확인을 보내는 스크립트(`X-Waypoint-Context-Ack: 1`)에만 쓴다.
