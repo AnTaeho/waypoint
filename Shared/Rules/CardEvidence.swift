@@ -89,8 +89,6 @@ public enum CardEvidence {
 
     /// 훅 기록이 보고를 확인하는 시간 창(보고 전 15분).
     public static let confirmWindow: TimeInterval = 15 * 60
-    /// 카드 상세 「검증 기록」에 보이는 수.
-    public static let listLimit = 12
 
     public static func records(for card: Card) -> [CheckRecord] {
         (card.events ?? []).compactMap(CheckRecord.init(event:)).sorted { $0.at > $1.at }
