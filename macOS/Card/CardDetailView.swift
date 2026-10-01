@@ -39,21 +39,11 @@ struct CardDetailView: View {
     }
 
     private func moveToDone() {
-        do {
-            try CardLifecycle.move(card, to: .done, at: Date(), in: context)
-            try context.save()
-        } catch {
-            context.rollback()
-        }
+        CardEditing.completeAndSave(card, at: Date(), in: context)
     }
 
     private func setCriterion(_ index: Int, _ isDone: Bool) {
-        guard CardEditing.setCriterion(card, at: index, isDone: isDone, date: Date(), in: context) else { return }
-        do {
-            try context.save()
-        } catch {
-            context.rollback()
-        }
+        CardEditing.setCriterionAndSave(card, at: index, isDone: isDone, date: Date(), in: context)
     }
 }
 

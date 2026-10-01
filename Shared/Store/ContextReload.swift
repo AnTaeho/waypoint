@@ -16,3 +16,24 @@ public enum ContextReload {
         _ = try? context.fetch(FetchDescriptor<CardSession>())
     }
 }
+
+extension ContextReload {
+    /// 바꾸고 저장한다. 바꾸는 중이든 저장에서든 실패하면 rollback 뒤 저장소 값으로 다시 읽고(`apply`) 그 오류를 다시 던진다.
+    /// rollback만 하면 메모리에 남은 값이 다음 저장에 섞인다. `save`는 테스트 이음새(기본은 `context.save()`).
+    @discardableResult
+    public static func commit<T>(
+        _ context: ModelContext,
+        save: (ModelContext) throws -> Void = { try $0.save() },
+        _ change: () throws -> T
+    ) throws -> T {
+        do {
+            let value = try change()
+            try save(context)
+            return value
+        } catch {
+            context.rollback()
+            apply(context)
+            throw error
+        }
+    }
+}
