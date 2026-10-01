@@ -39,7 +39,7 @@ import Testing
     @Test func configurationDetectsMissingPartialDisabledAndWrongPort() throws {
         let dir = try temporary()
         defer { try? FileManager.default.removeItem(at: dir) }
-        #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47821).state == .missing)
+        #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47821) == .init(state: .missing, detail: "설정 없음"))
         let config = dir.appendingPathComponent(".codex/hooks.json")
         try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
         let bridge = dir.appendingPathComponent(".codex/waypoint/waypoint-codex-hook.sh")
@@ -53,12 +53,12 @@ import Testing
             try JSONSerialization.data(withJSONObject: ["hooks": hooks, "disableAllHooks": disabled]).write(to: config)
         }
         try write()
-        #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47821).state == .ready)
+        #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47821) == .init(state: .ready, detail: "설정됨"))
         #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47822).state == .attention)
         try write(disabled: true)
         #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47821).state == .attention)
         hooks.removeValue(forKey: "SessionEnd"); try write()
-        #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47821).detail.contains("SessionEnd"))
+        #expect(IntegrationInstallation.inspect(provider: .codex, home: dir, port: 47821).detail == "빠진 연결: SessionEnd")
         #expect(IntegrationInstallation.hooksDisabled("[features]\nhooks = false # off\n"))
         #expect(IntegrationInstallation.hooksDisabled("features.hooks = false\n"))
         #expect(!IntegrationInstallation.hooksDisabled("[other]\nhooks = false\n[features]\nhooks = true\n"))

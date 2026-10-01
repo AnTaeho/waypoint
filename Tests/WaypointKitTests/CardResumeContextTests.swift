@@ -50,16 +50,20 @@ import Testing
         #expect(text.contains("등록된 메모 없음") && text.contains("기록된 파일 없음"))
         card.body = String(repeating: "가", count: 7000)
         #expect(CardResumeContext.text(card: card, provider: .claude)?.contains("일부 생략") == true)
-        for status in [CardStatus.done, .archived] {
+        for (status, reason) in [(CardStatus.done, "완료한 카드"), (.archived, "보관한 카드")] {
             card.status = status
             #expect(CardResumeContext.text(card: card, provider: .claude) == nil)
+            #expect(CardResumeContext.unavailableReason(card) == reason)
         }
         card.status = .next; h.project.archivedAt = t0
         #expect(CardResumeContext.text(card: card, provider: .claude) == nil)
+        #expect(CardResumeContext.unavailableReason(card) == "보관한 프로젝트")
         h.project.archivedAt = nil; h.project.rootPath = " "
         #expect(CardResumeContext.text(card: card, provider: .claude) == nil)
+        #expect(CardResumeContext.unavailableReason(card) == "작업 폴더 없음")
         card.project = nil
         #expect(CardResumeContext.text(card: card, provider: .claude) == nil)
+        #expect(CardResumeContext.unavailableReason(card) == "프로젝트 없음")
     }
 
     @Test func newProviderSessionResumesSameCardFromDifferentFolder() throws {

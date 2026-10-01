@@ -26,7 +26,7 @@ struct CardResumeSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading).padding(Theme.Spacing.l)
                 }.background(Theme.bgSunken, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
             } else {
-                Text(CardResumeContext.unavailableReason(card) ?? "재개 문맥을 만들 수 없습니다.")
+                Text(CardResumeContext.unavailableReason(card) ?? "재개 문맥 없음")
                     .font(Theme.body).foregroundStyle(Theme.liveText)
                 Spacer()
             }

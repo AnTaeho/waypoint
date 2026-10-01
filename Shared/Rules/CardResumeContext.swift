@@ -3,12 +3,12 @@ import Foundation
 /// 기존 기록으로 재개 문맥을 만든다. 생성·복사는 카드나 세션 상태를 바꾸지 않는다.
 public enum CardResumeContext {
     public static func unavailableReason(_ card: Card) -> String? {
-        guard let project = card.project else { return "프로젝트가 연결되지 않은 카드입니다." }
-        if project.archivedAt != nil { return "프로젝트 보관을 해제한 뒤 이어갈 수 있습니다." }
-        if card.status == .archived { return "카드 보관을 해제한 뒤 이어갈 수 있습니다." }
-        if card.status == .done { return "완료한 카드입니다. 다시 작업하려면 다음 할 일로 옮겨 주세요." }
+        guard let project = card.project else { return "프로젝트 없음" }
+        if project.archivedAt != nil { return "보관한 프로젝트" }
+        if card.status == .archived { return "보관한 카드" }
+        if card.status == .done { return "완료한 카드" }
         if project.rootPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "프로젝트 작업 폴더가 필요합니다."
+            return "작업 폴더 없음"
         }
         return nil
     }
