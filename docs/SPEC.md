@@ -222,15 +222,15 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 
 - 스크립트는 `SessionStart`·`UserPromptSubmit` 요청에 머리 `X-Waypoint-Context-Ack: 1`을 싣는다(출력 뒤 확인을 보낸다는 뜻).
 - 그런 요청에 블록을 줄 때 앱은 키를 바로 적지 않고 대기로 둔다: `contextPendingKey`(블록의 프로젝트 키), `contextPendingID`(새 응답 ID, 소문자 UUID), `contextPendingCount`(같은 키의 블록을 확인 없이 보낸 횟수). 응답에 머리 `X-Waypoint-Context-ID: <ID>`를 싣는다.
-- 스크립트는 `200` 본문을 stdout에 출력한 **뒤에만** `POST /hooks/ack` `{"contextId":"<ID>"}`를 보낸다(6장). 출력에 실패하면 보내지 않는다. 앱은 대기 중인 ID면 `contextProjectKey = contextPendingKey`로 확정하고 대기를 지운다. 모르는 ID(이미 확정, 새 블록으로 바뀜, 프로젝트 재연결)는 무시한다.
-- 확인이 없으면(응답 시간 초과, 스크립트 실패, 확인 유실) 다음 `UserPromptSubmit`이 늦은 주입 조건(`contextProjectKey` ≠ 지금 키)에 걸려 같은 블록을 새 ID로 다시 준다. 같은 블록을 두 번 받는 것은 블록은 출력됐는데 확인만 잃었을 때뿐이다(블록 유실보다 낫다, DECISIONS).
+- 스크립트는 `200` 본문을 stdout에 출력한 **뒤에만** `POST /hooks/ack` `{"contextId":"<ID>"}`를 보낸다(6장). 출력에 실패하면 보내지 않는다. 앱은 확인을 서버 큐에서 받아 메모리 집합(`ContextAckInbox`)에 넣고 바로 `204`로 답한다(메인 액터·저장·화면 갱신을 거치지 않는다). 그 세션의 다음 훅을 메인에서 처리할 때 대기 ID가 집합에 있으면 늦은 주입 판단 전에 `contextProjectKey = contextPendingKey`로 확정하고 대기를 지운다. 지금 대기와 맞지 않는 ID(이미 확정, 새 블록으로 바뀜, 프로젝트 재연결)는 쓰이지 않고 집합에 남다가 오래된 것부터 버려진다(1000개). 확정을 저장하지 못하면 ID를 집합에 되돌린다.
+- 확인이 없으면(응답 시간 초과, 스크립트 실패, 확인 유실, 확인을 받아 둔 뒤 다음 훅 전에 앱을 다시 켬) 다음 `UserPromptSubmit`이 늦은 주입 조건(`contextProjectKey` ≠ 지금 키)에 걸려 같은 블록을 새 ID로 다시 준다. 같은 블록을 두 번 받는 것은 블록은 출력됐는데 확인을 잃었을 때뿐이다(블록 유실보다 낫다, DECISIONS).
 - 같은 키의 블록은 확인 없이 `SessionStart` 포함 3번(`HookProcessor.maxContextAttempts`)까지만 보낸다. 그 뒤로는 확인이 오거나 프로젝트가 바뀔 때까지 주지 않는다(확인이 계속 닿지 않는 환경에서 프롬프트마다 블록이 붙지 않게).
 - 확인을 보내는 스크립트의 `SessionStart`는 이미 확정한 키도 비운다. 재개·압축으로 다시 온 `SessionStart`의 블록이 시간 초과로 빠지면 다음 프롬프트에 다시 준다.
 - 머리가 없는 요청(옛 스크립트, 버전이 섞인 Codex 사본)에는 예전처럼 블록을 주는 즉시 확정하고 대기를 지운다. 응답 ID도 싣지 않는다. 옛 앱은 응답 ID를 주지 않으므로 새 스크립트도 확인을 보내지 않는다.
 - outbox로 흡수한 훅(앱이 꺼져 있던 동안)은 블록이 출력되지 않았으므로 대기도 확인도 없다. 앱이 켜진 뒤 첫 `UserPromptSubmit`이 블록과 응답 ID를 준다.
 - `session_bind`·명시 재연결은 MCP 응답으로 블록을 직접 돌려주므로 확인 없이 확정한다. 프로젝트 재연결은 대기도 지운다.
 - Codex도 같다(`/hooks/codex/<Event>` 요청의 머리, 확인은 공용 `/hooks/ack`).
-- 걸리는 시간(2026-10-01, Dev Debug, 세션 사이 1.5초 쉼, 20회): 훅 전체 중앙값 `SessionStart` 263 → 758 ms, 늦은 주입 262 → 861 ms, 최대 1.19초. 확인 처리 자체는 한가할 때 약 9 ms이고, 늘어난 몫은 확인 요청이 앞 훅이 일으킨 화면 갱신(메인 큐)을 기다리는 시간이다. 확인 curl도 1초에서 끊으므로 늘어나는 몫은 1초를 넘지 않는다. 세션마다 `SessionStart` 한 번과 늦은 주입 때만 든다.
+- 걸리는 시간(2026-10-01, Dev Debug, 세션 사이 1.5초 쉼, 20회씩 두 번, 옛 → 새 스크립트): 훅 전체 중앙값 `SessionStart` 267 → 289 ms·251 → 263 ms, 늦은 주입 258 → 303 ms·241 → 254 ms, 최대 522 ms. SessionStart 바로 뒤의 확인 요청은 중앙값 1.7 ms(최대 5.5 ms)에 답한다. 메인 큐에서 받던 첫 구현은 같은 측정에서 확인이 앞 훅의 화면 갱신을 기다려 약 0.5초가 늘었다(DECISIONS).
 
 ### 마지막 요청 문장 (`UserPromptSubmit`)
 
@@ -313,7 +313,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 
 - 요청 머리 `X-Waypoint-Context-Ack: 1`: 스크립트가 `SessionStart`·`UserPromptSubmit`에만 싣는다. 없으면 앱은 블록을 바로 확정한다(옛 스크립트).
 - 응답 머리 `X-Waypoint-Context-ID: <소문자 UUID>`: 앱이 블록을 대기로 둔 `200` 본문 응답에만 싣는다. 스크립트는 curl `-w '%header{x-waypoint-context-id}'`로 읽고, 꼴이 맞을 때만 쓴다.
-- `POST /hooks/ack`, 본문 `{"contextId":"<ID>"}`(Claude·Codex 공용, ID가 세션을 가리킨다). 응답 `204`(모르는 ID도 `204`), 본문·ID 꼴이 틀리면 `400`, POST가 아니면 `405`. 스크립트는 본문을 stdout에 출력한 뒤에만 보내고, curl은 `--max-time 1 --connect-timeout 1 --noproxy '*'`, 결과를 보지 않으며 실패해도 outbox에 쓰지 않는다(exit 0, stdout 없음). 앱은 이 요청에 데이터 변경 알림·재개 점검을 하지 않는다.
+- `POST /hooks/ack`, 본문 `{"contextId":"<ID>"}`(Claude·Codex 공용, ID가 세션을 가리킨다). 응답 `204`(모르는 ID도 `204`), 본문·ID 꼴이 틀리면 `400`, POST가 아니면 `405`. 서버 큐에서 바로 답한다(메인 액터를 기다리지 않는다). 스크립트는 본문을 stdout에 출력한 뒤에만 보내고, curl은 `--max-time 1 --connect-timeout 1 --noproxy '*'`, 결과를 보지 않으며 실패해도 outbox에 쓰지 않는다(exit 0, stdout 없음).
 
 outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID>,"trimmed":true,"payload":<줄인 JSON>}`. `claudePid`는 PID를 찾았을 때만 있다(Codex는 `"provider":"codex"`, `processPid`). 앱은 실행 시 순서대로 흡수하고 파일을 비운다(흡수한 파일은 지운다). 읽을 수 없는 줄(JSON·필수 필드·`provider` 오류)은 버리지 않고 원문 그대로 `outbox.quarantine.jsonl`(0600)에 덧붙인다. 격리 줄은 다시 흡수하지 않고 미처리 기록 수에도 넣지 않는다(연동 상태에 「누락 기록 N건 형식 오류」). 한 줄의 DB 저장이 실패하면(또는 격리 파일에 쓰지 못하면) 그 줄부터 끝까지를 떼어 낸 파일에 다시 쓰고, 뒤 파일까지 모두 멈춘다. 흡수는 한 번마다 새 `ModelContext`(같은 컨테이너)에서 하고, 저장에 실패하면 그 context를 통째로 버린다(`HookProcessor.absorbOutbox`). 메인 context는 흡수 전에 저장 안 된 변경을 저장하고(저장하지 못하면 그 흡수를 미룬다), 흡수 뒤에는 이미 올려 둔 프로젝트·카드·세션·연결을 저장소 값으로 다시 읽는다(`ContextReload`). 그래서 남긴 줄은 같은 실행의 다음 10초 점검·연동 상태 **다시 점검**·서버 준비 때 그 줄부터 다시 흡수한다. 횟수 제한은 없다(디스크가 잠깐 막혀도 기록을 잃지 않게). 서브에이전트 대기 항목은 흡수용 처리기에 넘겼다가 저장된 결과대로 돌려받는다. 실시간 훅과 세션 정리의 저장 실패는 rollback 뒤 같은 다시 읽기로 메모리를 저장소에 맞춘다(DECISIONS 2026-10-01 TRK-33). MCP 도구·프로젝트 등록·보드 끌어 놓기·카드 상세도 같다(`ContextReload.commit`, TRK-34). 남은 줄을 다시 쓰는 것마저 실패하면 파일을 그대로 두어 앞부분이 다시 들어올 수 있다(손실보다 중복). 줄은 읽혔지만 본문에서 세션 정보를 못 읽은 경우는 저장 실패가 아니므로 소비하고 「누락 기록 세션 정보 읽기 실패」만 알린다.
 
