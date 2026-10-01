@@ -12,6 +12,8 @@ public final class HookProcessor {
     public var home: String
     /// cwd → git 브랜치. 테스트에서 바꾼다.
     public var gitBranch: (String) -> String?
+    /// 저장. 테스트에서 실패를 흉내 낸다.
+    var saveContext: (ModelContext) throws -> Void = { try $0.save() }
 
     /// `PreToolUse(Agent)`에서 올려 두고 `SubagentStart`에서 꺼내는 대기 항목. 메모리에만 둔다.
     struct PendingSpawn {
@@ -45,6 +47,7 @@ public final class HookProcessor {
     @discardableResult
     public func handle(event: String?, json: Data, at date: Date, claudePid: Int? = nil,
                        delivers: Bool = true, provider: AgentProvider = .claude, processPid: Int? = nil) -> String? {
+        lastSaveFailed = false
         guard var input = HookInput(event: event, json: json, provider: provider) else { return nil }
         input.claudePid = provider == .claude ? claudePid : nil
         input.processPid = processPid
@@ -54,16 +57,19 @@ public final class HookProcessor {
     @discardableResult
     public func handle(_ input: HookInput, at date: Date, delivers: Bool = true) -> String? {
         lastSaveFailed = false
+        // 저장에 실패하면 DB와 함께 메모리의 대기 항목도 되돌린다. 같은 훅을 다시 처리해도 대기 항목이 겹치거나 사라지지 않게.
+        let spawns = pendingSpawns
         let result = process(input, at: date, delivers: delivers)
         if let main = fetchSession(input.sessionID), main.project?.archivedAt == nil {
             let target = input.event == "SubagentStart" ? subagentSession(input) : (subagentSession(input) ?? main)
             SessionActivityRules.observe(input, session: target ?? main, at: date)
         }
         do {
-            try context.save()
+            try saveContext(context)
         } catch {
             lastSaveFailed = true
             context.rollback()
+            pendingSpawns = spawns
         }
         return result
     }

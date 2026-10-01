@@ -156,11 +156,13 @@ final class AppServices {
         guard let processor, let directory = try? WaypointStore.supportDirectory() else { return }
         let result = Outbox.drain(directory: directory) { entry in
             processor.handle(entry)
+            guard !processor.lastSaveFailed else { throw OutboxSaveError.failed }
             if let input = HookInput(event: entry.event, json: entry.payload, provider: entry.provider) {
                 receiveHook(input, at: entry.receivedAt, replayed: true)
             } else { integration.report("누락 기록 세션 정보 읽기 실패") }
         }
         if result.skipped > 0 { integration.report("누락 기록 \(result.skipped)건 형식 오류") }
+        if result.retryPending { integration.report("작업 기록 저장 실패 · 미처리 기록 보존") }
         integration.refresh()
     }
 

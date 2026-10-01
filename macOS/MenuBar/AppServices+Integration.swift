@@ -3,6 +3,8 @@ import SwiftData
 import WaypointKit
 
 extension AppServices {
+    enum OutboxSaveError: Error { case failed }
+
     func receiveHook(_ input: HookInput, at: Date, replayed: Bool) {
         let id = input.sessionID
         let context = container.mainContext
