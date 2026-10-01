@@ -4,7 +4,7 @@ import Testing
 @testable import WaypointKit
 
 /// 블록 수신 확인(SPEC 5장 「수신 확인」, TRK-35): 확인을 보내는 스크립트에는 블록을 대기로 두고,
-/// `POST /hooks/ack`가 와야 받은 것으로 적는다. 확인이 없으면 다음 프롬프트에 다시 준다.
+/// 서버 큐가 받아 둔 확인(`contextAcks`)을 그 세션의 다음 훅에서 확정한다. 확인이 없으면 다음 프롬프트에 다시 준다.
 @Suite struct ContextAckTests {
     private enum SaveFailure: Error { case diskUnavailable }
 
@@ -15,8 +15,13 @@ import Testing
                            provider: provider, acknowledges: acknowledges)
     }
 
-    /// 정상: 확인이 오면 확정되고 다음 프롬프트에는 블록이 없다.
-    @Test func ackConfirmsAndNextPromptGetsNothing() throws {
+    /// 서버 큐가 확인을 받는 것과 같다(메인·저장을 거치지 않는다).
+    func ack(_ h: HookHarness) throws {
+        h.processor.contextAcks.insert(try #require(h.processor.lastContextID))
+    }
+
+    /// 정상: 확인을 받아 두면 다음 훅(프롬프트)에서 확정되고 그 프롬프트에는 블록이 없다.
+    @Test func ackConfirmsOnNextHookAndPromptGetsNothing() throws {
         let h = try HookHarness()
         let start = try #require(try send(h, "doc-SessionStart", at: t0))
         #expect(start.hasPrefix("Waypoint: LDG"))
@@ -26,17 +31,27 @@ import Testing
         #expect(s.contextProjectKey == nil)
         #expect(s.contextPendingKey == "LDG" && s.contextPendingID == id && s.contextPendingCount == 1)
 
-        #expect(h.processor.acknowledge(contextID: id))
-        #expect(s.contextProjectKey == "LDG")
-        #expect(s.contextPendingKey == nil && s.contextPendingID == nil && s.contextPendingCount == 0)
+        try ack(h)
+        // 확인을 받아 둔 것만으로는 저장소가 바뀌지 않는다
+        #expect(s.contextProjectKey == nil && h.processor.contextAcks.count == 1)
         #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 60) == nil)
         #expect(h.processor.lastContextID == nil)
-        // 같은 확인을 다시 받아도 바뀌는 것이 없다
-        #expect(!h.processor.acknowledge(contextID: id))
         #expect(s.contextProjectKey == "LDG")
+        #expect(s.contextPendingKey == nil && s.contextPendingID == nil && s.contextPendingCount == 0)
+        #expect(h.processor.contextAcks.count == 0)
+        #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 120) == nil)
     }
 
-    /// 시간 초과: 확인이 없으면 다음 프롬프트에 블록을 새 ID로 한 번 더, 그 확인이 오면 확정.
+    /// 프롬프트가 아닌 훅이 먼저 와도 그때 확정한다.
+    @Test func anyHookOfTheSessionConfirms() throws {
+        let h = try HookHarness()
+        _ = try send(h, "doc-SessionStart", at: t0)
+        try ack(h)
+        _ = try send(h, "doc-Stop", at: t0 + 10)
+        #expect(try h.session()?.contextProjectKey == "LDG")
+    }
+
+    /// 시간 초과: 확인이 없으면 다음 프롬프트에 블록을 새 ID로 한 번 더, 그 확인 뒤에는 없다.
     @Test func missingAckRedeliversOnNextPromptThenConfirms() throws {
         let h = try HookHarness()
         _ = try send(h, "doc-SessionStart", at: t0)
@@ -47,12 +62,13 @@ import Testing
         #expect(second != first)
         let s = try #require(try h.session())
         #expect(s.contextPendingCount == 2)
-        // 앞 블록의 ID는 더 이상 대기가 아니다
-        #expect(!h.processor.acknowledge(contextID: first))
+        // 앞 블록의 ID로 온 확인은 지금 대기와 맞지 않아 확정하지 않는다
+        h.processor.contextAcks.insert(first)
+        #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 90) != nil)
         #expect(s.contextProjectKey == nil)
-        #expect(h.processor.acknowledge(contextID: second))
-        #expect(s.contextProjectKey == "LDG")
+        try ack(h)
         #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 120) == nil)
+        #expect(s.contextProjectKey == "LDG")
     }
 
     /// 확인이 계속 오지 않으면 SessionStart 포함 세 번까지만 보낸다. 늦게라도 마지막 확인이 오면 확정.
@@ -66,7 +82,21 @@ import Testing
         #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 180) == nil)
         #expect(h.processor.lastContextID == nil)
         #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 240) == nil)
-        #expect(h.processor.acknowledge(contextID: last))
+        h.processor.contextAcks.insert(last)
+        _ = try send(h, "doc-Stop", at: t0 + 250)
+        #expect(try h.session()?.contextProjectKey == "LDG")
+    }
+
+    /// 앱을 다시 켜 받아 둔 확인을 잃으면 블록이 한 번 더 나간다(허용). 그 확인 뒤에는 없다.
+    @Test func lostAckAfterRestartRedeliversOnce() throws {
+        let h = try HookHarness()
+        _ = try send(h, "doc-SessionStart", at: t0)
+        // 확인은 받았지만 다음 훅 전에 앱이 꺼졌다: 새 처리기(빈 집합)가 같은 저장소를 쓴다
+        let restarted = HookProcessor(context: h.context, home: "/Users/me", gitBranch: { _ in nil })
+        let text = restarted.handle(event: nil, json: try fixture("doc-UserPromptSubmit"), at: t0 + 60, acknowledges: true)
+        #expect(text?.hasPrefix("Waypoint: LDG") == true)
+        restarted.contextAcks.insert(try #require(restarted.lastContextID))
+        #expect(restarted.handle(event: nil, json: try fixture("doc-UserPromptSubmit"), at: t0 + 120, acknowledges: true) == nil)
         #expect(try h.session()?.contextProjectKey == "LDG")
     }
 
@@ -97,7 +127,9 @@ import Testing
     @Test func restartedSessionWaitsForNewAck() throws {
         let h = try HookHarness()
         _ = try send(h, "doc-SessionStart", at: t0)
-        #expect(h.processor.acknowledge(contextID: try #require(h.processor.lastContextID)))
+        try ack(h)
+        _ = try send(h, "doc-Stop", at: t0 + 10)
+        #expect(try h.session()?.contextProjectKey == "LDG")
         _ = try send(h, "doc-SessionStart", at: t0 + 600)
         let s = try #require(try h.session())
         #expect(s.contextProjectKey == nil && s.contextPendingCount == 1)
@@ -114,7 +146,8 @@ import Testing
         let s = try #require(try h.session())
         #expect(s.contextProjectKey == nil && s.contextPendingID == nil)
         #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 60)?.hasPrefix("Waypoint: LDG") == true)
-        #expect(h.processor.acknowledge(contextID: try #require(h.processor.lastContextID)))
+        try ack(h)
+        #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 90) == nil)
         #expect(s.contextProjectKey == "LDG")
     }
 
@@ -127,9 +160,9 @@ import Testing
         #expect(session.contextProjectKey == nil)
         let late = try #require(try send(h, "doc-codex-UserPromptSubmit", at: t0 + 60, provider: .codex))
         #expect(late.contains("provider: codex"))
-        #expect(h.processor.acknowledge(contextID: try #require(h.processor.lastContextID)))
-        #expect(session.contextProjectKey == "LDG")
+        try ack(h)
         #expect(try send(h, "doc-codex-UserPromptSubmit", at: t0 + 120, provider: .codex) == nil)
+        #expect(session.contextProjectKey == "LDG")
     }
 
     /// 프로젝트를 다시 연결하면(`session_bind` 등) 앞 프로젝트 블록의 대기는 지워진다. 늦은 확인이 와도 키를 적지 않는다.
@@ -142,11 +175,12 @@ import Testing
         h.context.insert(other)
         SessionProjectBinding.bind(s, to: other, at: t0 + 30, in: h.context)
         try h.context.save()
-        #expect(!h.processor.acknowledge(contextID: id))
+        h.processor.contextAcks.insert(id)
+        _ = try send(h, "doc-Stop", at: t0 + 60)
         #expect(s.contextProjectKey == nil)
     }
 
-    /// 저장에 실패하면 응답 ID를 주지 않고(확인할 곳이 없다), 확인 저장에 실패하면 대기를 그대로 둔다.
+    /// 저장에 실패하면 응답 ID를 주지 않고(확인할 곳이 없다), 확정 저장에 실패하면 확인을 되돌려 다음 훅에서 다시 쓴다.
     @Test func saveFailureKeepsStateConsistent() throws {
         let h = try HookHarness(onDisk: true)
         h.processor.saveContext = { _ in throw SaveFailure.diskUnavailable }
@@ -156,14 +190,36 @@ import Testing
         h.processor.saveContext = { try $0.save() }
         _ = try send(h, "doc-SessionStart", at: t0 + 10)
         let id = try #require(h.processor.lastContextID)
+        h.processor.contextAcks.insert(id)
         h.processor.saveContext = { _ in throw SaveFailure.diskUnavailable }
-        #expect(!h.processor.acknowledge(contextID: id))
+        _ = try send(h, "doc-Stop", at: t0 + 20)
         #expect(h.processor.lastSaveFailed)
         let s = try #require(try h.session())
         #expect(s.contextProjectKey == nil && s.contextPendingID == id)
+        #expect(h.processor.contextAcks.count == 1)
         h.processor.saveContext = { try $0.save() }
-        #expect(h.processor.acknowledge(contextID: id))
+        #expect(try send(h, "doc-UserPromptSubmit", at: t0 + 30) == nil)
         #expect(s.contextProjectKey == "LDG")
+    }
+}
+
+@Suite struct ContextAckInboxTests {
+    @Test func takeOnceAndBounded() {
+        let inbox = ContextAckInbox()
+        inbox.insert("a"); inbox.insert("a")
+        #expect(inbox.count == 1)
+        #expect(inbox.take("a") && !inbox.take("a"))
+        for i in 0...ContextAckInbox.capacity { inbox.insert("id-\(i)") }
+        #expect(inbox.count == ContextAckInbox.capacity)
+        #expect(!inbox.take("id-0") && inbox.take("id-\(ContextAckInbox.capacity)"))
+    }
+
+    @Test func concurrentInsertsAreSafe() async {
+        let inbox = ContextAckInbox()
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<200 { group.addTask { inbox.insert("id-\(i)") } }
+        }
+        #expect(inbox.count == 200)
     }
 }
 

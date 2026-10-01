@@ -62,11 +62,12 @@ final class AppServices {
             Task { @MainActor in initWindow.show() }
         }
         let mcp = MCPServer(context: container.mainContext, drafts: drafts)
-        let server = LocalServer(port: port) { [weak self] request in
-            // 블록 수신 확인은 화면에 보이는 값을 바꾸지 않는다. 데이터 변경 알림·재개 점검을 건너뛴다(다음 훅이 화면 갱신을 기다리지 않게).
-            if request.path == HookRouter.ackPath {
-                return HookRouter.respondAck(to: request) { id in processor.acknowledge(contextID: id) }
-            }
+        // 블록 수신 확인은 서버 큐에서 받아 두기만 한다(메인 큐·저장·화면 갱신을 기다리지 않게). 확정은 다음 훅에서.
+        let acks = processor.contextAcks
+        let server = LocalServer(port: port, fastHandler: { request in
+            guard request.path == HookRouter.ackPath else { return nil }
+            return HookRouter.respondAck(to: request) { acks.insert($0) }
+        }) { [weak self] request in
             defer {
                 self?.lastDataChange = Date()
                 if let self { self.reliability.checkResumes(in: self.container.mainContext) }

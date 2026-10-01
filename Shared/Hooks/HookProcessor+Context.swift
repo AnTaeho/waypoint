@@ -4,8 +4,9 @@ import SwiftData
 /// `Waypoint:` 블록 전달과 수신 확인(SPEC 5장 「늦은 주입」·「수신 확인」, TRK-35).
 ///
 /// 훅 스크립트는 응답을 1초까지 기다린다. 앱이 블록을 만들었어도 그 사이 응답이 닿지 않으면 대화에 들어가지 않는다.
-/// 확인을 보내는 스크립트에는 블록을 대기로 두고, 스크립트가 stdout에 출력한 뒤 보낸 `POST /hooks/ack`를 받아야
-/// `contextProjectKey`를 적는다. 확인이 없으면 다음 `UserPromptSubmit`에서 같은 블록을 다시 준다.
+/// 확인을 보내는 스크립트에는 블록을 대기로 두고, 스크립트가 stdout에 출력한 뒤 보낸 `POST /hooks/ack`를 서버 큐가
+/// 받아 두면(`ContextAckInbox`) 그 세션의 다음 훅에서 `contextProjectKey`를 적는다. 확인이 없으면 다음 `UserPromptSubmit`에서
+/// 같은 블록을 다시 준다.
 extension HookProcessor {
     /// 같은 프로젝트 블록을 확인 없이 보내는 최대 횟수(`SessionStart` 포함). 확인이 계속 닿지 않는 환경에서 매 프롬프트마다
     /// 블록이 붙지 않게 한다.
@@ -47,25 +48,13 @@ extension HookProcessor {
         lastContextID = id
     }
 
-    /// 스크립트가 블록을 출력했다는 확인. 대기 중인 응답 ID면 그 블록의 키를 확정하고 true.
-    /// 모르는 ID(이미 확정, 새 블록으로 바뀜, 세션 전환)는 아무것도 바꾸지 않는다. 저장에 실패하면 되돌리고 false.
-    @discardableResult
-    public func acknowledge(contextID: String) -> Bool {
-        lastSaveFailed = false
-        guard HookRouter.isContextID(contextID) else { return false }
-        let target: String? = contextID
-        var descriptor = FetchDescriptor<Session>(predicate: #Predicate<Session> { $0.contextPendingID == target })
-        descriptor.fetchLimit = 1
-        guard let session = (try? context.fetch(descriptor))?.first else { return false }
+    /// 이 훅의 메인 세션에 대기 블록이 있고 그 ID의 확인을 받아 두었으면 확정한다. 꺼낸 ID(저장 실패 때 되돌릴 것)를 돌려준다.
+    /// 확인 요청 자체는 서버 큐에서 `contextAcks`에 넣기만 한다(메인 큐·저장·화면 갱신을 기다리지 않게).
+    func applyAcknowledgement(_ input: HookInput) -> String? {
+        guard let session = fetchSession(input.sessionID), let id = session.contextPendingID,
+              contextAcks.take(id)
+        else { return nil }
         session.confirmContext(session.contextPendingKey)
-        do {
-            try saveContext(context)
-            return true
-        } catch {
-            lastSaveFailed = true
-            context.rollback()
-            ContextReload.apply(context)
-            return false
-        }
+        return id
     }
 }
