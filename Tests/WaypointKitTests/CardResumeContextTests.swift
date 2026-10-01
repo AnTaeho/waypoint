@@ -15,7 +15,7 @@ import Testing
         let before = try h.context.fetchCount(FetchDescriptor<Event>())
         let text = try #require(CardResumeContext.text(card: card, provider: .codex))
         #expect(text.contains("The goal") && text.contains("Start with validation"))
-        #expect(text.contains("- remaining") && !text.contains("already satisfied"))
+        #expect(text.contains("- remaining") && text.contains("[체크됨] already satisfied · 미검증"))
         #expect(text.contains("provider: codex") && text.contains("codex:"))
         #expect(text.contains("session_bind") && text.contains("card_get") && text.contains("card_start"))
         #expect(!text.contains(old.id))
@@ -41,6 +41,43 @@ import Testing
         let text = try #require(CardResumeContext.text(card: card, provider: .codex))
         #expect(text.contains("외 2개") && text.contains("123456789012 checkpoint"))
         #expect(!text.contains("other-secret.swift"))
+    }
+
+    @Test func exportsEvidenceIndependentlyOfCheckboxAndRefreshesAfterChanges() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "evidence", status: .next, at: t0)
+        card.criteria = [Criterion("checked without evidence", isDone: true),
+                         Criterion("reported pass"), Criterion("confirmed failure", isDone: true),
+                         Criterion("skipped")]
+        for (index, outcome) in [(1, CheckOutcome.pass), (2, .fail), (3, .skipped)] {
+            CardEvidence.record(CheckRecord(at: t0, command: "swift test --filter Case\(index)",
+                outcome: outcome, source: .agent, criterion: index, criterionText: card.criteria[index].text),
+                card: card, session: nil, in: h.context)
+        }
+        CardEvidence.record(CheckRecord(at: t0, command: "swift test --filter Case2", outcome: .fail,
+            source: .hook), card: card, session: nil, in: h.context)
+        for provider in AgentProvider.allCases {
+            let text = try #require(CardResumeContext.text(card: card, provider: provider))
+            #expect(text.contains("[체크됨] checked without evidence · 미검증"))
+            #expect(text.contains("[미체크] reported pass · 통과 · 보고"))
+            #expect(text.contains("[체크됨] confirmed failure · 실패 · 확인됨"))
+            #expect(text.contains("skipped · 건너뜀 · 보고"))
+        }
+        Event.record(.fileChanged, in: h.context, card: card, at: t0 + 1, payload: ["path": "edited.swift"])
+        let changed = try #require(CardResumeContext.text(card: card, provider: .codex))
+        #expect(changed.contains("reported pass · 변경 후 미검증 · 보고"))
+        #expect(changed.contains("confirmed failure · 변경 후 미검증 · 확인됨"))
+        #expect(card.criteria[0].isDone && !card.criteria[1].isDone && card.status == .next)
+    }
+
+    @Test func evidenceListIsBoundedAndKeepsOriginalCriterionNumbers() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "many", status: .next, at: t0)
+        card.criteria = (1...22).map { Criterion("item\($0)", isDone: true) }
+        let text = try #require(CardResumeContext.text(card: card, provider: .codex))
+        #expect(text.contains("조건 20 [체크됨] item20 · 미검증"))
+        #expect(!text.contains("item21"))
+        #expect(text.contains("외 2개 — card_get에서 전체 검증 상태 확인"))
     }
 
     @Test func unavailableAndEmptyStatesAreExplicit() throws {

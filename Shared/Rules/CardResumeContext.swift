@@ -59,6 +59,13 @@ public enum CardResumeContext {
         lines += remaining.isEmpty ? [card.criteria.isEmpty ? "등록된 완료 조건 없음." : "모든 등록 조건이 체크됨. 최종 검증 여부를 확인하세요."]
             : remaining.prefix(20).map { "- " + excerpt($0.text, limit: 500) }
         if remaining.count > 20 { lines.append("외 \(remaining.count - 20)개 — card_get에서 전체 확인") }
+        lines += ["", "## 완료 조건별 검증 상태", "체크 여부와 검증 근거는 별개입니다. 미검증·실패·건너뜀·변경 후 미검증 항목을 확인하세요."]
+        let evidence = CardEvidence.criteria(for: card)
+        if card.criteria.isEmpty { lines.append("등록된 완료 조건 없음.") }
+        for (index, criterion) in card.criteria.prefix(20).enumerated() {
+            lines.append("- 조건 \(index + 1) [\(criterion.isDone ? "체크됨" : "미체크")] \(excerpt(criterion.text, limit: 500)) · \(EvidenceFormat.criterionLabel(evidence[index]))")
+        }
+        if card.criteria.count > 20 { lines.append("외 \(card.criteria.count - 20)개 — card_get에서 전체 검증 상태 확인") }
         lines += ["", "## 최근 변경 파일 (이 카드에 기록된 경로)"]
         let files = recentFiles(card)
         lines += files.isEmpty ? ["기록된 파일 없음."] : files.prefix(10).map { "- \($0)" }
