@@ -10,9 +10,11 @@ import WaypointKit
 @MainActor
 @Observable
 final class AppServices {
+    private(set) var lastDataChange = Date()
     private(set) var serverState: LocalServer.State = .stopped
     /// 서버 포트. 평소용 47821, 개발용 47822(`AppInstance`), 환경 변수 `WAYPOINT_PORT`가 먼저.
     let port = AppInstance.current.port()
+    let integration = IntegrationMonitor(port: AppInstance.current.port())
     /// 방금 등록한 프로젝트. 메인 창이 받아서 사이드바에서 고르고 비운다.
     var pendingSelection: PersistentIdentifier?
 
@@ -24,15 +26,17 @@ final class AppServices {
     @ObservationIgnored var mainWindowCount = 0
     @ObservationIgnored private var initWindow: InitWindowController?
 
-    @ObservationIgnored private let container: ModelContainer
-    @ObservationIgnored private var processor: HookProcessor?
+    @ObservationIgnored let container: ModelContainer
+    @ObservationIgnored var processor: HookProcessor?
     @ObservationIgnored private var server: LocalServer?
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var guides: GuideMonitor?
+    @ObservationIgnored var activeObserver: NSObjectProtocol?
+    @ObservationIgnored var wakeObserver: NSObjectProtocol?
     @ObservationIgnored private var importObserver: NSObjectProtocol?
 
     /// `SessionEnd` 없이 끝난 세션 정리와 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
-    static let refreshInterval: TimeInterval = 60
+    static let refreshInterval: TimeInterval = 10
 
     init(container: ModelContainer) {
         self.container = container
@@ -54,12 +58,33 @@ final class AppServices {
             Task { @MainActor in initWindow.show() }
         }
         let mcp = MCPServer(context: container.mainContext, drafts: drafts)
-        let server = LocalServer(port: port) { request in
-            if MCPRouter.matches(request.path) {
-                return MCPRouter.respond(to: request) { mcp.handle($0) }
+        let server = LocalServer(port: port) { [weak self] request in
+            defer { self?.lastDataChange = Date() }
+            if request.path == "/integration/status" {
+                return request.method == "GET" ? (self?.integrationResponse() ?? .notFound) : .methodNotAllowed
             }
-            return HookRouter.respond(to: request) { event, body, claudePid in
-                processor.handle(event: event, json: body, at: Date(), claudePid: claudePid)
+            if MCPRouter.matches(request.path) {
+                return MCPRouter.respond(to: request) { message in
+                    if message["jsonrpc"] == "2.0", message["method"]?.stringValue != nil {
+                        self?.integration.receiveMCP()
+                    }
+                    let response = mcp.handle(message)
+                    self?.receiveBinding(message, response: response)
+                    return response
+                }
+            }
+            return HookRouter.respond(to: request) { provider, event, body, pid in
+                guard SessionActivityRules.hookEvents.contains(event),
+                      let input = HookInput(event: event, json: body, provider: provider) else {
+                    self?.integration.report("훅 입력 형식을 읽을 수 없습니다. Waypoint 훅 설치를 확인하세요.")
+                    return nil
+                }
+                let now = Date()
+                let result = processor.handle(event: event, json: body, at: now,
+                                 claudePid: provider == .claude ? pid : nil,
+                                 provider: provider, processPid: provider == .codex ? pid : nil)
+                self?.receiveHook(input, at: now, replayed: false)
+                return result
             }
         }
         server.onStateChange = { [weak self] state in
@@ -78,11 +103,14 @@ final class AppServices {
 
         observeCloudKitImports()
 
-        // 첫 outbox 흡수 뒤 한 번, 그 뒤 60초마다
+        // 첫 outbox 흡수 뒤 한 번, 그 뒤 10초마다
         refreshStates()
-        timer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshStates() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+        observeLifecycle()
     }
 
     /// iPhone에서 온 변경(CloudKit 가져오기)을 메인 context에 들인다(`RemoteCardMerge`). 그대로 두면 iPhone에서
@@ -124,13 +152,22 @@ final class AppServices {
 
     private func drainOutbox() {
         guard let processor, let directory = try? WaypointStore.supportDirectory() else { return }
-        Outbox.drain(directory: directory) { processor.handle($0) }
+        let result = Outbox.drain(directory: directory) { entry in
+            processor.handle(entry)
+            if let input = HookInput(event: entry.event, json: entry.payload, provider: entry.provider) {
+                receiveHook(input, at: entry.receivedAt, replayed: true)
+            } else { integration.report("누락 기록의 세션 정보를 읽지 못했습니다. 훅 설치를 확인하세요.") }
+        }
+        if result.skipped > 0 { integration.report("누락 기록 중 \(result.skipped)건은 입력 형식 오류로 읽지 못했습니다. 훅 설치를 확인하세요.") }
+        integration.refresh()
     }
 
     /// `SessionEnd`가 오지 않은 세션을 끝내고(`SessionSweep`), active가 아닌 카드의 열린 연결을 닫고
     /// (`CardLifecycle.closeStrayLinks`), 남은 세션의 상태 캐시를 맞춘다.
-    private func refreshStates() {
+    func refreshStates() {
+        drainOutbox()
         let now = Date()
+        defer { lastDataChange = now }
         processor?.sweep(now: now, probe: SessionSweep.systemProbe)
         let context = container.mainContext
         let closed = CardLifecycle.closeStrayLinks(at: now, in: context)
@@ -139,5 +176,10 @@ final class AppServices {
         if SessionStateCache.refresh(sessions, now: now) > 0 || closed > 0 {
             try? context.save()
         }
+    }
+
+    func retryIntegration() {
+        if serverState != .ready { server?.start() }
+        refreshStates()
     }
 }

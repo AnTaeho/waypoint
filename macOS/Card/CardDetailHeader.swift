@@ -68,7 +68,7 @@ struct CardStatusBadge: View {
               let link = BoardQuery.primaryLink(of: card, now: now),
               let session = link.session,
               let time = CardFormat.workTime(
-                  state: work, attachedAt: link.attachedAt, lastSeenAt: session.lastSeenAt, now: now
+                  state: work, attachedAt: link.attachedAt, lastSeenAt: session.lastSeenAt, now: now, session: session
               )
         else { return name }
         return "\(name) · \(time)"

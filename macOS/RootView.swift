@@ -12,8 +12,10 @@ struct RootView: View {
     /// 지침 문서 화면에서 고른 문서. 프로젝트를 바꾸면 비운다(첫 문서).
     @State private var guideDocID: PersistentIdentifier?
     @State private var showsInspector = true
+    @State private var showsDashboardInspector = false
     /// 프로젝트 보드 화면의 인스펙터. 네 칸이 넓게 보이도록 닫힌 채 시작하고, 연 뒤에는 앱을 끌 때까지 기억한다.
     @State private var showsBoardInspector = false
+    @State private var showsActivityInspector = false
     @State private var searchText = ""
     /// 샘플 모드에서는 nil
     @Environment(AppServices.self) private var services: AppServices?
@@ -56,10 +58,12 @@ struct RootView: View {
             )
         }
         .toolbar {
+            ToolbarItem(placement: .primaryAction) { IntegrationStatusButton() }
             if selectedProjectID != nil, path.isEmpty {
                 ToolbarItem(placement: .principal) {
                     Picker("화면", selection: $projectMode) {
                         Text("보드").tag(ProjectMode.board)
+                        Text("활동").tag(ProjectMode.activity)
                         Text("지침 문서").tag(ProjectMode.guide)
                     }
                     .pickerStyle(.segmented)
@@ -105,6 +109,8 @@ struct RootView: View {
     /// 보드 화면이면 보드 전용 상태, 대시보드·카드 상세·지침 문서는 공용 상태.
     private var inspectorShown: Binding<Bool> {
         let isBoard = selectedProjectID != nil && projectMode == .board && path.isEmpty
+        if selectedProjectID == nil && path.isEmpty { return $showsDashboardInspector }
+        if selectedProjectID != nil && projectMode == .activity && path.isEmpty { return $showsActivityInspector }
         return isBoard ? $showsBoardInspector : $showsInspector
     }
 
@@ -115,32 +121,5 @@ struct RootView: View {
 
 /// 프로젝트 화면 종류.
 enum ProjectMode: Hashable {
-    case board, guide
-}
-
-/// 사이드바 선택에 맞는 첫 화면.
-private struct DetailRootView: View {
-    let selection: SidebarSelection
-    let mode: ProjectMode
-    @Binding var guideDocID: PersistentIdentifier?
-    let searchText: String
-    let selectProject: (Project) -> Void
-    @Environment(\.modelContext) private var context
-
-    var body: some View {
-        switch selection {
-        case .dashboard:
-            DashboardView(searchText: searchText, selectProject: selectProject)
-                .navigationTitle("대시보드")
-        case .project(let id):
-            if let project = context.model(for: id) as? Project {
-                switch mode {
-                case .board: ProjectBoardView(project: project)
-                case .guide: GuideView(project: project, selectedID: $guideDocID)
-                }
-            } else {
-                Theme.bg.navigationTitle("")
-            }
-        }
-    }
+    case board, activity, guide
 }

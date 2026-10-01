@@ -9,19 +9,20 @@ struct CardDetailView: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { timeline in
+        LiveDataTimeline { now in
             // GeometryReader로 감싸 본문이 분할 뷰에 최소 폭을 요구하지 않게 한다.
             GeometryReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.section) {
-                        CardDetailHeader(card: card, now: timeline.date) { moveToDone() }
+                        CardDetailHeader(card: card, now: now) { moveToDone() }
+                        CardResumeSection(card: card)
                         if !card.body.isEmpty {
                             CardMarkdownText(markdown: card.body)
                         }
                         if !card.criteria.isEmpty {
                             CardCriteriaView(card: card) { setCriterion($0, $1) }
                         }
-                        CardHistoryView(lines: CardHistoryFormat.lines(for: card), now: timeline.date)
+                        CardHistoryView(lines: CardHistoryFormat.lines(for: card), now: now)
                     }
                     .padding(.horizontal, Theme.Spacing.pageH)
                     .padding(.vertical, Theme.Spacing.pageV)
