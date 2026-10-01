@@ -23,6 +23,12 @@ public final class HookProcessor {
     }
     /// 부모 세션 ID → 먼저 올린 순
     var pendingSpawns: [String: [PendingSpawn]] = [:]
+    /// 대기 목록에 이미 올린 서브에이전트 도구 호출(`부모 세션|tool_use_id` → 시각). 같은 훅을 다시 받아도 두 번 올리지 않는다.
+    var seenSpawns: [String: Date] = [:]
+    /// 같은 훅의 재수신으로 보는 시간 폭(10분). 실시간 응답이 늦어 outbox에도 쓰인 줄은 원래 시각 근처로 들어온다.
+    public static let redeliveryWindow: TimeInterval = 10 * 60
+    /// ID 없는 옛 outbox 줄의 요청 문장을 같은 요청으로 보는 시간 폭(10초).
+    public static let promptRedeliveryTolerance: TimeInterval = 10
     /// 대기 항목이 짝을 기다리는 시간(10분). 넘으면 버린다.
     public static let pendingLifetime: TimeInterval = 10 * 60
     /// `subagent_type`을 안 준 Agent 호출의 기본 에이전트 종류(문서 기준).
@@ -60,6 +66,7 @@ public final class HookProcessor {
         // 저장에 실패하면 DB와 함께 메모리의 대기 항목도 되돌린다. 같은 훅을 다시 처리해도 대기 항목이 겹치거나 사라지지 않게.
         // rollback이 되돌리지 못한 메모리 값은 저장소 값으로 다시 읽는다(`ContextReload`). 그대로 두면 다음 저장에 섞인다.
         let spawns = pendingSpawns
+        let seen = seenSpawns
         let result = process(input, at: date, delivers: delivers)
         if let main = fetchSession(input.sessionID), main.project?.archivedAt == nil {
             let target = input.event == "SubagentStart" ? subagentSession(input) : (subagentSession(input) ?? main)
@@ -72,6 +79,7 @@ public final class HookProcessor {
             context.rollback()
             ContextReload.apply(context)
             pendingSpawns = spawns
+            seenSpawns = seen
         }
         return result
     }
@@ -194,6 +202,7 @@ public final class HookProcessor {
         }
         end(session, at: date, reason: reason, activity: activity)
         pendingSpawns[session.id] = nil
+        seenSpawns = seenSpawns.filter { !$0.key.hasPrefix(session.id + "|") }
     }
 
     /// 세션을 끝낸다: 열린 연결을 모두 닫고 `session.end` 기록.

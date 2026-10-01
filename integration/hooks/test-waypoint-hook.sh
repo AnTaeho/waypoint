@@ -178,6 +178,12 @@ elif case == "failure":
     assert "SECRET" not in raw
     assert p["error"] == "Exit code 3" and p["is_interrupt"] is False, p
     assert p["tool_input"] == {"command": "bash test-fail.sh"}, p
+elif case == "ids":
+    # 재수신 중복 판정 열쇠(SPEC 5장): tool_use_id·prompt_id(Claude)·turn_id(Codex)는 남는다
+    original = json.load(open(sys.argv[3]))
+    for key in ("tool_use_id", "prompt_id", "turn_id"):
+        if key in original:
+            assert p[key] == original[key], (key, p)
 elif case == "minimal":
     assert "SECRET" not in raw
     assert p == {"session_id": sys.argv[3], "cwd": "/w", "hook_event_name": "PostToolUse"}, p
@@ -196,6 +202,11 @@ outbox_of PostToolUse < "$FIX/real-PostToolUse-Bash-commit.json"
 check "Bash 커밋: 커밋 줄·gitOperation·bashEditDiff 유지, 다른 출력 없음" 'expect commit "$TMP/line"'
 outbox_of PreToolUse < "$FIX/real-PreToolUse-Agent.json"
 check "Agent: 프롬프트는 카드 ID만" 'expect agent "$TMP/line"'
+outbox_of UserPromptSubmit < "$FIX/real-UserPromptSubmit.json"
+check "요청: prompt_id 유지" 'expect ids "$TMP/line" "$FIX/real-UserPromptSubmit.json" && grep -q prompt_id "$TMP/line"'
+check "Edit: tool_use_id·prompt_id 유지" 'outbox_of PostToolUse < "$FIX/real-PostToolUse-Edit.json" && expect ids "$TMP/line" "$FIX/real-PostToolUse-Edit.json"'
+WAYPOINT_AGENT=codex outbox_of UserPromptSubmit < "$FIX/doc-codex-UserPromptSubmit.json"
+check "Codex 요청: turn_id 유지" 'expect ids "$TMP/line" "$FIX/doc-codex-UserPromptSubmit.json" && grep -q turn_id "$TMP/line"'
 WAYPOINT_AGENT=codex outbox_of PostToolUse < "$FIX/doc-codex-PostToolUse-apply_patch.json"
 check "Codex apply_patch: 머리 줄과 +/- 표시만" 'expect patch "$TMP/line"'
 

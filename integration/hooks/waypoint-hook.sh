@@ -78,7 +78,8 @@ def object_or($key): if type == "object" then .
 if type != "object" then error("not an object") else . end
 | .tool_name as $tool
 | keep(["session_id", "cwd", "hook_event_name", "agent_id", "agent_type", "source", "reason",
-        "prompt", "prompt_text", "tool_name", "tool_use_id", "tool_input", "tool_response", "error", "is_interrupt"])
+        "prompt", "prompt_text", "prompt_id", "turn_id", "tool_name", "tool_use_id", "tool_input", "tool_response",
+        "error", "is_interrupt"])
 # PostToolUseFailure 설명: 앱은 첫 줄 `Exit code N`만 본다. 나머지(명령 출력)는 버린다.
 | if has("error") then .error |= (if type == "string" then (split("\n")[0] | if test("^Exit code -?[0-9]+$") then . else null end) else null end) else . end
 | if has("is_interrupt") then .is_interrupt |= (if type == "boolean" then . else null end) else . end

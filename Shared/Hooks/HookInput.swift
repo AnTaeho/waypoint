@@ -16,6 +16,8 @@ public struct HookInput {
     public let reason: String?
     /// UserPromptSubmit: 사용자 문장. 실측·문서는 `prompt`, 옛 문서 예시의 `prompt_text`도 받는다.
     public let prompt: String?
+    /// 요청 한 건의 ID. Claude는 `prompt_id`(2.1.196+), Codex는 `turn_id`. 재수신 중복 판정에 쓴다.
+    public let promptID: String?
     public let toolName: String?
     public let toolUseID: String?
     public let toolInput: [String: Any]
@@ -53,6 +55,7 @@ public struct HookInput {
         self.source = string("source")
         self.reason = string("reason")
         self.prompt = string("prompt") ?? string("prompt_text")
+        self.promptID = string("prompt_id") ?? string("turn_id")
         self.toolName = string("tool_name")
         self.toolUseID = string("tool_use_id")
         self.error = string("error")
