@@ -241,3 +241,14 @@ PreToolUse·PostToolUse matcher를 `*`로 넓힌 뒤 앱이 꺼진 동안 outbox
 ## 2026-10-01 — Codex 사용량은 대화 기록 파일 끝에서 읽는다
 
 Codex 한도는 `~/.codex/sessions`의 최근 기록 파일 끝부분에서 마지막 `limit_id: "codex"` 줄을 읽는다(네트워크 없이, 큰 파일 전체를 읽지 않게). 다른 한도(`premium`·`base_model_inference`)가 같은 파일에 섞여 오므로 걸러 낸다. 사용량 표시는 설정 창에서 도구별로 끌 수 있다(기본 켬). 대안: Codex 앱 서버·API 조회(네트워크·프로세스 의존이라 버림). 되돌리려면 설정에서 Codex를 끄거나 `UsageMonitor.reloadCodex`를 빼면 된다.
+
+## 2026-10-01 — 미처리 기록 저장 실패 시 원본 보존과 재시도 (TRK-32)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 저장 실패한 줄부터 끝까지를 떼어 낸 파일에 남기고 그 뒤 파일까지 멈춘다. 다음 흡수가 그 줄부터 다시 한다 | 순서가 중요하다(`SessionStart` 전에 `Stop`이 들어가면 안 된다). 실패 원인은 대개 디스크·저장소 전체 문제라 뒤 줄도 실패한다 | 실패한 줄만 따로 빼고 계속 | `Outbox.drain`의 `preserve` 대신 `continue` |
+| 재시도 횟수 제한·간격 늘리기 없음. 10초 점검·**다시 점검**·서버 준비 때마다 한 줄 시도 | 한 줄 시도라 비용이 작다. N번 실패 시 격리는 디스크가 잠깐(수십 초) 막혀도 멀쩡한 기록을 치워 버린다 | 같은 줄 N번 실패하고 뒤 줄은 저장되면 격리(독 줄 판정, 시도 횟수 파일 필요) | 사이드카 시도 횟수와 격리 조건 추가 |
+| 읽을 수 없는 줄은 `outbox.quarantine.jsonl`에 원문 그대로 덧붙이고(0600) 미처리 수에 넣지 않는다. 덧붙이기 실패는 저장 실패와 같이 다룬다 | 원본을 잃지 않는다. outbox 줄은 이미 줄인 형식이라(6장) 파일 내용·명령 출력이 없다. 미처리 수에 넣으면 지울 화면이 없어 연동 상태가 늘 「확인 필요」 | 버리기(이전 동작), 미처리 수에 포함 | `quarantine` 호출을 `skipped += 1`로 |
+| 저장 실패 때 `HookProcessor.pendingSpawns`(메모리의 서브에이전트 대기)를 처리 전 값으로 되돌린다 | DB는 rollback되는데 대기 항목만 남으면 재시도한 `PreToolUse(Agent)`가 두 번 쌓이고, `SubagentStart`는 짝을 잃는다 | 그대로 두기 | `handle(_:at:delivers:)`의 `spawns` 복원 줄 |
+
+알려진 한계: SwiftData `rollback()`은 이미 메모리에 올라온 모델의 값과 관계를 되돌리지 않는다(실측: 실패한 `SubagentStart` 뒤에도 메모리의 카드는 active·연결 1개, 새 context로 읽으면 next·연결 0개). 그 상태에서 같은 줄을 다시 처리하면 남은 연결이 기본값(세션 id `""`, 연결 `session` nil)으로 함께 저장된다(`OutboxTests.retriedSubagentLinesKeepPendingSpawnConsistent`의 `withKnownIssue`). 재시도 없이도 실패 뒤 메인 화면은 앱을 다시 켤 때까지 되돌려지지 않은 값을 보여 준다. 고치려면 outbox 흡수를 별도 `ModelContext`에서 하고 실패하면 그 context를 버리는 구조가 필요하다(서버 실시간 경로·`pendingSpawns` 공유를 같이 바꿔야 해서 이번 범위 밖).

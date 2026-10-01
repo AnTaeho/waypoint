@@ -285,7 +285,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 
 스크립트는 `SessionStart`·`UserPromptSubmit`이 `200`이고 본문이 있을 때만 stdout으로 찍는다. 다른 이벤트는 본문이 와도 찍지 않는다.
 
-outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID>,"trimmed":true,"payload":<줄인 JSON>}`. `claudePid`는 PID를 찾았을 때만 있다(Codex는 `"provider":"codex"`, `processPid`). 앱은 실행 시 순서대로 흡수하고 파일을 비운다(흡수한 파일은 지운다).
+outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid":<PID>,"trimmed":true,"payload":<줄인 JSON>}`. `claudePid`는 PID를 찾았을 때만 있다(Codex는 `"provider":"codex"`, `processPid`). 앱은 실행 시 순서대로 흡수하고 파일을 비운다(흡수한 파일은 지운다). 읽을 수 없는 줄(JSON·필수 필드·`provider` 오류)은 버리지 않고 원문 그대로 `outbox.quarantine.jsonl`(0600)에 덧붙인다. 격리 줄은 다시 흡수하지 않고 미처리 기록 수에도 넣지 않는다(연동 상태에 「누락 기록 N건 형식 오류」). 한 줄의 DB 저장이 실패하면(또는 격리 파일에 쓰지 못하면) 그 줄부터 끝까지를 떼어 낸 파일에 다시 쓰고, 뒤 파일까지 모두 멈춘다. 다음 흡수(10초 점검, 연동 상태 **다시 점검**, 서버 준비)가 그 줄부터 다시 시도한다. 횟수 제한은 없다. 남은 줄을 다시 쓰는 것마저 실패하면 파일을 그대로 두어 앞부분이 다시 들어올 수 있다(손실보다 중복). 줄은 읽혔지만 본문에서 세션 정보를 못 읽은 경우는 저장 실패가 아니므로 소비하고 「누락 기록 세션 정보 읽기 실패」만 알린다.
 
 `payload`는 앱이 읽는 필드만 남긴다(2026-10-01, 스크립트 안 jq 필터 `OUTBOX_FILTER`, `/usr/bin/jq`). 실시간 POST와 로깅 모드(`hook-log/`)는 원본 그대로다. 앱이 세는 값은 같은 결과가 나오는 자리표시로 바꿔서 앱 코드는 그대로 읽는다.
 
