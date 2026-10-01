@@ -1,6 +1,11 @@
 import Foundation
 
 public enum ActivityEntryFormat {
+    /// 보관 기간이 지나 문장을 지운 요청 이벤트의 표시(`PromptRetention`).
+    public static let clearedPromptText = "요청"
+    /// 문장이 남은 요청 이벤트의 보조 글. 문장을 지운 요청은 보조 글이 비어 세션 묶음 제목으로 쓰지 않는다.
+    public static let promptDetail = "사용자 요청"
+
     public static func entry(_ event: Event) -> ActivityEntry? {
         let p = event.payloadValues
         var text: String
@@ -23,10 +28,12 @@ public enum ActivityEntryFormat {
             kind = p["kind"]?.stringValue ?? "note"
             if kind == "project.bound" {
                 text = "작업 프로젝트 연결"; detail = p["to"]?.stringValue ?? ""
+            } else if kind == PromptRetention.promptKind, (p["text"]?.stringValue ?? "").isEmpty {
+                text = clearedPromptText
             } else {
                 guard let content = p["text"]?.stringValue, !content.isEmpty else { return nil }
                 text = content
-                detail = kind == "handoff" ? "다음 세션 메모" : kind == "user.prompt" ? "사용자 요청" : "메모"
+                detail = kind == "handoff" ? "다음 세션 메모" : kind == PromptRetention.promptKind ? promptDetail : "메모"
             }
         case .guideSynced:
             text = "지침 문서 변경"; detail = p["relPath"]?.stringValue ?? ""

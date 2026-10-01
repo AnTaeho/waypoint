@@ -34,6 +34,8 @@ final class AppServices {
     @ObservationIgnored var activeObserver: NSObjectProtocol?
     @ObservationIgnored var wakeObserver: NSObjectProtocol?
     @ObservationIgnored private var importObserver: NSObjectProtocol?
+    /// 마지막 요청 문장 정리 시각(`PromptRetention`). 시작 직후 첫 점검에서 한 번 돌고 하루마다 다시 돈다.
+    @ObservationIgnored private var lastPromptRetention: Date?
 
     /// `SessionEnd` 없이 끝난 세션 정리와 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
     static let refreshInterval: TimeInterval = 10
@@ -171,9 +173,15 @@ final class AppServices {
         processor?.sweep(now: now, probe: SessionSweep.systemProbe)
         let context = container.mainContext
         let closed = CardLifecycle.closeStrayLinks(at: now, in: context)
+        var cleared = 0
+        if PromptRetention.isDue(lastRun: lastPromptRetention, now: now) {
+            lastPromptRetention = now
+            let result = PromptRetention.apply(in: context, now: now)
+            cleared = result.events + result.sessions
+        }
         let open = FetchDescriptor<Session>(predicate: #Predicate<Session> { $0.endedAt == nil })
         let sessions = (try? context.fetch(open)) ?? []
-        if SessionStateCache.refresh(sessions, now: now) > 0 || closed > 0 {
+        if SessionStateCache.refresh(sessions, now: now) > 0 || closed > 0 || cleared > 0 {
             try? context.save()
         }
     }
