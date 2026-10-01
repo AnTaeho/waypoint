@@ -4,3 +4,4 @@ DerivedData/
 .swiftpm/
 .DS_Store
 *.xcuserstate
+__pycache__/

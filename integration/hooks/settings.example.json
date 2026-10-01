@@ -1,13 +1,117 @@
 {
-  "_comment": "~/.claude/settings.json 의 hooks 에 병합. 2026-09-28 hooks 문서 기준. 서브에이전트 도구 이름은 Agent(옛 이름 Task도 함께 둔다).",
+  "_comment": "~/.claude/settings.json 의 hooks 에 병합. 2026-09-28 hooks 문서 기준. PreToolUse·PostToolUse는 작업 상태(도구 실행·승인 대기)를 위해 모든 도구(*)를 받는다. 승인 흐름에는 개입하지 않는다(PermissionRequest도 stdout 없음).",
   "hooks": {
-    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh SessionStart", "timeout": 2 }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh UserPromptSubmit", "timeout": 2 }] }],
-    "PreToolUse":       [{ "matcher": "Agent|Task", "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh PreToolUse", "timeout": 2 }] }],
-    "SubagentStart":    [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh SubagentStart", "timeout": 2 }] }],
-    "PostToolUse":      [{ "matcher": "Edit|MultiEdit|Write|Bash", "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh PostToolUse", "timeout": 2 }] }],
-    "SubagentStop":     [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh SubagentStop", "timeout": 2 }] }],
-    "Stop":             [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh Stop", "timeout": 2 }] }],
-    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "~/.claude/waypoint/waypoint-hook.sh SessionEnd", "timeout": 2 }] }]
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh SessionStart",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh UserPromptSubmit",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh PreToolUse",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh SubagentStart",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh PostToolUse",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh SubagentStop",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh Stop",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh SessionEnd",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh PermissionRequest",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/waypoint/waypoint-hook.sh PostToolUseFailure",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
   }
 }

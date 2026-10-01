@@ -95,9 +95,14 @@ run_as_claude Stop doc-Stop; code=$?
 check "PID outbox: exit 0" '[ $code -eq 0 ]'
 check "PID outbox: 최상위 claudePid, payload 원본 그대로" 'python3 -c "import json,sys; l=json.loads(open(sys.argv[1]).readline()); o=json.load(open(sys.argv[3])); assert l[\"claudePid\"]==int(sys.argv[2]) and l[\"payload\"]==o and l[\"event\"]==\"Stop\"" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" "$(cat "$TMP/pid")" "$FIX/doc-Stop.json"'
 
-# 6) 4단계 안에 claude가 없으면 PID를 보내지 않는다(셸 4겹으로 감싼다)
+# 6) 8단계 안에 claude가 없으면 PID를 보내지 않는다(셸 9겹으로 감싼다. 이 테스트를 Claude Code 안에서 돌려도 실제 claude가 범위 밖에 있게)
 rm -f "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
-bash -c 'bash -c '"'"'bash -c "bash -c \"bash \\\"$0\\\" Stop < \\\"$1\\\"; true\"; true"; true'"'"' "$0" "$1"; true' "$HOOK" "$FIX/doc-Stop.json"
+nest_hook() {  # $1 남은 겹 수. `; true`로 bash가 exec로 바꾸지 않게 한다.
+  if [ "$1" -eq 0 ]; then bash "$HOOK" Stop < "$FIX/doc-Stop.json"; true
+  else bash -c 'nest_hook "$0"; true' "$(($1 - 1))"; true; fi
+}
+export -f nest_hook; export HOOK FIX
+bash -c 'nest_hook 8; true'
 check "PID 없음: outbox 줄에 claudePid 없음" 'python3 -c "import json,sys; l=json.loads(open(sys.argv[1]).readline()); assert \"claudePid\" not in l and l[\"event\"]==\"Stop\"" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"'
 
 exit $FAIL
