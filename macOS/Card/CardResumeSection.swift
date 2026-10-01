@@ -15,13 +15,9 @@ struct CardResumeSection: View {
                     .buttonStyle(.bordered)
                     .disabled(CardResumeContext.unavailableReason(card) != nil)
             }
-            if let resumeAttempt {
-                Text(resumeAttempt.label(for: card)).font(Theme.captionLarge)
-                    .foregroundStyle(resumeAttempt.state(for: card) == .connected ? Theme.done : Theme.textMuted)
-            }
-            if let reason = CardResumeContext.unavailableReason(card) {
-                Text(reason).font(Theme.body).foregroundStyle(Theme.textMuted)
-            }
+            let status = CardResumeStatus.of(card, attempt: resumeAttempt)
+            Text(status.label).font(Theme.captionLarge)
+                .foregroundStyle(status.isConnected ? Theme.done : Theme.textMuted)
             if let note = card.nextSessionNote, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 if let freshness = HandoffFreshness.evaluate(card) {
                     Text(freshness.label).font(Theme.captionLarge)

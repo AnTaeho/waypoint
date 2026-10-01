@@ -75,7 +75,9 @@
 		A6AFC6300AD9C9F662C6BCE0 /* BoardSessionBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F4EC7A40B6A8FAE8629FA1 /* BoardSessionBox.swift */; platformFilters = (macos, ); };
 		AE8010717EC3BCB93185B8C3 /* BoardCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F03EBCDF71261B2E51201D1 /* BoardCardView.swift */; platformFilters = (macos, ); };
 		AE9F35059E715B8E5776DD93 /* NanumSquareRoundEB.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8208066D1C74F68869BF5909 /* NanumSquareRoundEB.ttf */; };
+		B298C90D29F59A11610D1FDF /* ToolLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E671984611D7402FF7DB76C4 /* ToolLauncher.swift */; platformFilters = (macos, ); };
 		B547543B28047D674BE2E18F /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786633AF6FAB07F8719504A1 /* SidebarView.swift */; platformFilters = (macos, ); };
+		B6EA463F076F1F20314252C0 /* CardResumeSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B19AC1674F72746238E04B /* CardResumeSummaryView.swift */; platformFilters = (macos, ); };
 		BB4B19ECB8780F419DFA3ACE /* TableHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1DBD11B33E77A4580CC8FF2 /* TableHeader.swift */; };
 		BC713A647294B86A45898ABF /* GuideHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1428C1C9DF33957DF12915D /* GuideHeaderBar.swift */; platformFilters = (macos, ); };
 		C1BD533F5FE9F200D7314416 /* IntegrationMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E9CD0EB19EC76CDDFEFAFD /* IntegrationMonitor.swift */; platformFilters = (macos, ); };
@@ -169,6 +171,7 @@
 		A2D3AC30512B9F9DFB6DC540 /* NanumSquareRoundR.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundR.ttf; sourceTree = "<group>"; };
 		A34DEBE029DF6C711921EBEC /* FontRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontRegistry.swift; sourceTree = "<group>"; };
 		A55C4D1900BA2387763F86D8 /* InitChecklists.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitChecklists.swift; sourceTree = "<group>"; };
+		A5B19AC1674F72746238E04B /* CardResumeSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardResumeSummaryView.swift; sourceTree = "<group>"; };
 		AFB8A9125DC79C85E7E2AA2A /* PhoneWorkCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneWorkCard.swift; sourceTree = "<group>"; };
 		B2A7C8940CD504E024CBC818 /* ActivityEventRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEventRow.swift; sourceTree = "<group>"; };
 		B3905FDAF71CEBAF40695A08 /* ProjectBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectBoardView.swift; sourceTree = "<group>"; };
@@ -187,6 +190,7 @@
 		DFBC70A24D83A2CD05CE0935 /* Theme+Resume.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme+Resume.swift"; sourceTree = "<group>"; };
 		E11E635A50DB29E130075B38 /* UsageGaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageGaugeView.swift; sourceTree = "<group>"; };
 		E6504A0D8B93119704EA413E /* DevBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevBadge.swift; sourceTree = "<group>"; };
+		E671984611D7402FF7DB76C4 /* ToolLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolLauncher.swift; sourceTree = "<group>"; };
 		E99F74BF0C8A31746501F1C3 /* AppServices+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServices+Lifecycle.swift"; sourceTree = "<group>"; };
 		EDF1E559044FBEEDD8FBB180 /* InitSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitSheetView.swift; sourceTree = "<group>"; };
 		F17DF63C0EFBD556CA5F328D /* DetailRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailRootView.swift; sourceTree = "<group>"; };
@@ -226,6 +230,8 @@
 				9F453B89102C767601AB4A40 /* CardInspectorSections.swift */,
 				FF678F0FE897110FEE90B196 /* CardResumeSection.swift */,
 				330BEB710FEA0D0239C8E18B /* CardResumeSheet.swift */,
+				A5B19AC1674F72746238E04B /* CardResumeSummaryView.swift */,
+				E671984611D7402FF7DB76C4 /* ToolLauncher.swift */,
 			);
 			path = Card;
 			sourceTree = "<group>";
@@ -553,6 +559,7 @@
 				483766829586C4679EAE620E /* CardInspectorSections.swift in Sources */,
 				98B4874398EC4181800F6DC9 /* CardResumeSection.swift in Sources */,
 				3CA1AC93C403D6128E7F0043 /* CardResumeSheet.swift in Sources */,
+				B6EA463F076F1F20314252C0 /* CardResumeSummaryView.swift in Sources */,
 				0D73B49177EC0BFBA92E61AB /* DashboardContinue.swift in Sources */,
 				FFCDCD6B48543A16F71A64DE /* DashboardProjects.swift in Sources */,
 				9FC97664F6F43070B5FB27AC /* DashboardRecentActivity.swift in Sources */,
@@ -615,6 +622,7 @@
 				60D8AD7C833441AC71F2DBF4 /* Theme+Integration.swift in Sources */,
 				1B3C2B52416D7A03CA3C779F /* Theme+Resume.swift in Sources */,
 				4DAAB619BA15440C409EC1FC /* Theme.swift in Sources */,
+				B298C90D29F59A11610D1FDF /* ToolLauncher.swift in Sources */,
 				CAE9446A3A4BE6ED82FA2DCA /* UsageGaugeView.swift in Sources */,
 				EC091F8610FAEAAACA92C238 /* UsageMonitor.swift in Sources */,
 				EB1BAD26D6D1B3B7B8E383E5 /* WaypointApp.swift in Sources */,

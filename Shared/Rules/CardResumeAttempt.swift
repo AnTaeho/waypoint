@@ -46,13 +46,4 @@ public struct CardResumeAttempt {
             return true
         }
     }
-
-    public func label(for card: Card) -> String {
-        switch state(for: card) {
-        case .waiting: "\(provider.name) 문맥 복사됨 · 새 세션 연결 대기"
-        case .connected: "복사 후 \(provider.name) 새 세션 연결 확인"
-        case .disconnected: "복사 후 \(provider.name) 연결 해제됨"
-        case .unavailable(let reason): "재개 확인 중단 · \(reason)"
-        }
-    }
 }
