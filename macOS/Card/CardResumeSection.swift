@@ -18,6 +18,10 @@ struct CardResumeSection: View {
                 Text(reason).font(Theme.body).foregroundStyle(Theme.textMuted)
             }
             if let note = card.nextSessionNote, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if let freshness = HandoffFreshness.evaluate(card) {
+                    Text(freshness.label).font(Theme.captionLarge)
+                        .foregroundStyle(freshness.changedFileCount > 0 ? Theme.liveText : Theme.textMuted)
+                }
                 Text(note).font(Theme.body).foregroundStyle(Theme.textSecondary).lineLimit(3)
             }
         }

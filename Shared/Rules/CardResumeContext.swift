@@ -50,6 +50,7 @@ public enum CardResumeContext {
             excerpt(card.body, limit: 6000, empty: "등록된 본문 없음. 카드 제목과 최신 요청에서 목표를 확인하세요."),
             "",
             "## 마지막 인수인계 메모",
+            HandoffFreshness.evaluate(card)?.label ?? "메모 없음",
             excerpt(card.nextSessionNote ?? "", limit: 3000, empty: "등록된 메모 없음. 실제 변경 내용부터 확인하세요."),
             "",
             "## 남은 완료 조건"
