@@ -3,14 +3,13 @@ import SwiftData
 import WaypointKit
 
 extension AppServices {
-    enum OutboxSaveError: Error { case failed }
-
     func receiveHook(_ input: HookInput, at: Date, replayed: Bool) {
         let id = input.sessionID
         let context = container.mainContext
         let session = try? context.fetch(FetchDescriptor<Session>(predicate: #Predicate { $0.id == id })).first
         integration.receive(input.provider, sessionID: id, at: at, project: session?.project?.key, replayed: replayed)
-        if processor?.lastSaveFailed == true {
+        // 흡수(`replayed`)의 저장 실패는 `drainOutbox`가 알린다. 실시간 처리기의 표시는 흡수가 바꾸지 않는다.
+        if !replayed, processor?.lastSaveFailed == true {
             integration.report("작업 기록 저장 실패")
         }
     }

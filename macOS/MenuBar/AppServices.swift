@@ -36,8 +36,6 @@ final class AppServices {
     @ObservationIgnored private var importObserver: NSObjectProtocol?
     /// 마지막 요청 문장 정리 시각(`PromptRetention`). 시작 직후 첫 점검에서 한 번 돌고 하루마다 다시 돈다.
     @ObservationIgnored private var lastPromptRetention: Date?
-    /// outbox 저장 실패가 있었다. rollback이 되돌리지 못한 메모리 값이 섞이지 않게 남긴 줄은 다음 실행에서만 다시 흡수한다.
-    @ObservationIgnored private var outboxHeld = false
 
     /// `SessionEnd` 없이 끝난 세션 정리와 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
     static let refreshInterval: TimeInterval = 10
@@ -154,21 +152,18 @@ final class AppServices {
         }
     }
 
+    /// 흡수는 매번 새 context에서 하고 실패하면 그 context를 버린다(`HookProcessor.absorbOutbox`).
+    /// 그래서 저장 실패로 남긴 줄도 10초 점검·**다시 점검**·서버 준비 때 바로 다시 흡수한다. 횟수 제한은 없다.
     private func drainOutbox() {
-        if outboxHeld { integration.refresh(); return }
         guard let processor, let directory = try? WaypointStore.supportDirectory() else { return }
-        let result = Outbox.drain(directory: directory) { entry in
-            processor.handle(entry)
-            guard !processor.lastSaveFailed else { throw OutboxSaveError.failed }
+        let result = processor.absorbOutbox(directory: directory) { entry in
             if let input = HookInput(event: entry.event, json: entry.payload, provider: entry.provider) {
                 receiveHook(input, at: entry.receivedAt, replayed: true)
             } else { integration.report("누락 기록 세션 정보 읽기 실패") }
         }
         if result.skipped > 0 { integration.report("누락 기록 \(result.skipped)건 형식 오류") }
-        if result.retryPending {
-            outboxHeld = true
-            integration.report("작업 기록 저장 실패 · 미처리 기록 보존")
-        }
+        if result.retryPending { integration.report("작업 기록 저장 실패 · 미처리 기록 보존") }
+        if result.processed > 0 || result.retryPending { lastDataChange = Date() }
         integration.refresh()
     }
 

@@ -226,8 +226,8 @@ import Testing
         #expect(h.processor.pendingSpawns[HookHarness.sessionID]?.count == 1)
     }
 
-    /// 앱은 저장 실패로 남긴 줄을 같은 실행에서 다시 흡수하지 않는다(`AppServices.drainOutbox`).
-    /// rollback이 되돌리지 못한 메모리 값이 섞이지 않게, 다음 실행의 새 context로 다시 처리하면 깨끗하게 들어간다.
+    /// `Outbox.drain`이 남긴 줄을 새 context와 처리기로 다시 처리하면 깨끗하게 들어간다.
+    /// 앱의 같은 실행 안 재시도(`HookProcessor.absorbOutbox`)는 `OutboxAbsorbTests`.
     @Test func preservedLineRetriedWithFreshContextLeavesNoStaleRecords() throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

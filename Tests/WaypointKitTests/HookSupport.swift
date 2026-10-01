@@ -27,10 +27,16 @@ struct HookHarness {
     static let sessionID = "7f2a9c41-3e8b-4d06-b5a2-9c7e1f4d8b60"
     static let agentID = "a4d2c8f1e0b3a297"
 
-    init() throws {
-        let (container, context) = try makeContext()
-        self.container = container
-        self.context = context
+    /// `onDisk`면 임시 폴더의 SQLite 저장소(저장 실패·다른 context 저장을 실제 저장소로 확인할 때).
+    init(onDisk: Bool = false) throws {
+        if onDisk {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("waypoint-hooks-\(UUID().uuidString)").appendingPathComponent("t.store")
+            container = try WaypointStore.makeContainer(url: url)
+            context = ModelContext(container)
+        } else {
+            (container, context) = try makeContext()
+        }
         let project = Project(key: "LDG", name: "가계부 앱", rootPath: "~/dev/ledger", createdAt: t0)
         context.insert(project)
         try context.save()

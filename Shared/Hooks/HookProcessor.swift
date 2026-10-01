@@ -58,6 +58,7 @@ public final class HookProcessor {
     public func handle(_ input: HookInput, at date: Date, delivers: Bool = true) -> String? {
         lastSaveFailed = false
         // 저장에 실패하면 DB와 함께 메모리의 대기 항목도 되돌린다. 같은 훅을 다시 처리해도 대기 항목이 겹치거나 사라지지 않게.
+        // rollback이 되돌리지 못한 메모리 값은 저장소 값으로 다시 읽는다(`ContextReload`). 그대로 두면 다음 저장에 섞인다.
         let spawns = pendingSpawns
         let result = process(input, at: date, delivers: delivers)
         if let main = fetchSession(input.sessionID), main.project?.archivedAt == nil {
@@ -69,6 +70,7 @@ public final class HookProcessor {
         } catch {
             lastSaveFailed = true
             context.rollback()
+            ContextReload.apply(context)
             pendingSpawns = spawns
         }
         return result
