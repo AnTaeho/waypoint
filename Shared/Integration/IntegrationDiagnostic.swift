@@ -5,7 +5,8 @@ public enum IntegrationDiagnostic {
     public static func text(version: String, environment: String, operatingSystem: String,
                             port: UInt16, serverReady: Bool, history: IntegrationHistory,
                             installations: [AgentProvider: IntegrationInstallation],
-                            queue: IntegrationQueue, checkedAt: Date) -> String {
+                            queue: IntegrationQueue, checkedAt: Date,
+                            metrics: ReliabilityMetrics? = nil) -> String {
         func time(_ date: Date?) -> String { date?.ISO8601Format() ?? "없음" }
         var lines = [
             "Waypoint 연동 진단", "앱: \(environment)", "버전: \(version)",
@@ -29,6 +30,7 @@ public enum IntegrationDiagnostic {
                       "재수신 기록: \(receipt.map { $0.replayed ? "예" : "아니오" } ?? "없음")",
                       "수신 프로젝트 연결: \(receipt.map { $0.project == nil ? "미연결" : "연결됨" } ?? "수신 없음")"]
         }
+        if let metrics { lines += [""] + metrics.diagnosticLines() }
         lines += ["", "프로젝트명·파일 경로·세션 ID·대화·오류 원문은 제외했습니다.",
                   "사용자 범위 설정과 실제 수신 기준이며, 신뢰 승인 여부를 증명하지 않습니다."]
         return lines.joined(separator: "\n")
