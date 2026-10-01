@@ -21,7 +21,7 @@ Codex를 새로 시작해 `/hooks`에서 각 Waypoint 훅을 검토·신뢰한�
 - SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStart, SubagentStop, Stop, Interrupt, SessionEnd를 연결한다. 도구별 명령 입력과 문자열 응답을 정규화한다.
 - 성공한 apply_patch만 파일 변경으로 기록한다. 파일 삭제에서 기존 전체 줄 수는 입력으로 알 수 없어 0으로 기록한다. Bash로 직접 수정한 파일은 구조화된 변경 정보가 없는 한 추정하지 않는다. 커밋은 git commit 명령과 성공 출력에서 읽는다.
 - 하위 에이전트의 명시적 카드 연결은 Agent/spawn_agent message 첫 줄의 `[KEY-N]`와 agent_type으로 매칭한다. 같은 종류의 동시 생성은 기존 Claude 처리와 같이 FIFO로 매칭하므로 실제 동시 실행에서 추가 확인이 필요하다.
-- HTTP는 1초 타임아웃, 실패 시 outbox, exit 0을 유지한다. 컨텍스트 stdout은 SessionStart와 늦은 UserPromptSubmit에만 나온다. Stop·Interrupt·세션 종료는 done으로 옮기지 않는다.
+- HTTP는 1초 타임아웃, 실패 시 outbox, exit 0을 유지한다. 컨텍스트 stdout은 SessionStart와 늦은 UserPromptSubmit에만 나온다. 블록을 출력한 뒤에만 `/hooks/ack`로 수신 확인을 보내고, 확인이 없으면 앱이 다음 요청에 블록을 다시 준다(SPEC 5장 「수신 확인」). 설치기가 저장소의 공통 브리지를 `~/.codex/waypoint/`에 복사하므로 브리지를 바꾸면 설치를 다시 돌린다. Stop·Interrupt·세션 종료는 done으로 옮기지 않는다.
 - Codex의 SessionEnd는 정상 닫기·보관/삭제·닫힌 대화의 장시간 유휴에서 발생한다. 대화를 다른 것으로 전환했다고 즉시 종료되지는 않는다. PID가 없어졌으면 앱이 다음 정리 주기에 닫는다.
 - 앱은 LLM API를 추가로 호출하지 않는다. MCP 도구/스킬/주입 컨텍스트는 사용 중인 Codex의 컨텍스트와 도구 호출 사용량에 포함된다.
 
