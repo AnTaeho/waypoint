@@ -343,3 +343,22 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | Debug 실행 인자 `-WaypointSidebar guidance`로 지침 화면에서 시작한다 | 손 없이 창 하나만 캡처해 화면을 확인하려고. Release에는 없다 | — | `RootView.launchSelection` |
 
 검증: 이 Mac에서 등록 프로젝트 셋(TRK·CHM·NHG)으로 수집 약 70 ms, 출처 46개. 기억 폴더 8개 중 짝지은 것 3(TRK·NHG 프로젝트, `~/workspace` 상위 폴더), 다른 폴더 5. Dev 앱을 임시 `CLAUDE_CONFIG_DIR`·`CODEX_HOME`으로 띄워 기억 파일·규칙 줄을 더하자 2초 안에 목록이 바뀌었다.
+
+## 2026-10-01 — 지침 항목 나누기 (TRK-38)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 원문 범위는 UTF-8 바이트 위치로, 줄은 `\n`에서 나누고 앞 `\r`은 개행에 넣는다. 바이트 비교는 `Array(utf8)`로 | Swift `String`은 `"\r\n"`을 글자 하나로 보고 `==`가 정규화 비교라 바이트 차이를 놓친다. 잘라 붙이는 자리가 늘 `\n` 경계라 조각마다 올바른 UTF-8이 남는다 | `String.Index` 범위 | `GuidanceLines` |
+| M4 `MarkdownParser`에서 줄 판정 함수(`fence`·`heading`·`isRule`·`listItem`·`table`)를 가져다 쓰고(`private` → 모듈 안) 블록 조립은 새로 짠다 | M4 블록 조립은 줄을 다듬고 CRLF를 바꿔 위치가 남지 않는다. 판정을 같이 써야 보기 화면에서 절 머리로 보이는 줄이 항목에서도 절 머리다 | 따로 만든 판정(화면과 어긋날 수 있다) | `GuidanceMarkdownSplitter`의 판정 호출 |
+| 보기 화면을 따라 `---`는 늘 구분선(밑줄 머리 없음), 목록 뒤 들여쓰지 않은 줄은 새 문단 | 화면과 항목이 같은 모양이어야 편집 화면(TRK-40)이 읽기 화면과 다르지 않다 | CommonMark(밑줄 머리, 게으른 이어짐) | `GuidanceMarkdownSplitter.scan`·`listItem` |
+| 목록 항목 안에서 연 코드 울타리는 들여쓰기와 상관없이 닫는 줄까지 그 항목 | 목록 아래 코드를 들여쓰지 않고 쓰는 경우가 흔하다. 중간에 끊으면 닫는 울타리가 새 코드 블록으로 열려 문서가 애매해진다 | CommonMark처럼 들여쓰지 않은 줄에서 항목 끝 | `listItem`의 울타리 분기 |
+| 표 머리 줄 + 구분 줄을 한 항목(표 머리)으로 | 구분 줄만 따로 지우면 표가 깨진다 | 구분 줄을 항목 밖 줄로 | `scan`의 표 분기 |
+| 지울 때 빈 줄: 앞이 빈 줄(또는 처음)이고 뒤도 빈 줄이면 뒤 빈 줄 하나, 앞이 빈 줄이고 뒤가 끝이면 앞 빈 줄 하나를 함께 지운다. 끝 개행이 없던 문서는 그대로 없게 | 절의 마지막 문단을 지워도 빈 줄 두 개가 남지 않고, 목록 가운데 항목은 줄만 빠진다. 한 줄 이상은 건드리지 않아 결과를 예측할 수 있다 | 빈 줄을 손대지 않기(빈 줄이 쌓인다), 이어진 빈 줄 모두 합치기(항목 밖 줄을 여럿 바꾼다) | `GuidanceDocument.deletionRange` |
+| 바꾸기는 항목 글(마지막 개행 제외)만 바꾸고, 항목 줄이 CRLF면 새 글의 줄바꿈을 CRLF로 맞춘다. 빈 글로 바꾸면 빈 줄이 남는다 | `item.text`를 고쳐 그대로 넘기면 되도록. 한 파일에 개행 모양이 섞이지 않게 | 새 글 끝 개행을 걷기 | `GuidanceDocument.replace` |
+| HTML 주석(`<!-- … -->`)도 HTML 블록으로 보아 문서 전체 한 항목 | 카드의 「보수적으로」. 주석 안에 지침이 숨어 있을 수 있고, 주석 짝을 깨는 편집을 막는다. 이 Mac에서 걸린 것은 Next.js가 만든 AGENTS.md 두 개뿐 | 주석 줄을 항목 밖 줄로 | `GuidanceMarkdownSplitter.isHTMLStart` |
+| 탭·공백 섞임은 문서 안의 들여쓴 목록 기호 줄 전체로 본다. 목록 중첩은 5단까지 나눈다 | 탭 폭을 몇 칸으로 볼지에 따라 하위 관계가 바뀐다. 5단은 실제 지침에서 드문 깊이 | 줄마다 판정, 3단 제한 | `listItem`의 `tabIndented`·`maxListDepth` |
+| 기억 파일 머리의 `type`은 맨 위 또는 `metadata:` 아래에서 읽는다 | 이 Mac의 기억 파일은 `metadata:` 아래에 `type`을 둔다 | 맨 위만 | `GuidanceDocument.memoryFields` |
+| 색인 짝짓기는 링크의 파일 이름만 본다(`./`·`#절`·퍼센트 인코딩 걷기) | 기억 폴더는 한 단계라 이름이 겹치지 않는다 | 상대 경로 그대로 | `MemoryIndexPairing.fileName` |
+| 바이트 입력이 UTF-8이 아니면 문서 전체 한 항목에 편집 금지 | 깨진 바이트를 대체 문자로 읽어 저장하면 원문이 바뀐다 | 대체 문자로 읽고 편집 허용 | `GuidanceDocument.parse(data:)` |
+
+검증: 이 Mac의 실제 지침 57개(Markdown 18, 기억 30, 색인 8, 명령 규칙 1)에서 항목 701개, 다시 합치기와 항목마다 지우기·바꾸기 속성 검사 통과. 애매 판정 2개(HTML 주석). `~/workspace`·`~/workspace/projects`·`~/workspace/app-factory` 바로 아래 폴더를 등록 프로젝트처럼 넘겨 모았다.

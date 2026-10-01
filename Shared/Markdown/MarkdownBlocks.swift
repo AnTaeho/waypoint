@@ -95,7 +95,7 @@ public enum MarkdownParser {
 
     // MARK: - 블록
 
-    private static func fence(_ trimmed: String) -> (marker: String, language: String?)? {
+    static func fence(_ trimmed: String) -> (marker: String, language: String?)? {
         for marker in ["```", "~~~"] where trimmed.hasPrefix(marker) {
             let info = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
             if marker == "```", info.contains("`") { return nil }
@@ -125,7 +125,7 @@ public enum MarkdownParser {
         return i
     }
 
-    private static func heading(_ trimmed: String) -> MarkdownBlock? {
+    static func heading(_ trimmed: String) -> MarkdownBlock? {
         let hashes = trimmed.prefix { $0 == "#" }.count
         guard (1...6).contains(hashes) else { return nil }
         let rest = trimmed.dropFirst(hashes)
@@ -137,7 +137,7 @@ public enum MarkdownParser {
         return .heading(level: hashes, text: text)
     }
 
-    private static func isRule(_ trimmed: String) -> Bool {
+    static func isRule(_ trimmed: String) -> Bool {
         let compact = trimmed.filter { $0 != " " && $0 != "\t" }
         guard compact.count >= 3, let first = compact.first, "-*_".contains(first) else { return false }
         return compact.allSatisfy { $0 == first }
@@ -248,7 +248,7 @@ public enum MarkdownParser {
         return result
     }
 
-    private static func table(_ lines: [String], at start: Int) -> (table: MarkdownTable, next: Int)? {
+    static func table(_ lines: [String], at start: Int) -> (table: MarkdownTable, next: Int)? {
         guard start + 1 < lines.count, lines[start].contains("|"),
               let aligns = alignments(lines[start + 1]) else { return nil }
         let header = cells(lines[start])

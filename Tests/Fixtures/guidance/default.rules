@@ -1,0 +1,9 @@
+# 만든 예시 명령 규칙
+prefix_rule(pattern=["git", "status"], decision="allow")
+prefix_rule(pattern=["swift", "test"], decision="allow")
+
+prefix_rule(pattern=["/bin/zsh", "-lc", "sed -n '1,20p' a.md | rg 'x|(y'"], decision="allow")
+prefix_rule(
+    pattern=["rm", "-rf"],
+    decision="forbidden",
+)
