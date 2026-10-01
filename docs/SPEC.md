@@ -449,7 +449,7 @@ Claude·Codex 사용량(한도별 사용 비율과 초기화 시각)을 사이�
 
 ## 10. 화면
 
-`docs/DESIGN.md` 참조. 대시보드 / 프로젝트 보드 / 카드 상세 / 지침 문서 / 새 프로젝트 등록 창 / iPhone 작업중.
+`docs/DESIGN.md` 참조. 대시보드 / 지침(출처 목록) / 프로젝트 보드 / 카드 상세 / 지침 문서 / 새 프로젝트 등록 창 / iPhone 작업중.
 
 ## 11. 열린 질문 (구현 중 결정)
 
@@ -532,4 +532,4 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 
 ### 다루지 않는 것
 
-`autoMemoryDirectory` 설정, `CLAUDE_CODE_PROJECT_DIR_NAME`, `claudeMdExcludes`, 지침 파일 고르기 설정(`instructionFiles`), Codex `project_doc_fallback_filenames`, `@path` 가져오기, 하위 폴더 CLAUDE.md, `~/.codex/skills`·Claude 스킬. 편집·삭제는 없다(TRK-36의 다음 단계).
+`autoMemoryDirectory` 설정, `CLAUDE_CODE_PROJECT_DIR_NAME`, `claudeMdExcludes`, 지침 파일 고르기 설정(`instructionFiles`), Codex `project_doc_fallback_filenames`, `@path` 가져오기, 하위 폴더 CLAUDE.md, 상위 폴더의 `.claude/rules/`, `~/.codex/skills`·Claude 스킬. 편집·삭제는 없다(TRK-36의 다음 단계).
