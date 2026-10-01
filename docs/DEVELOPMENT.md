@@ -36,6 +36,8 @@ Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`) → �
 
 앱이 꺼져 있는 동안 온 훅은 `outbox.jsonl`에 쌓였다가 새 앱이 켜질 때 흡수된다.
 
+빌드 실패 시 마지막 직접 오류 최대 12개를 표시한다. 접근 거부가 포함되면 실행 환경의 sandbox·경로 권한과 설치 명령 승인 여부를 확인한다. 전체 로그는 `.build/release/install-build.log`에 있으며, 직접 오류 문구가 없으면 마지막 12줄을 표시한다. 실패 진단과 앱 교체 전 중단은 `python3 scripts/test_build_failure_report.py`로 실제 앱을 건드리지 않고 검증한다.
+
 ## 개발용 실행
 
 Xcode에서 Waypoint 스킴을 Debug로 실행하거나:
