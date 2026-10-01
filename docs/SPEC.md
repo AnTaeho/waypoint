@@ -365,12 +365,30 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 
 ## 9. 사용량 게이지
 
-Claude 사용량(5시간·7일 한도의 사용 비율)을 사이드바 아래와 메뉴 막대 메뉴에 보인다. 앱은 파일만 읽고 API를 호출하지 않는다.
+Claude·Codex 사용량(한도별 사용 비율과 초기화 시각)을 사이드바 아래와 메뉴 막대 메뉴에 도구별로 보인다. 앱은 파일만 읽고 API·네트워크를 쓰지 않는다.
+
+### Claude
+
 
 - 출처: Claude Code가 상태줄 명령 stdin에 넘기는 JSON의 `rate_limits.five_hour` / `rate_limits.seven_day`(`used_percentage` 0–100, `resets_at` 유닉스 초). 사용자의 상태줄 명령 앞에 중계 스크립트 `integration/statusline/waypoint-statusline-tap.sh`를 끼운다. 스크립트는 입력에 `rate_limits` 객체가 있으면 저장 폴더에 `usage.json`을 원자적으로 쓰고(임시 파일 → `mv`, jq 필요), 같은 입력을 원래 명령에 넘겨 출력을 그대로 내보낸다. jq가 없거나 쓰기에 실패해도 상태줄 출력은 그대로 나온다. 추가 시간은 약 8 ms.
 - 파일: `~/Library/Application Support/Waypoint/usage.json`(`WAYPOINT_SUPPORT_DIR`로 바꿀 수 있음), 한 줄 `{"capturedAt":<unix 초>,"rateLimits":<rate_limits 원본>}`.
 - 설치: 스크립트를 `~/.claude/waypoint/`에 복사하고 `chmod +x`, `~/.claude/settings.json`의 `statusLine.command`를 `bash ~/.claude/waypoint/waypoint-statusline-tap.sh <원래 명령>`으로 바꾼다(예: `bash ~/.claude/waypoint/waypoint-statusline-tap.sh bash ~/.claude/awesome-statusline.sh`). 원래 명령은 인자 대신 환경 변수 `WAYPOINT_STATUSLINE_NEXT`(셸 명령 문자열)로 줘도 된다. 되돌리려면 `statusLine.command`를 원래 명령으로 돌린다.
-- 앱(macOS): 30초마다 파일 수정 시각을 보고 바뀌었을 때만 다시 읽는다(`UsageMonitor`). 파서는 숫자·숫자 문자열, 초·밀리초·ISO 8601 시각, 한쪽 창만 있는 경우를 받는다. 초기화 시각이 지난 창은 0%로 보인다. 30분보다 오래된 기록은 흐리게, 파일이 없으면 게이지를 숨긴다. iOS에는 없다.
+- 앱(macOS): 30초마다 파일 수정 시각을 보고 바뀌었을 때만 다시 읽는다(`UsageMonitor`). 파서는 숫자·숫자 문자열, 초·밀리초·ISO 8601 시각, 한쪽 창만 있는 경우를 받는다.
+
+### Codex
+
+- 출처: Codex가 대화마다 남기는 기록 `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`(`CODEX_HOME`이 있으면 `$CODEX_HOME/sessions`). `type: "event_msg"`, `payload.type: "token_count"` 줄의 `payload.rate_limits`: `{"limit_id":"codex","primary":{"used_percent":12.0,"window_minutes":10080,"resets_at":<unix 초>},"secondary":null|{...},"credits":…,"plan_type":"plus",…}`. 줄 시각은 최상위 `timestamp`(ISO 8601, 소수 초). 2026-10-01 실제 기록에서 확인.
+- 한도 기간은 `window_minutes`로 정한다(300 → 5시간, 10080 → 7일, 무료 요금제 43200 → 30일). `primary`/`secondary` 순서는 믿지 않고 짧은 기간부터 보인다. 둘 다 null이면 그 줄은 버린다.
+- 같은 파일에 `limit_id`가 `premium`(둘 다 null)·`base_model_inference`(다른 7일 한도)인 줄이 섞여 온다. `limit_id`가 `codex`이거나 없는 줄만 받는다.
+- 읽기(`CodexUsage`): 날짜 폴더 이름순으로 최근 7개 폴더의 기록 파일을 수정 시각 최근 순으로 최대 5개 훑는다. 폴더 날짜는 기록한 기기의 날짜이고 오래된 대화를 이어 쓰면 옛 폴더 파일이 가장 최근에 바뀌므로 수정 시각으로 고른다. 파일마다 끝 256KB만 읽어(첫 줄은 잘렸을 수 있어 버리고, 쓰는 중인 마지막 줄은 깨져 있으면 건너뜀) 마지막 Codex 줄을 찾고, 없으면 끝 4MB로 한 번 더, 그래도 없으면 다음 파일로 넘어간다. 기록 시각은 그 줄의 `timestamp`, 없으면 파일 수정 시각.
+- 30초 폴링. 가장 최근 파일과 지난번 값을 준 파일의 수정 시각이 그대로면 다시 읽지 않는다. 기록이 없으면 Codex 묶음을 숨긴다.
+
+### 표시 공통
+
+- 초기화 시각이 지난 한도는 0%로 보인다. 30분보다 오래된 기록은 묶음째 흐리게, 기록이 없는 도구는 묶음째 숨긴다.
+- 설정 창(⌘,) 「사용량」의 Claude·Codex 토글(기본 켬, `UserDefaults` `usage.showClaude`·`usage.showCodex`)을 사이드바·메뉴 막대가 함께 따른다. 둘 다 끄면 게이지 영역과 메뉴 줄이 사라진다(파일 읽기는 계속).
+- 메뉴 막대: 「사용량 Claude 5시간 42% · 7일 18% / Codex 7일 12%」. 44자를 넘으면 도구마다 한 줄(둘째 줄은 「Codex 5시간 95% · 7일 39%」).
+- iOS에는 없다.
 
 ## 10. 화면
 
