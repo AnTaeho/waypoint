@@ -4,12 +4,17 @@ import WaypointKit
 
 struct CardResumeSheet: View {
     let card: Card
+    @Binding var resumeAttempt: CardResumeAttempt?
     @Environment(\.dismiss) private var dismiss
     @AppStorage("resumeProvider") private var provider: AgentProvider = .codex
     @State private var copiedText: String?
     @State private var copyFailed = false
 
     var body: some View {
+        LiveDataTimeline { _ in content }
+    }
+
+    @ViewBuilder private var content: some View {
         let prompt = CardResumeContext.text(card: card, provider: provider)
         VStack(alignment: .leading, spacing: Theme.Spacing.l) {
             Text("\(card.displayID) · 작업 이어가기").font(Theme.pageTitle).lineLimit(2)
@@ -29,6 +34,10 @@ struct CardResumeSheet: View {
                 Text(CardResumeContext.unavailableReason(card) ?? "재개 문맥 없음")
                     .font(Theme.body).foregroundStyle(Theme.liveText)
                 Spacer()
+            }
+            if let resumeAttempt {
+                Text(resumeAttempt.label(for: card)).font(Theme.captionLarge)
+                    .foregroundStyle(resumeAttempt.state(for: card) == .connected ? Theme.done : Theme.textMuted)
             }
             HStack {
                 if copyFailed {
@@ -56,5 +65,6 @@ struct CardResumeSheet: View {
         let success = NSPasteboard.general.setString(text, forType: .string)
         copiedText = success ? text : nil
         copyFailed = !success
+        if success { resumeAttempt = CardResumeAttempt(card: card, provider: provider, at: Date()) }
     }
 }

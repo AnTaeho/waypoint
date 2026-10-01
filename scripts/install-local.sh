@@ -12,6 +12,7 @@ BUNDLE_ID="dev.antaeho.waypoint"
 PORT=47821
 CONTAINER="iCloud.dev.antaeho.waypoint"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/build-failure-report.sh"
 DERIVED="$ROOT/.build/release"
 BUILT="$DERIVED/Build/Products/Release/Waypoint.app"
 DEST_DIR="${WAYPOINT_INSTALL_DIR:-/Applications}"
@@ -36,7 +37,7 @@ if [ "${WAYPOINT_SKIP_BUILD:-0}" != "1" ]; then
   mkdir -p "$DERIVED"
   if ! xcodebuild -project "$ROOT/Waypoint.xcodeproj" -scheme Waypoint -configuration Release \
       -destination 'platform=macOS' -derivedDataPath "$DERIVED" -allowProvisioningUpdates build > "$log" 2>&1; then
-    grep -E "error:" "$log" | head -5 >&2
+    report_build_failure "$log"
     fail "빌드 실패(전체 로그: $log)"
   fi
 fi

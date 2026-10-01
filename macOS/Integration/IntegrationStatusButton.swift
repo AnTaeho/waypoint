@@ -10,30 +10,40 @@ struct IntegrationStatusButton: View {
     var body: some View {
         if let services {
             let warning = states(services).contains(.attention)
-            Button { showsDetails.toggle(); services.refreshStates() } label: {
+            Group {
                 if compact {
-                    Label(warning ? "연동 확인 필요" : "연동 상태", systemImage: warning ? "exclamationmark.circle" : "antenna.radiowaves.left.and.right")
-                } else {
-                    HStack(spacing: Theme.Spacing.m) {
-                        Image(systemName: warning ? "exclamationmark.circle" : "antenna.radiowaves.left.and.right")
-                        Text("AI 연동")
-                        ForEach(AgentProvider.allCases, id: \.self) { provider in
-                            Text("\(provider.name) · \(state(provider, services).title)")
-                                .font(Theme.captionLarge)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
+                    // 툴바가 아이콘 크기·클릭 영역·배경 여백을 함께 결정한다.
+                    Button { showsDetails.toggle(); services.refreshStates() } label: {
+                        Label(warning ? "연동 확인 필요" : "연동 상태",
+                              systemImage: symbol(warning))
                     }
-                    .padding(Theme.Spacing.l)
-                    .background(Theme.bgPanel, in: RoundedRectangle(cornerRadius: Theme.Integration.cornerRadius))
+                } else {
+                    Button { showsDetails.toggle(); services.refreshStates() } label: {
+                        HStack(spacing: Theme.Spacing.m) {
+                            Image(systemName: symbol(warning))
+                            Text("AI 연동")
+                            ForEach(AgentProvider.allCases, id: \.self) { provider in
+                                Text("\(provider.name) · \(state(provider, services).title)")
+                                    .font(Theme.captionLarge)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                        }
+                        .padding(Theme.Spacing.l)
+                        .background(Theme.bgPanel, in: RoundedRectangle(cornerRadius: Theme.Integration.cornerRadius))
+                    }
+                    .buttonStyle(.plain)
+                    .font(Theme.body)
                 }
             }
-            .buttonStyle(.plain)
-            .font(Theme.body)
             .foregroundStyle(warning ? Theme.liveText : Theme.textMuted)
             .help("Claude·Codex의 설정, 마지막 수신과 누락 기록 확인")
             .popover(isPresented: $showsDetails) { IntegrationHealthPanel(services: services) }
         }
+    }
+
+    private func symbol(_ warning: Bool) -> String {
+        warning ? "exclamationmark.circle" : "antenna.radiowaves.left.and.right"
     }
 
     private func states(_ services: AppServices) -> [IntegrationState] {
