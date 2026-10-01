@@ -90,7 +90,7 @@ CardSession  card, session, attachedAt, detachedAt?
 Event        id, project, card?, session?, at,
              type: session.start | session.end | card.created | card.status |
                    card.attached | card.detached | file.changed | commit |
-                   note | guide.synced,
+                   note | guide.synced | check,
              payload: JSON(Data)
 
 GuideDoc     id, project, relPath, content, contentHash(SHA-256), lastSyncedAt,
@@ -104,6 +104,22 @@ GuideVersion doc, content, at, source: app | local
 - **삭제**: 확인 알림(이름, 카드 수) 뒤 프로젝트를 지우면 카드·세션·연결·이벤트·지침 문서(버전 포함)가 함께 지워진다(cascade). 로컬 파일은 건드리지 않는다.
 
 CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.unique)`를 쓰지 않고 키·ID 중복은 코드에서 막는다. 모든 속성은 기본값이 있거나 옵셔널, 관계는 옵셔널이고 역관계를 둔다. enum은 원시 문자열로 저장한다.
+
+### 검증 근거 (`check` 이벤트, TRK-10)
+
+카드 완료 조건별로 실행한 검증 명령과 결과를 잇는다. 모델 필드는 늘리지 않고 이벤트로 남긴다(기존 데이터 마이그레이션 없음).
+
+- payload(`CheckRecord`): `command`(변수 대입 값은 `…`로 가림, 300자), `outcome`(`pass`·`fail`·`skipped`·`unknown`), `source`(`hook` = 훅이 실행을 직접 봄, 화면 「확인됨」 / `agent` = 에이전트 보고, 화면 「보고」), `criterion`(0부터, 에이전트 보고만), `criterionText`(보고 때 조건 글), `detail`(200자), `exitCode`, `provider`(claude·codex), `toolUseId`(훅, 재수신 중복 방지). `text` 키는 두지 않는다 — 옛 앱은 모르는 이벤트 종류를 `note`로 읽고 `text` 없는 메모를 숨기므로 옛 앱·옛 iPhone 앱에 근거가 메모로 보이지 않는다.
+- 이벤트는 카드와 실행한 세션에 붙는다. 근거를 남기는 것은 훅(5장 「검증 근거」)과 `card_evidence`(7장)뿐이다.
+
+### 완료 조건 근거 상태 (`CardEvidence`, 순수 함수)
+
+- 조건마다 통과·실패·건너뜀·미검증 + 출처·시각·명령. 근거가 없으면 미검증. 완료 조건이 없는 카드는 표시하지 않는다(기존 카드 그대로 동작).
+- 기준은 그 조건에 직접 붙은 가장 최근 에이전트 보고다. 보고 때 조건 글(`criterionText`)이 지금 조건 글과 다르면(`card_update`로 조건을 바꿈) 그 보고는 그 조건의 근거가 아니다.
+- 훅 기록과 짝짓기: 보고와 훅 기록의 명령을 검증 조각으로 다듬어(리다이렉션·앞 변수 대입 제거, 공백 정리 — `cd /x && swift test 2>&1`과 `swift test`는 같은 조각) 보고의 조각이 모두 훅 기록에 있고, 훅 기록 시각이 보고 15분 전 이후이며 결과가 `pass`·`fail`이면 짝이다. 짝 중 가장 최근 훅 기록이 조건 상태를 정하고 출처는 「확인됨」이다: 보고와 같으면 보고를 확인한 것, 다르면 훅 결과를 따르고(보고가 통과라도 훅이 실패를 봤으면 실패), 보고 뒤에 같은 명령을 다시 돌렸으면 그 결과가 최신이다. `unknown` 훅 기록은 확인하지 않는다.
+- 오래된 근거: 근거 시각(확인됨이면 실행 시각) 뒤에 그 카드의 `file.changed`가 있으면 「변경 후 미검증」. 같은 시각(같은 도구 호출)은 오래되지 않았다. 커밋은 코드를 바꾸지 않아 보지 않는다. 건너뜀은 오래되지 않는다.
+- 세션 종료·카드 연결 해제·체크 상자는 근거 상태를 바꾸지 않는다. 체크 상자는 사용자 판단 표시로 근거와 따로 보인다. 카드를 자동으로 done 처리하지 않는다.
+- 훅 기록만 있는 검증(조건 번호 없음)은 카드 수준 「검증 기록」에만 보인다.
 
 ### 파생 규칙
 
@@ -222,6 +238,16 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - **속도**: 훅 한 번 실행에 수십 ms(전사의 `stop_hook_summary`에서 Waypoint `Stop` 32 ms). `claude -p "hi"` 전체 9초로 눈에 띄는 지연 없음.
 - **이전 matcher 제한 해소(2026-09-30)**: PreToolUse·PostToolUse는 모든 도구를 관찰한다. 도구 실행은 시작과 완료를 tool_use_id로 연결하므로 장시간 실행을 활동 없음으로 오판하지 않는다.
 
+### 검증 근거 (`PostToolUse`·`PostToolUseFailure`, TRK-10)
+
+셸 도구(Claude `Bash`, Codex `Bash`·옛 이름 `shell`·`exec_command`·`local_shell`)가 검증 명령을 실행하면 그 세션의 열린 카드(서브에이전트가 카드 없이 일하면 부모 세션의 카드)에 `check`(`source: hook`)를 남긴다. 카드가 없는 세션은 남기지 않는다(조건과 이을 곳이 없다). 같은 `tool_use_id`는 한 번만. outbox로 늦게 흡수한 훅도 남긴다.
+
+- 검증 명령 판정(`VerificationCommand`): 따옴표를 존중해 `&&` `||` `|` `;` `&` 줄바꿈에서 나눈 조각이 아래 패턴으로 시작하면(앞 변수 대입·`time`·`env`·`timeout N`·`uv|poetry|pipenv|hatch run` 허용) 검증 명령이다. `swift test|build`, `xcodebuild … test|build|build-for-testing|test-without-building`, `npm|pnpm|yarn|bun (run )test`, `(npx|pnpm exec|yarn) jest|vitest|mocha`, `pytest`, `python(3) -m pytest|unittest`, `python(3) …/test*.py`, `go test`, `cargo test|nextest`, `gradle|gradlew … test`, `mvn … test|verify`, `make test|check`, `bash|sh|zsh …/test*.sh`, `./…/test*.sh`, `deno test`. 패턴 문자열은 `VerificationCommand.pattern` 한 곳이고 훅 스크립트의 `verify_pattern`과 같은 문자열이어야 한다(테스트가 비교). 늘릴 때 둘을 같이 고친다.
+- 결과(`HookParsing.check`):
+  - Claude: 문서(2026-10-01 확인, https://code.claude.com/docs/en/hooks 「PostToolUseFailure」)와 실측(2.1.286, `real-PostToolUse-Bash-test.json`·`real-PostToolUseFailure-Bash-test.json`)으로 **0이 아닌 종료는 `PostToolUseFailure`로만 오고**, `error` 첫 줄이 `Exit code N`이다(`is_interrupt`도 온다). 성공한 `PostToolUse`의 `tool_response`(`stdout`, `stderr`, `interrupted`, `isImage`, `noOutputExpected`)에는 종료 코드가 없다. 그래서 `PostToolUse` = 종료 코드 0, `PostToolUseFailure` = `Exit code N`의 N. `interrupted`·`is_interrupt`, `Exit code` 줄이 없는 실패(셸을 못 띄움·시간 초과 문구), 백그라운드 실행(`run_in_background` → 시작만 알리는 `PostToolUse`에 `backgroundTaskId`, 실측. 뒤의 종료 코드는 훅으로 오지 않는다)은 `unknown`.
+  - Codex: 문서상 0이 아닌 종료도 `PostToolUse`로 온다. `metadata.exit_code`·`exit_code`, 없으면 출력의 `Process exited with code N`·`Exit code: N` 줄. 모르면 `unknown`. Codex 응답 형식은 문서 예시가 없어 `doc-codex-PostToolUse-Bash-test-*.json`은 추정 형식이다(실제 Codex 실행 미확인).
+  - 명령 전체의 종료 코드가 검증 조각의 것일 때만 `pass`·`fail`: 첫 검증 조각 앞 연결자는 `&&`·`;`·`|`, 뒤는 `&&`만, 끝이 `&`가 아닐 것. `swift test | tail`(pipefail 없음), `swift test; echo`, `swift test || true`, `make lint || swift test`는 `unknown`.
+
 ### 종료 판정 (`SessionEnd`가 오지 않은 세션)
 
 앱이 10초마다, 시작 직후, 앱 활성화·잠자기 복귀 때 outbox를 흡수하고, 끝나지 않은 **메인 세션**을 검사한다(`SessionSweep`, `AppServices.refreshStates`).
@@ -265,11 +291,11 @@ outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid
 
 | 자리 | 남기는 것 |
 |---|---|
-| 최상위 | `session_id`, `cwd`, `hook_event_name`, `agent_id`, `agent_type`, `source`, `reason`, `tool_name`, `tool_use_id`, `prompt`·`prompt_text`(앞 600자 — 앱은 공백·붙여넣기 태그를 벗긴 뒤 300자) |
-| `tool_input` | `file_path`, `subagent_type`, `agent_type`, `workdir`, `cwd`. `old_string`·`new_string`·`content`·`edits[]`는 줄 수만큼의 `\n`. `prompt`·`message`는 `[KEY-n]` 카드 ID만. `command`는 `git commit`이 들어 있으면 `"git commit"`(또는 `"git -c commit"`), 아니면 뺀다. Codex `apply_patch`의 `command`는 `*** ` 머리 줄과 `+`/`-` 한 글자 줄만 |
-| `tool_response` | `structuredPatch[].lines`·`bashEditDiff.files[].hunks[].lines`는 `+`/`-` 한 글자만(조각 개수 유지), `bashEditDiff.files[].filePath`·`changedFiles`, `gitOperation.commit.{sha,branch}`, `stdout`은 커밋 줄 `[브랜치 해시] 메시지` 첫 줄과 Codex `Success. Updated the following files:`·`A/M/D 경로` 줄만, `metadata.exit_code`, `exit_code`. Codex의 문자열 응답·`output`·`text`는 `stdout`으로 합친 뒤 줄인다 |
+| 최상위 | `session_id`, `cwd`, `hook_event_name`, `agent_id`, `agent_type`, `source`, `reason`, `tool_name`, `tool_use_id`, `prompt`·`prompt_text`(앞 600자 — 앱은 공백·붙여넣기 태그를 벗긴 뒤 300자), `error`(첫 줄이 `Exit code N`일 때 그 줄만), `is_interrupt` |
+| `tool_input` | `file_path`, `subagent_type`, `agent_type`, `workdir`, `cwd`. `old_string`·`new_string`·`content`·`edits[]`는 줄 수만큼의 `\n`. `prompt`·`message`는 `[KEY-n]` 카드 ID만. `command`는 검증 명령 패턴(5장 「검증 근거」, `verify_pattern`)에 맞으면 원문, 아니면 `git commit`이 들어 있으면 `"git commit"`(또는 `"git -c commit"`), 아니면 뺀다. `run_in_background`는 셸 도구만. Codex `apply_patch`의 `command`는 `*** ` 머리 줄과 `+`/`-` 한 글자 줄만 |
+| `tool_response` | `structuredPatch[].lines`·`bashEditDiff.files[].hunks[].lines`는 `+`/`-` 한 글자만(조각 개수 유지), `bashEditDiff.files[].filePath`·`changedFiles`, `gitOperation.commit.{sha,branch}`, `stdout`은 커밋 줄 `[브랜치 해시] 메시지` 첫 줄, Codex 종료 코드 줄(`Process exited with code N`·`Exit code: N`) 첫 줄과 Codex `Success. Updated the following files:`·`A/M/D 경로` 줄만, `metadata.exit_code`, `exit_code`, `exitCode`, `interrupted`, `backgroundTaskId`. Codex의 문자열 응답·`output`·`text`는 `stdout`으로 합친 뒤 줄인다 |
 
-그 밖의 필드(`transcript_path`, `permission_mode`, `description`, 파일 내용, 명령 출력 등)는 쓰지 않는다. jq가 없거나 실패하면 `session_id`·`cwd`만 남기고(값에 따옴표·역슬래시가 없을 때), 그것도 못 찾으면 줄을 쓰지 않는다. 원문은 어느 경우에도 outbox에 쓰지 않는다. 앱이 꺼진 경로 한 번에 약 5~8 ms가 는다(중앙값 21 → 26~27 ms, 2026-10-01 측정).
+그 밖의 필드(`transcript_path`, `permission_mode`, `description`, 파일 내용, 명령 출력·실패 출력 등)는 쓰지 않는다. 검증 명령의 원문은 남는다(앱이 근거로 쓴다). jq가 없거나 실패하면 `session_id`·`cwd`만 남기고(값에 따옴표·역슬래시가 없을 때), 그것도 못 찾으면 줄을 쓰지 않는다. 원문은 어느 경우에도 outbox에 쓰지 않는다. 앱이 꺼진 경로 한 번에 약 5~8 ms가 는다(중앙값 21 → 26~27 ms, 2026-10-01 측정).
 
 Claude Code PID 찾기(스크립트): 조상 프로세스를 4단계까지 올라가며(`ps -o ppid=,comm= -p`) 실행 파일 이름(`comm`의 마지막 경로 조각)이 `claude`인 첫 프로세스. 인자(`args`)로는 비교하지 않는다 — 이 스크립트 경로 `~/.claude/waypoint/…`가 셸 인자에 들어 있다. 2.1.283 실측에서는 스크립트 바로 위 부모가 `claude`라 `ps`를 한 번 부르고, 훅 한 번에 약 3 ms가 늘었다(중앙값 15.9 → 18.7 ms).
 
@@ -293,7 +319,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 - 연결할 때 먼저 **새 방식(2026-07-28, 세션 없는 방식)** 으로 떠본다: `POST /mcp`, 머리 `mcp-protocol-version: 2026-07-28`, `mcp-method: server/discover`, 본문 `server/discover`(`params._meta`에 버전·클라이언트 정보). 본문 없는 `400`을 받으면 `initialize`(`protocolVersion: "2025-11-25"`, 머리에 버전 없음)로 내려온다. 원문은 `Tests/Fixtures/mcp/real-*.json`. 그래서 모르는 버전 머리에는 JSON-RPC 오류를 싣지 않는다(새 방식 오류 본문이면 새 방식 서버로 보고 내려오지 않는다).
 - `initialize`에도 실패하면 옛 HTTP+SSE로 `GET /mcp`를 한다(`405`면 연결 실패).
 - 요청은 `Connection: keep-alive`로 오지만 서버는 응답마다 닫는다. 문제없이 이어졌다.
-- `--allowedTools 'mcp__waypoint__*'`로 도구 8개가 모두 허용됐다. 도구는 지연 로딩되어 Claude가 `ToolSearch`로 불러 쓴다.
+- `--allowedTools 'mcp__waypoint__*'`로 도구 8개가 모두 허용됐다(당시 개수. 지금은 아래 표 11개). 도구는 지연 로딩되어 Claude가 `ToolSearch`로 불러 쓴다.
 - 스킬은 `~/.claude/skills/tracker/SKILL.md`에서 `-p` 세션에도 불렸다(주입 블록 + 「PRB-1 하자」에 `Skill(tracker)`가 먼저 호출됨).
 
 ### 도구
@@ -311,6 +337,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `card_update` | **`id`**, `title`, `body`, `status`, `criteria` | `status: active`는 거부(작업중은 `card_start`로만). 다른 상태는 `CardLifecycle.move`(done이면 `doneAt`, active였으면 열린 세션 연결을 모두 닫는다 — 4장 불변식). `criteria`는 통째로 바꾼다 |
 | `card_note` | **`id`**, **`text`** | `note` 기록 `{text}` |
 | `card_handoff` | **`id`**, **`nextSessionNote`** | `nextSessionNote` 저장 + `note` 기록 `{kind: "handoff", text}` |
+| `card_evidence` | **`id`**, `criterion`, **`command`**, **`outcome`**, `detail`, `sessionId` | 에이전트 보고 근거 `check`(`source: agent`). `criterion`은 **1부터**(card_get `criteria` 순서, 저장은 0부터 + 조건 글), 빼면 카드 수준. 범위 밖·조건 없는 카드에 번호·정수 아님은 오류. `outcome`은 `pass`·`fail`·`skipped`(일부러 건너뛴 경우만). `detail` 200자. 결과 `{id, outcome, source, criterion?, state?, confirmed?}`(`confirmed`: 훅 기록과 짝지어져 「확인됨」인지) |
 
 `criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
 
