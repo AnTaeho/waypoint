@@ -89,6 +89,21 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 
 실측 폴더에서 훅 수신(47822), 카드의 터미널 열기, 연동 상태 진단이 평소 Dev와 같은지 확인한다. 되면 `project.yml`에서 켜서 평소용과 배포 빌드를 맞출지 정한다.
 
+**배포판 실측 (2026-10-02, `Waypoint-0.0.1-229.zip`, 메인 세션)**: 공증된 zip을 스크래치에 풀어(`spctl` accepted) 평소용을 끄지 않고 옆에 띄웠다 — `open -n -g -j --env WAYPOINT_SUPPORT_DIR=<임시> --env WAYPOINT_PORT=47823 --env WAYPOINT_CLOUDKIT=0 Waypoint.app`. 같은 번들 ID라 종료는 번들 ID quit 대신 PID에 `kill -TERM`.
+
+| 확인 | 결과 |
+|---|---|
+| 하드닝 런타임으로 실행 | 됨(`flags=0x10000(runtime)`, Developer ID). 충돌 보고 없음 |
+| 저장소 열기·백업 | 임시 폴더에 저장소·`store-version.json`·`daily` 백업 생성 |
+| 로컬 서버 | 47823 LISTEN, `/integration/status` 200 |
+| 훅 수신 | `waypoint-hook.sh SessionStart`(픽스처) → 블록 출력·exit 0, 연동 기록에 claude 수신 |
+| 연결 요청 | `tools/list` 11개, `project_resolve` 정상 응답 |
+| 첫 실행 온보딩 | 지표에 시도 1회 기록(창은 숨김이라 화면은 안 봄) |
+| 터미널 열기 | 실행 안 함(화면을 가져감). 코드는 `NSWorkspace.open`만 써서 Apple Events 엔타이틀먼트가 필요 없다 |
+| `claude`·`codex` 하위 프로세스 | 실행 안 함(Release엔 화면 없이 설치기를 부르는 경로가 없음). 하드닝 런타임은 `Process` 실행을 막지 않는다 — 일반 사항, 이 앱에서 확인 못 함 |
+| iCloud(Production) | **확인 못 함**. `WAYPOINT_SUPPORT_DIR`을 주면 앱이 iCloud를 끈다(`AppInstance.cloudKitContainer`). 켜려면 실제 저장 폴더를 써야 해서 평소용 기록과 섞인다. Production 스키마가 없을 때 앱이 어떻게 되는지 모른다 |
+
+
 ## 단계와 기대 출력
 
 `scripts/release-mac.sh` 한 번이 아래를 차례로 한다. 단계마다 `· …` 한 줄을 출력하고, 실패하면 이유를 출력하고 exit 1. 같은 내용이 `dist/<이름>-summary.txt`에 남는다(실패해도).
