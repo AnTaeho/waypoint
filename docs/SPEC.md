@@ -90,7 +90,7 @@ CardSession  card, session, attachedAt, detachedAt?
 Event        id, project, card?, session?, at,
              type: session.start | session.end | card.created | card.status |
                    card.attached | card.detached | file.changed | commit |
-                   note | guide.synced | check,
+                   note | guide.synced | check | project.status | session.filed,
              payload: JSON(Data)
 
 GuideDoc     id, project, relPath, content, contentHash(SHA-256), lastSyncedAt,
@@ -111,6 +111,15 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 
 - payload(`CheckRecord`): `command`(변수 대입 값은 `…`로 가림, 300자), `outcome`(`pass`·`fail`·`skipped`·`unknown`), `source`(`hook` = 훅이 실행을 직접 봄, 화면 「확인됨」 / `agent` = 에이전트 보고, 화면 「보고」), `criterion`(0부터, 에이전트 보고만), `criterionText`(보고 때 조건 글), `detail`(200자), `exitCode`, `provider`(claude·codex), `toolUseId`(훅, 재수신 중복 방지). `text` 키는 두지 않는다 — 옛 앱은 모르는 이벤트 종류를 `note`로 읽고 `text` 없는 메모를 숨기므로 옛 앱·옛 iPhone 앱에 근거가 메모로 보이지 않는다.
 - 이벤트는 카드와 실행한 세션에 붙는다. 근거를 남기는 것은 훅(5장 「검증 근거」)과 `card_evidence`(7장)뿐이다.
+
+### 프로젝트 지금 상황·정리 안 된 작업 (`project.status`·`session.filed`, TRK-62·63)
+
+모델 필드는 늘리지 않고 이벤트로 남긴다. 새 종류는 `typeRaw` 문자열 값이라 저장 형식(스키마 판)은 그대로다. 옛 앱은 모르는 종류를 `note`로 읽으므로 두 종류 모두 `text` 키를 두지 않는다(옛 앱·옛 iPhone 앱의 활동 탭에 메모로 보이지 않는다).
+
+- `project.status`: 프로젝트(필수)·세션(있으면)에 붙는다. payload `summary`(지금 상황 글), `provider`(claude·codex), `sessionId`(있으면). **가장 최근 것이 지금 상황**이다. 7일(`ProjectStatus.staleAfter`)보다 오래되면 「오래됨」. 활동 탭에 「지금 상황」으로 보인다.
+- `session.filed`: 정리 안 된 작업 처리. 프로젝트·세션에, 연결이면 카드에도 붙는다. payload `sessionId`, `outcome`(`filed` 카드에 이음 · `dismissed` 넘김), `cardId`·`files`(경로 수)·`moved`(옮긴 이벤트 수)는 연결 때만. 카드 기록에 「이전 세션 작업 연결 · 파일 N개」.
+- **정리 안 된 작업**(`UnfiledWork`): 이 프로젝트의 메인 세션 중 끝났고(`endedAt`) 마지막 활동(`lastSeenAt`)이 최근 14일이며, 세션·서브에이전트가 카드에 붙은 적이 한 번도 없고(`CardSession`이 없음, 풀린 것 포함), 최근 14일 안에 이 프로젝트에 카드 없는 `file.changed`를 1개 이상 남겼고(서브에이전트 것 포함), `session.filed`가 아직 없는 것. 최근 것부터.
+- 연결(`work_file`에 카드): 그 세션·서브에이전트의 카드 없는 `file.changed`·`commit`·`check` 중 이 프로젝트 것을 그 카드로 옮긴다(`Event.card`만 바꾼다). 카드 상태·`updatedAt`·`CardSession`은 그대로라 작업중 판정과 상태 복귀에 영향이 없다. 옮긴 파일 변경이 그 카드 근거보다 늦으면 「변경 후 미검증」, 다음 세션 메모 뒤면 메모 신선도가 바뀔 수 있다(그 파일이 실제로 그 카드 작업이었으므로 그대로 둔다).
 
 ### 완료 조건 근거 상태 (`CardEvidence`, 순수 함수)
 
@@ -187,19 +196,26 @@ Mac 카드 상세에서 재개 문맥을 준비하고 Claude Code·Codex를 선�
 ```
 Waypoint: PRB (훅 실측)
 sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
+지금 상황 (3시간 전, Claude Code):
+  파서 리팩터 진행 중. 다음: 오류 메시지 정리
 다음 할 일:
 - PRB-1 실측용 카드
 다른 세션에서 작업중:
 - PRB-4 파서 (sess·a1b2)
 직전 세션 메모 (PRB-1 실측용 카드):
   note.txt에 hello 추가함. 볼 파일: note.txt
-작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 tracker 스킬을 따른다.
+정리 안 된 작업:
+- 어제 14:32 · Claude Code · 파일 3개: Parser.swift, note.txt, hello.txt 외 1 · 9c3e71d2
+작업을 시작·전환하거나 한 단위를 끝낼 때마다, 나중에 할 일을 들으면 tracker 스킬을 따른다.
 ```
 
 - 1줄: `Waypoint: <키> (<이름>)`, 2줄: `sessionId: <Claude Code session_id>`. 마지막 줄은 스킬 안내(고정 문구).
+- 지금 상황: 최신 `project.status`가 있으면 `지금 상황 (<상대 시각>, <도구 이름>[, 오래됨]):`과 두 칸 들여쓴 글 줄. 상대 시각은 `TimeFormat.relative`, 7일보다 오래되면 `오래됨`. 없으면 제목째 뺀다.
 - 다음 할 일: status next, 번호순 상위 5개. 없으면 제목째 뺀다.
 - 다른 세션에서 작업중: 대시보드 작업중 줄 중 이 세션·이 세션의 서브에이전트가 아닌 카드 줄(카드 없는 세션 줄은 뺀다). 멈춘 세션은 `, 멈춤`.
 - 직전 세션 메모: 다음 세션 메모가 있고 done·archived가 아닌 카드 중 **가장 최근에 `card_handoff`한 카드 하나**(handoff 기록 시각, 없으면 `updatedAt`). 메모 줄은 두 칸 들여쓴다.
+- 정리 안 된 작업(4장): 최대 3개, 줄마다 `- <마지막 활동 시각> · <도구 이름> · 파일 <N>개: <많이 바뀐 파일 최대 3개>[ 외 M] · <짧은 세션 ID>`. 짧은 ID는 원본 ID 앞 8자(Codex는 `codex:` + 8자), `work_file`이 앞부분 일치로 받는다. 3개를 넘으면 `- 외 K개`. 없으면 제목째 뺀다.
+- 속도: `SessionStart` 응답 안에서 만든다(훅 타임아웃 1초). 상황은 `project.status` 이벤트만, 정리 안 된 작업은 이 프로젝트·최근 14일의 끝난 메인 세션 ID(객체를 읽지 않는 `fetchIdentifiers`)와 카드 없는 `file.changed`만 질의하고, 파일 목록은 보일 3개만 읽는다. 측정은 9장 뒤 「자동 갱신 지표」.
 - 등록되지 않은 폴더: 한 줄 `Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음.`
 
 **보관된 프로젝트 폴더**(가장 가까운 상위 `rootPath`가 보관된 프로젝트)는 등록되지 않은 폴더처럼 기록하지 않되, `SessionStart`에 안내 줄도 주지 않는다(빈 본문). 보관하기 전에 시작한 세션도 보관 뒤의 훅(heartbeat·파일 변경 등)은 기록하지 않는다. 단 `SessionEnd`·`SubagentStop`은 열린 세션을 닫는다(보관을 풀었을 때 끝난 세션이 작업중으로 남지 않게). 닫히지 않은 세션은 종료 판정이 닫는다. 보관을 풀면 다음 훅부터 다시 기록한다.
@@ -349,7 +365,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 - 연결할 때 먼저 **새 방식(2026-07-28, 세션 없는 방식)** 으로 떠본다: `POST /mcp`, 머리 `mcp-protocol-version: 2026-07-28`, `mcp-method: server/discover`, 본문 `server/discover`(`params._meta`에 버전·클라이언트 정보). 본문 없는 `400`을 받으면 `initialize`(`protocolVersion: "2025-11-25"`, 머리에 버전 없음)로 내려온다. 원문은 `Tests/Fixtures/mcp/real-*.json`. 그래서 모르는 버전 머리에는 JSON-RPC 오류를 싣지 않는다(새 방식 오류 본문이면 새 방식 서버로 보고 내려오지 않는다).
 - `initialize`에도 실패하면 옛 HTTP+SSE로 `GET /mcp`를 한다(`405`면 연결 실패).
 - 요청은 `Connection: keep-alive`로 오지만 서버는 응답마다 닫는다. 문제없이 이어졌다.
-- `--allowedTools 'mcp__waypoint__*'`로 도구 8개가 모두 허용됐다(당시 개수. 지금은 아래 표 11개). 도구는 지연 로딩되어 Claude가 `ToolSearch`로 불러 쓴다.
+- `--allowedTools 'mcp__waypoint__*'`로 도구 8개가 모두 허용됐다(당시 개수. 지금은 아래 표 13개). 도구는 지연 로딩되어 Claude가 `ToolSearch`로 불러 쓴다.
 - 스킬은 `~/.claude/skills/tracker/SKILL.md`에서 `-p` 세션에도 불렸다(주입 블록 + 「PRB-1 하자」에 `Skill(tracker)`가 먼저 호출됨).
 
 ### 도구
@@ -364,9 +380,11 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `card_get` | **`id`** | 카드 + `body`, `origin`, `nextSessionNote`, `children`, 최근 기록 20개 |
 | `card_create` | **`project`**, **`title`**, `kind`, `status`, `body`, `parentId`, `criteria`, `sessionId` | origin=claude, `originSessionId`=`sessionId`. 기본 kind task, status next(kind idea면 idea). `active`는 거부(만든 뒤 `card_start`). `parentId`는 같은 프로젝트. `card.created` 기록 |
 | `card_start` | **`id`**, **`sessionId`** | 세션이 없거나 끝났거나 프로젝트가 다르면 오류. 그 세션에 붙은 **다른** 카드 연결을 먼저 푼다(주제 전환 — 그 카드는 작업 전 상태로, done 아님). 그다음 연결 → 작업중. 같은 카드를 다시 부르면 아무 일 없음. 서브에이전트 세션 ID(`agent_id`)면 그 하위 세션에 붙인다. 결과: `card`, `detached`(풀린 카드 ID), `otherSessions`(같은 카드에 붙은 다른 살아 있는 세션) |
-| `card_update` | **`id`**, `title`, `body`, `status`, `criteria` | `status: active`는 거부(작업중은 `card_start`로만). 다른 상태는 `CardLifecycle.move`(done이면 `doneAt`, active였으면 열린 세션 연결을 모두 닫는다 — 4장 불변식). `criteria`는 통째로 바꾼다 |
+| `card_update` | **`id`**, `title`, `body`, `status`, `criteria` | `status: active`는 거부(작업중은 `card_start`로만). 다른 상태는 `CardLifecycle.move`(done이면 `doneAt`, active였으면 열린 세션 연결을 모두 닫는다 — 4장 불변식). `criteria`는 통째로 바꾼다. 체크가 바뀐 조건(같은 글의 체크 변경, 체크된 채 새로 생긴 조건)마다 앱의 체크 상자와 같은 `note` `{kind: "criterion", text, isDone}`을 남긴다 |
 | `card_note` | **`id`**, **`text`** | `note` 기록 `{text}` |
 | `card_handoff` | **`id`**, **`nextSessionNote`** | `nextSessionNote` 저장 + `note` 기록 `{kind: "handoff", text}` |
+| `project_status` | **`project`**, `text`, `sessionId`, `provider` | `text`가 있으면 지금 상황을 새로 쓴다: 줄마다 앞뒤 공백을 다듬고 빈 줄을 뺀 뒤 600자·8줄을 넘거나 비면 오류(자르지 않는다 — 에이전트가 줄여 다시 보내게). `project.status` 기록(`provider`는 세션이 있으면 세션의 도구). `text`가 없으면 읽기. 결과 `{project, status: {text, at, provider?, sessionId?, stale} \| null}` |
+| `work_file` | **`sessionId`**, `cardId` | 정리 안 된 작업 하나를 처리(4장). `sessionId`는 전체 ID 또는 앞부분 8자 이상(메인 세션 중 하나만 맞아야 함). 끝나지 않은 세션·카드에 붙은 적 있는 세션·이미 처리한 세션·다른 프로젝트·보관된 카드는 오류. `cardId`가 있으면 기록을 카드로 옮기고 `session.filed`(`filed`), 없으면 `session.filed`(`dismissed`). 카드 상태는 바꾸지 않는다. 결과 `{sessionId, outcome, cardId?, files?, moved?}` |
 | `card_evidence` | **`id`**, `criterion`, **`command`**, **`outcome`**, `detail`, `sessionId` | 에이전트 보고 근거 `check`(`source: agent`). `criterion`은 **1부터**(card_get `criteria` 순서, 저장은 0부터 + 조건 글), 빼면 카드 수준. 범위 밖·조건 없는 카드에 번호·정수 아님은 오류. `outcome`은 `pass`·`fail`·`skipped`(일부러 건너뛴 경우만). `detail` 200자. 결과 `{id, outcome, source, criterion?, state?, confirmed?}`(`confirmed`: 훅 기록과 짝지어져 「확인됨」인지) |
 
 `criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
@@ -519,6 +537,16 @@ Codex: `scripts/install-codex.py`를 그대로 옮겼다(`CodexInstallPlanner`).
 ### 기록 지표와 진단 내보내기 (2026-10-01, TRK-11)
 
 이 기기에서만 숫자와 시각을 모은다(`ReliabilityMetrics`, 저장 폴더 `metrics.json` 0600, 10초 점검 때 저장, CloudKit 아님): 실시간 훅의 수신(서버가 연결을 받은 시각)→저장·화면 반영 지연 최근 1000건, 재개 시간(재개 문맥을 처음 복사한 시각 → 그 카드에 같은 도구의 새 메인 세션이 연결된 시각, 최근 100건), 연동 실패(서버 시작·형식 오류·저장 실패), 복구(outbox 흡수·보존·격리, 세션 정리) 횟수. 연동 상태 패널에 짧게 보이고, 「진단 정보 복사」를 누를 때만 같은 숫자를 내보낸다. 프로젝트명·경로·세션 ID·대화는 담지 않는다. `/integration/status`가 `metrics`로 돌려준다. 기준·측정 방법·관측값은 docs/RELIABILITY.md.
+
+### 자동 갱신 지표 (2026-10-02, TRK-62·63)
+
+에이전트가 일하면서 기록을 얼마나 갱신했는지 본다(`TrackingCoverage`, 순수 함수, 저장하지 않고 요청 때 저장소에서 계산). 최근 30일, 보관 안 된 프로젝트별, 세션은 마지막 활동(`lastSeenAt`)이 기간 안인 끝난 메인 세션.
+
+- 카드 연결: 파일을 바꾼 세션(세션·서브에이전트의 `file.changed`가 있음) 중 카드에 붙은 적이 있거나 `work_file`로 처리한(연결·넘김 모두) 세션 / 파일을 바꾼 세션.
+- 메모 갱신: 카드에 붙은 세션 중 세션 동안(`startedAt`…`endedAt`) 붙었던 카드에 `card_note` 메모·다음 세션 메모·완료 조건 체크 변경(`note` kind 없음·`handoff`·`criterion`)이나 에이전트 검증 보고(`check` `source: agent`)가 하나라도 남은 세션 / 카드에 붙은 세션. `card_note`·`card_handoff`는 세션을 적지 않으므로 시각으로 가른다.
+- 상황 경과: 마지막 `project.status` 이후 일수(없으면 없음).
+- 내보내기: 숫자와 프로젝트 키만. 「진단 정보 복사」 끝에 `자동 갱신 (최근 30일)` · `전체: 카드 연결 a/b · 메모 갱신 c/d` · 프로젝트마다 `<키>: 카드 연결 … · 메모 갱신 … · 상황 N일 전|오늘|없음`. `/integration/status`의 `coverage` `{windowDays, projects: [{key, workedSessions, linkedSessions, linkRate, attachedSessions, notedSessions, noteRate, statusAgeDays}]}`(분모 0이면 비율 `null`). 연동 상태 패널 「기록 지표」에 `최근 30일 · 카드 연결 a/b · 메모 갱신 c/d`, `지금 상황 · 7일 안에 갱신 x/y 프로젝트`(패널을 열 때 한 번 계산).
+- 시작 블록 지연(2026-10-02, Dev Debug, `SessionStart` 새 세션 → 끝을 반복해 왕복을 잼, 확인 머리 있음): 같은 저장소에서 main과 이 변경을 30회씩 번갈아 6번 — 중앙값 평균 218 → 233 ms, p95 평균 386 → 407 ms(회차마다 134–289 ms로 흔들려 차이는 잡음 안), 최대 595 ms(main)·528 ms(이 변경). 블록 생성만 따로 재면(저장소 사본, swift test Debug) 끝난 메인 세션 732개·카드 없는 파일 변경 1,279건인 Dev 실측 저장소에서 정리 안 된 작업 17 ms, 실제 저장소 백업 사본(메인 세션 9개)에서 0.5–1 ms. 첫 구현(세션마다 관계를 따라감)은 Dev 저장소에서 280 ms라 질의를 바꿨다.
 
 ### 이벤트 기반 작업 상태 (2026-09-30)
 
@@ -722,13 +750,13 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 | 항목 | 남기는 것(코드에서 확인) | 보관 |
 |---|---|---|
 | 프로젝트 | 이름·키·폴더 경로·개요·스택·다음 카드 번호·만든/보관 시각 | 계속 |
-| 카드 | 제목·본문·종류·상태·완료 조건(글·체크)·만든 쪽·부모·시각, 세션 연결(붙은/떨어진 시각), 이벤트 `card.*`, 조건 체크 메모(`kind: criterion`) | 계속 |
+| 카드 | 제목·본문·종류·상태·완료 조건(글·체크)·만든 쪽·부모·시각, 세션 연결(붙은/떨어진 시각), 이벤트 `card.*`, 조건 체크 메모(`kind: criterion`), 정리 안 된 작업 처리(`session.filed`: 세션 ID·결과·카드 ID·파일·옮긴 수) | 계속 |
 | 세션 | 도구·종류·에이전트 이름·작업 폴더·브랜치·시작/마지막/끝 시각·끝난 까닭·요청 시각(`lastPromptAt`, 요청 이벤트의 시각·`promptId`), `session.*`, 프로젝트 옮김(`kind: project.bound`) | 계속 |
 | 요청 문장 | `Session.lastPrompt`와 요청 이벤트의 `text`, 앞 300자 | 30일(`PromptRetention`) |
 | 바뀐 파일 | `file.changed`: 프로젝트 기준 경로·늘고 준 줄 수 | 계속 |
 | 커밋 | `commit`: 해시·메시지 첫 줄(커밋 출력의 `[branch hash] 메시지` 줄) | 계속 |
 | 검증 기록 | `check`: 명령(값 가림, 300자)·결과·출처·조건 번호와 글·짧은 설명(200자)·끝 코드 | 계속 |
-| 메모 | 카드 메모(`card_note`)·다음 세션 메모(`nextSessionNote`, `kind: handoff`). 에이전트가 도구로 남긴 글도 여기 든다 | 계속 |
+| 메모 | 카드 메모(`card_note`)·다음 세션 메모(`nextSessionNote`, `kind: handoff`)·프로젝트 지금 상황(`project.status`: 글·도구·세션 ID). 에이전트가 도구로 남긴 글도 여기 든다 | 계속 |
 | 지침 문서 | 등록한 문서의 **내용 전체**·저장 안 한 편집·충돌 때 읽은 로컬 내용·이전 판(`GuideVersion`) | 계속 |
 
 - 남기지 않는 것: AI 답변, 대화 전체, 명령 출력(끝 코드·커밋 줄만 뽑고 버린다), 지침 문서가 아닌 파일의 내용(편집 원문·읽은 파일은 저장하지 않는다. outbox에는 앱이 켜질 때까지 요청 600자·편집 크기·앱이 읽는 출력 줄(끝 코드·커밋 줄을 찾는 몫)이 잠시 머문다).

@@ -506,3 +506,23 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | Debug 실행 인자로 대화상자 없이 같은 동작을 탄다(`-WaypointSettingsTab`·`-WaypointExport`·`-WaypointBackupNow`·`-WaypointRestore`·`-WaypointWipe`·`-WaypointSettingsScroll`)(내 판단) | 화면 조작 없이 Dev 실측을 하려고. Release에서는 설정 창 탭 선택 말고는 무시한다 | — | `RecordsLaunch` |
 
 검증: `swift test` 672개 통과, macOS Debug·iOS 빌드. Dev 실측(실제 저장소 백업 사본, CloudKit 꺼짐): 기록 탭 창 캡처, 전체·프로젝트 하나 내보내기, 지금 백업, 복원 예약 → 다시 시작 → 복원 확인, 모든 기록 지우기 → 비고 `beforeDelete` 백업 남음.
+
+## 2026-10-02 — 자동 갱신 빈틈·프로젝트 상황 (TRK-62·63)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 저장 형식은 바꾸지 않고 이벤트 종류 `project.status`·`session.filed`로 담는다. 메인 세션 결정 | `typeRaw`가 문자열이라 스키마 판이 그대로다. 모델 필드를 더하면 판·CloudKit 스키마가 바뀐다 | `Project.status`·`Session.filedAt` 필드 | 두 `EventType` case와 생성 지점 지우기(남은 이벤트는 옛 앱처럼 `note`로 읽힌다) |
+| 상황 글 payload 키는 `summary`(지시서는 `text`, 내 판단) | 4장 「검증 근거」 규칙: 옛 앱은 모르는 종류를 `note`로 읽고 `text`가 있으면 메모로 보인다. 옛 평소용·옛 iPhone 앱의 활동 탭에 상황 글이 메모로 섞이지 않게 | 지시서의 `text` | 키 이름(`RecordScope`·`ProjectStatus.entry`·`project_status`) |
+| 시작 블록에 「지금 상황」(최신 하나, 7일 넘으면 `오래됨`)과 「정리 안 된 작업」(14일, 최대 3개). 메인 세션 결정(7일·줄 형식은 내 판단) | 에이전트가 세션을 열자마자 프로젝트 흐름과 놓친 작업을 본다. 앱은 글을 만들지 않는다 | 화면에만 표시 | `SessionContext.text`의 두 절 |
+| `project_status`는 600자·8줄, 넘으면 자르지 않고 오류. `text`를 빼면 읽기(내 판단) | 블록이 길어지지 않게, 잘린 글이 남지 않게 에이전트가 줄여 다시 쓴다. 읽기 도구를 따로 두지 않는다 | 잘라서 저장, `project_status_get` | `ProjectStatus.normalized` |
+| `work_file`은 이벤트의 카드만 바꾸고 `CardSession`을 만들지 않는다. 카드 상태·`updatedAt`도 그대로(내 판단) | 끝난 세션을 카드에 붙이면 작업중 판정·상태 복귀가 움직인다. 기록(파일·커밋·검증)만 카드에 보이면 충분하다 | 끝난 `CardSession`을 만들기 | `MCPTools.workFile` |
+| 블록의 세션 ID는 앞 8자, `work_file`은 앞부분 일치(8자 이상, 하나만)(내 판단) | 블록을 짧게. 36자 UUID 셋은 시끄럽다 | 전체 ID | `UnfiledWork.shortID`·`findEndedSession` |
+| 「정리 안 된 작업」의 파일 변경은 최근 14일 안의 것만 본다(내 판단) | 질의를 기간으로 묶어야 `SessionStart`가 빠르다. 14일 전에 파일을 바꾸고 그 뒤 활동만 있던 세션은 빠진다 | 세션 시작 이후 전부 | `UnfiledWork.items`의 `at >= cutoff` |
+| 블록 질의: 끝난 메인 세션은 ID만(`fetchIdentifiers`), 카드 없는 `file.changed`를 한 번에 가져와 세션별로 나누고, 파일 목록은 보일 3개만 읽는다(내 판단) | 첫 구현(세션마다 관계를 따라감)은 Dev 실측 저장소(끝난 세션 732개)에서 블록 하나에 280 ms. 바꾼 뒤 17 ms, 실제 저장소 사본 1 ms 안 | 캐시 | `UnfiledWork.items` |
+| `card_update`로 조건 체크가 바뀌면 `note` `kind: criterion`을 남긴다(내 판단) | 메모 갱신률이 조건 갱신을 볼 수 있게. 앱 체크 상자와 같은 기록이라 카드 기록에도 보인다 | 지표에서 조건 갱신 빼기 | `CardEditing.recordCriteriaChanges` 호출 |
+| 지표(`TrackingCoverage`)는 `metrics.json`(`ReliabilityMetrics`)에 넣지 않고 요청 때 계산. 진단·`/integration/status`에는 프로젝트 키를 쓴다(내 판단) | 저장소에서 다시 계산할 수 있는 값이고, `ReliabilityMetrics`는 문자열 필드가 없음을 테스트로 고정한다. 지시서 「숫자·키만」 | 10초 점검마다 저장 | `TrackingCoverage`·호출 세 곳 |
+| 연결률 분자에 「넘김」도 넣는다. 메인 세션 결정 | 사람이(에이전트가) 본 작업은 빈틈이 아니다. 대신 넘김이 많으면 연결률이 높아 보인다 — Dev 실측에서 측정용 세션 42개를 넘겨 2% → 98% | 연결만 | `TrackingCoverage.compute`의 `filedSessionIDs` |
+| 스킬: 「마무리할 때」를 「단위가 끝날 때마다」로, 블록 마지막 줄을 「…한 단위를 끝낼 때마다, …」로. 메인 세션 결정(문구는 내 판단) | 세션은 예고 없이 끝나서 끝에만 쓰는 메모는 남지 않았다(메모 있는 카드 19개) | 세션 끝만 | 스킬 절과 `SessionContext.skillHint` |
+| 시작 블록 지연은 main과 번갈아 쟀다(내 판단) | 저장소가 측정마다 커지고 기계 부하로 회차마다 크게 흔들렸다(같은 빌드 중앙값 134–289 ms) | 전후 한 번씩 | — |
+
+검증: `swift test` 688개 중 686개 통과. 실패 2개는 `RealInstallStateTests`(이 Mac에 설치된 tracker 스킬이 저장소 스킬과 달라 설치 계획이 스킬 파일 하나씩 — 머지 뒤 스킬을 동기화하면 통과). macOS Debug·iOS 빌드. Dev 실측: 픽스처 세션 → 다음 블록에 「정리 안 된 작업」, `project_status`·`work_file` → 블록·카드 기록 반영, 지표, 실제 `claude -p` 한 번(haiku, 한 줄 수정 과제 — 에이전트는 MCP를 부르지 않았고 그 세션이 다음 블록의 「정리 안 된 작업」으로 잡혔다). 지연은 SPEC 「자동 갱신 지표」.
