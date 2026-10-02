@@ -176,6 +176,25 @@ shasum -a 256 -c dist/Waypoint-<버전>-<빌드>.zip.sha256   # dist/에서
 - 수락 뒤에도 아카이브 `Info.plist`의 `processingEvent.state`는 `processing`으로 남았다. 그래서 스크립트는 완료를 plist로 판단하지 않고 `-exportNotarizedApp`의 결과로만 본다.
 - 이 아카이브로 `--resume-notarize`를 돌려 성공 경로(서명 재검증·staple 확인·spctl accepted·zip)를 확인했다.
 
+### 스크립트 기본 실행 (2026-10-02, 커밋 891ea1c, 빌드 229)
+
+`scripts/release-mac.sh`(깨끗한 트리) — exit 0. 두 번째 공증은 첫 확인(제출 직후)에서 처리 중, 다음 확인(5분 뒤)에서 수락:
+
+```
+· 공증 제출: 성공(Xcode 계정, 2026-10-02 16:13:01 +0900, …/upload.log)
+· 공증 결과 대기(300초마다 확인, 최대 180분)
+  16:13 처리 중 — 제출 뒤 0분, 300초 뒤 다시 확인
+· 공증: 수락(제출 뒤 5분째 확인, 로그 dist/Waypoint-0.0.1-229-notarize.log)
+· 공증된 앱 서명 검증: 통과(Developer ID Application: Taeho An (2FCXA77MC5), 하드닝 런타임, iCloud.dev.antaeho.waypoint Production, aps production)
+· staple: 확인(The validate action worked!)
+  …/notarized/Waypoint.app: accepted
+  source=Notarized Developer ID
+  origin=Developer ID Application: Taeho An (2FCXA77MC5)
+· 산출물: dist/Waypoint-0.0.1-229.zip (5.4M), SHA256 d57b378321e491fcfc4ae9bab3bbba4bce6ff99c8d12ba2048437b158fdfff07
+```
+
+zip을 풀어 본 앱도 `spctl` accepted(`Notarized Developer ID`), `stapler validate` 성공.
+
 ## 실패할 때
 
 | 증상 | 할 일 |
