@@ -214,7 +214,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - 다음 할 일: status next, 번호순 상위 5개. 없으면 제목째 뺀다.
 - 다른 세션에서 작업중: 대시보드 작업중 줄 중 이 세션·이 세션의 서브에이전트가 아닌 카드 줄(카드 없는 세션 줄은 뺀다). 멈춘 세션은 `, 멈춤`.
 - 직전 세션 메모: 다음 세션 메모가 있고 done·archived가 아닌 카드 중 **가장 최근에 `card_handoff`한 카드 하나**(handoff 기록 시각, 없으면 `updatedAt`). 메모 줄은 두 칸 들여쓴다.
-- 정리 안 된 작업(4장): 최대 3개, 줄마다 `- <마지막 활동 시각> · <도구 이름> · 파일 <N>개: <많이 바뀐 파일 최대 3개>[ 외 M] · <짧은 세션 ID>`. 짧은 ID는 원본 ID 앞 8자(Codex는 `codex:` + 8자), `work_file`이 앞부분 일치로 받는다. 3개를 넘으면 `- 외 K개`. 없으면 제목째 뺀다.
+- 정리 안 된 작업(4장): 블록을 받는 세션 자신은 뺀다(재개). 최대 3개, 줄마다 `- <마지막 활동 시각> · <도구 이름> · 파일 <N>개: <많이 바뀐 파일 최대 3개>[ 외 M] · <짧은 세션 ID>`. 짧은 ID는 원본 ID 앞 8자(Codex는 `codex:` + 8자), `work_file`이 앞부분 일치로 받는다. 3개를 넘으면 `- 외 K개`. 없으면 제목째 뺀다.
 - 속도: `SessionStart` 응답 안에서 만든다(훅 타임아웃 1초). 상황은 `project.status` 이벤트만, 정리 안 된 작업은 이 프로젝트·최근 14일의 끝난 메인 세션 ID(객체를 읽지 않는 `fetchIdentifiers`)와 카드 없는 `file.changed`만 질의하고, 파일 목록은 보일 3개만 읽는다. 측정은 9장 뒤 「자동 갱신 지표」.
 - 등록되지 않은 폴더: 한 줄 `Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음.`
 
@@ -384,7 +384,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `card_note` | **`id`**, **`text`** | `note` 기록 `{text}` |
 | `card_handoff` | **`id`**, **`nextSessionNote`** | `nextSessionNote` 저장 + `note` 기록 `{kind: "handoff", text}` |
 | `project_status` | **`project`**, `text`, `sessionId`, `provider` | `text`가 있으면 지금 상황을 새로 쓴다: 줄마다 앞뒤 공백을 다듬고 빈 줄을 뺀 뒤 600자·8줄을 넘거나 비면 오류(자르지 않는다 — 에이전트가 줄여 다시 보내게). `project.status` 기록(`provider`는 세션이 있으면 세션의 도구). `text`가 없으면 읽기. 결과 `{project, status: {text, at, provider?, sessionId?, stale} \| null}` |
-| `work_file` | **`sessionId`**, `cardId` | 정리 안 된 작업 하나를 처리(4장). `sessionId`는 전체 ID 또는 앞부분 8자 이상(메인 세션 중 하나만 맞아야 함). 끝나지 않은 세션·카드에 붙은 적 있는 세션·이미 처리한 세션·다른 프로젝트·보관된 카드는 오류. `cardId`가 있으면 기록을 카드로 옮기고 `session.filed`(`filed`), 없으면 `session.filed`(`dismissed`). 카드 상태는 바꾸지 않는다. 결과 `{sessionId, outcome, cardId?, files?, moved?}` |
+| `work_file` | **`sessionId`**, `cardId` | 정리 안 된 작업 하나를 처리(4장). `sessionId`는 전체 ID 또는 앞부분 8자 이상(메인 세션 중 하나만 맞아야 함). 끝나지 않은 세션·카드에 붙은 적 있는 세션·이미 이은 세션·이미 넘긴 세션을 다시 넘김·다른 프로젝트·보관된 카드는 오류(넘긴 세션은 나중에 카드에 이을 수 있다). `cardId`가 있으면 기록을 카드로 옮기고 `session.filed`(`filed`), 없으면 `session.filed`(`dismissed`). 카드 상태는 바꾸지 않는다. 결과 `{sessionId, outcome, cardId?, files?, moved?}` |
 | `card_evidence` | **`id`**, `criterion`, **`command`**, **`outcome`**, `detail`, `sessionId` | 에이전트 보고 근거 `check`(`source: agent`). `criterion`은 **1부터**(card_get `criteria` 순서, 저장은 0부터 + 조건 글), 빼면 카드 수준. 범위 밖·조건 없는 카드에 번호·정수 아님은 오류. `outcome`은 `pass`·`fail`·`skipped`(일부러 건너뛴 경우만). `detail` 200자. 결과 `{id, outcome, source, criterion?, state?, confirmed?}`(`confirmed`: 훅 기록과 짝지어져 「확인됨」인지) |
 
 `criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
