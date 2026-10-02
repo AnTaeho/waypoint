@@ -14,6 +14,9 @@ public enum AppInstance: Sendable, Equatable {
     public static let supportDirectoryEnvironmentKey = "WAYPOINT_SUPPORT_DIR"
     /// `0`이면 CloudKit 동기화를 끈다(테스트·확인용).
     public static let cloudKitEnvironmentKey = "WAYPOINT_CLOUDKIT"
+    /// 빌드 때 정한 iCloud 동기화 스위치(Info.plist, build setting `WAYPOINT_ICLOUD`). `NO`면 끈다.
+    /// 외부 베타 배포(`scripts/release-mac.sh`)는 기본으로 `NO`, 평소용·개발용·iOS는 `YES`이거나 키가 없다.
+    public static let iCloudInfoKey = "WaypointICloud"
 
     /// 번들 ID가 없으면(명령행 도구·테스트) 평소용.
     public init(bundleIdentifier: String?) {
@@ -68,14 +71,31 @@ public enum AppInstance: Sendable, Equatable {
     }
 
     /// 저장소를 미러링할 CloudKit 컨테이너. nil이면 동기화하지 않는다.
+    /// - Info.plist `WaypointICloud`가 `NO`면 끈다(외부 베타 배포 빌드).
     /// - `WAYPOINT_CLOUDKIT=0`이면 끈다.
     /// - `WAYPOINT_SUPPORT_DIR`로 저장 폴더를 옮겼으면 끈다. 확인용 임시 저장소가 실제 컨테이너의 기록을 받아 오거나
     ///   임시 기록을 올려 섞지 않게.
     public func cloudKitContainer(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        info: [String: Any]? = Bundle.main.infoDictionary
     ) -> String? {
+        if !Self.iCloudBuildEnabled(info: info) { return nil }
         if environment[Self.cloudKitEnvironmentKey]?.trimmingCharacters(in: .whitespaces) == "0" { return nil }
         if let custom = environment[Self.supportDirectoryEnvironmentKey], !custom.isEmpty { return nil }
         return cloudKitContainerIdentifier
+    }
+
+    /// 빌드 스위치(`WaypointICloud`)가 켜져 있는가. 키가 없거나 비었으면 켬(iOS·옛 빌드·테스트).
+    /// 문자열 `NO`·`FALSE`·`0`(대소문자·앞뒤 공백 무시)이나 불리언 false면 끔.
+    public static func iCloudBuildEnabled(info: [String: Any]?) -> Bool {
+        switch info?[iCloudInfoKey] {
+        case let flag as Bool:
+            return flag
+        case let text as String:
+            let value = text.trimmingCharacters(in: .whitespaces).uppercased()
+            return !["NO", "FALSE", "0"].contains(value)
+        default:
+            return true
+        }
     }
 }

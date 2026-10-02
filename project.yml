@@ -61,9 +61,14 @@ targets:
         CODE_SIGN_IDENTITY: Apple Development
         # CloudKit 컨테이너. 엔타이틀먼트가 이 값을 쓰고, 앱은 `AppInstance.cloudKitContainerIdentifier`로 같은 값을 연다.
         WAYPOINT_CONTAINER: iCloud.dev.antaeho.waypoint
+        # iCloud 동기화를 켜고 빌드하는가. Info.plist `WaypointICloud`로 들어가 `AppInstance.cloudKitContainer`가 읽는다.
+        # 평소용·개발용은 켬. 외부 베타 배포(`scripts/release-mac.sh`)만 기본으로 NO를 넘긴다. 엔타이틀먼트는 그대로 둔다.
+        WAYPOINT_ICLOUD: YES
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Config/Waypoint-macOS.entitlements
         "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]": Config/Waypoint-iOS.entitlements
         "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": Config/Waypoint-iOS.entitlements
+        # macOS: `WaypointICloud`(위 WAYPOINT_ICLOUD). 나머지 Info.plist 키는 생성한다.
+        "INFOPLIST_FILE[sdk=macosx*]": Config/Waypoint-macOS-Info.plist
         # iOS만: 원격 알림(백그라운드)으로 CloudKit 변경을 받는다. 나머지 Info.plist 키는 생성한다.
         "INFOPLIST_FILE[sdk=iphoneos*]": Config/Waypoint-iOS-Info.plist
         "INFOPLIST_FILE[sdk=iphonesimulator*]": Config/Waypoint-iOS-Info.plist

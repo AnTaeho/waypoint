@@ -53,18 +53,41 @@ import Testing
     }
 
     @Test func cloudKitContainer() {
-        #expect(AppInstance.stable.cloudKitContainer(environment: [:]) == "iCloud.dev.antaeho.waypoint")
-        #expect(AppInstance.dev.cloudKitContainer(environment: [:]) == "iCloud.dev.antaeho.waypoint.dev")
+        #expect(AppInstance.stable.cloudKitContainer(environment: [:], info: [:]) == "iCloud.dev.antaeho.waypoint")
+        #expect(AppInstance.dev.cloudKitContainer(environment: [:], info: [:]) == "iCloud.dev.antaeho.waypoint.dev")
         // 끄는 스위치
-        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": "0"]) == nil)
-        #expect(AppInstance.dev.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": " 0 "]) == nil)
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": "0"], info: [:]) == nil)
+        #expect(AppInstance.dev.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": " 0 "], info: [:]) == nil)
         // 0이 아닌 값은 켠 채로
         for on in ["", "1", "yes"] {
-            #expect(AppInstance.dev.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": on]) != nil, "\(on)")
+            #expect(AppInstance.dev.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": on], info: [:]) != nil, "\(on)")
         }
         // 저장 폴더를 옮기면 끈다(빈 값은 없는 것과 같다)
-        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_SUPPORT_DIR": "/tmp/wp"]) == nil)
-        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_SUPPORT_DIR": ""]) != nil)
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_SUPPORT_DIR": "/tmp/wp"], info: [:]) == nil)
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_SUPPORT_DIR": ""], info: [:]) != nil)
+    }
+
+    /// 빌드 스위치 `WaypointICloud`(외부 베타 배포는 NO).
+    @Test func cloudKitContainerBuildSwitch() {
+        let key = AppInstance.iCloudInfoKey
+        #expect(key == "WaypointICloud")
+        // 키가 없으면(iOS·옛 빌드) 켬, info 자체가 없어도 켬
+        #expect(AppInstance.stable.cloudKitContainer(environment: [:], info: nil) == "iCloud.dev.antaeho.waypoint")
+        #expect(AppInstance.stable.cloudKitContainer(environment: [:], info: ["CFBundleIdentifier": "x"]) != nil)
+        // 켬: YES, 빈 값(설정이 안 펼쳐진 경우), 불리언 true
+        for on: Any in ["YES", "yes", "", "1", true] {
+            #expect(AppInstance.stable.cloudKitContainer(environment: [:], info: [key: on]) != nil, "\(on)")
+        }
+        // 끔: NO, false, 0, 불리언 false
+        for off: Any in ["NO", "no", " NO ", "false", "FALSE", "0", false] {
+            #expect(AppInstance.stable.cloudKitContainer(environment: [:], info: [key: off]) == nil, "\(off)")
+            #expect(AppInstance.dev.cloudKitContainer(environment: [:], info: [key: off]) == nil, "\(off)")
+        }
+        // 키가 YES여도 환경 변수 규칙은 그대로 끈다
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": "0"], info: [key: "YES"]) == nil)
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_SUPPORT_DIR": "/tmp/wp"], info: [key: "YES"]) == nil)
+        // 키가 NO면 환경 변수로 켤 수 없다
+        #expect(AppInstance.stable.cloudKitContainer(environment: ["WAYPOINT_CLOUDKIT": "1"], info: [key: "NO"]) == nil)
     }
 
     @Test func cloudKitDatabase() {
