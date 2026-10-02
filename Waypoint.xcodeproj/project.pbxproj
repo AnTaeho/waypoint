@@ -67,6 +67,7 @@
 		6BF8F5047D1E0882C2152162 /* InitChecklists.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55C4D1900BA2387763F86D8 /* InitChecklists.swift */; platformFilters = (macos, ); };
 		6FB4D68DBA55E3DD18293286 /* Theme+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558C8C4DB87D7F169087BD9F /* Theme+Dashboard.swift */; };
 		712EBB359F2AAF7A901ED6FB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93ACA15FE4B6D1BD5BC3C0AF /* SettingsView.swift */; platformFilters = (macos, ); };
+		71FC9542096A5C39778CF67A /* OnboardingModel+Metrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550967C499B209F065ADE378 /* OnboardingModel+Metrics.swift */; platformFilters = (macos, ); };
 		7525FC1FD847071E6EFB47DE /* AppServices+Integration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09475FCBA9E35F2B22254CED /* AppServices+Integration.swift */; platformFilters = (macos, ); };
 		755413082D45EF8A77797090 /* OnboardingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E906DEE6EC044844E85F336 /* OnboardingModel.swift */; platformFilters = (macos, ); };
 		786DE851725A294441A17554 /* MarkdownBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7589B21E222DC5DBB867A617 /* MarkdownBlockView.swift */; platformFilters = (macos, ); };
@@ -183,6 +184,7 @@
 		513714242E8675B19C5134DA /* ActiveWorkRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkRowView.swift; sourceTree = "<group>"; };
 		5182AAF26F00C37D627FC1AE /* GuidanceSourceList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSourceList.swift; sourceTree = "<group>"; };
 		5451E3F0EEC533B30989C6CB /* DashboardSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSearch.swift; sourceTree = "<group>"; };
+		550967C499B209F065ADE378 /* OnboardingModel+Metrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OnboardingModel+Metrics.swift"; sourceTree = "<group>"; };
 		558C8C4DB87D7F169087BD9F /* Theme+Dashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme+Dashboard.swift"; sourceTree = "<group>"; };
 		59B811F1DE3AC3DC226F1C4E /* Theme+Integration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme+Integration.swift"; sourceTree = "<group>"; };
 		5A86041D8ABF749C806E93C1 /* CardCriteriaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardCriteriaView.swift; sourceTree = "<group>"; };
@@ -311,6 +313,7 @@
 				043E7D1710F5F887B6F7C48F /* OnboardingInstallStep.swift */,
 				282B0287CBA91E3D25BCE8BE /* OnboardingLaunch.swift */,
 				6E906DEE6EC044844E85F336 /* OnboardingModel.swift */,
+				550967C499B209F065ADE378 /* OnboardingModel+Metrics.swift */,
 				7A2CF0FCA811E696C8AADA1E /* OnboardingProjectStep.swift */,
 				95C95CFF8638C9A144FE098F /* OnboardingReceiveStep.swift */,
 				166DF61B86227F013B117906 /* OnboardingSheet.swift */,
@@ -794,6 +797,7 @@
 				FC6C73EC6FDF95584A01134B /* MenuBarContent.swift in Sources */,
 				9B532F794522F12FE86F4FBC /* OnboardingInstallStep.swift in Sources */,
 				3B8E51568A459D858FEDB579 /* OnboardingLaunch.swift in Sources */,
+				71FC9542096A5C39778CF67A /* OnboardingModel+Metrics.swift in Sources */,
 				755413082D45EF8A77797090 /* OnboardingModel.swift in Sources */,
 				8E84ADE18A38AAB21A26C4A0 /* OnboardingProjectStep.swift in Sources */,
 				0E2F1C59C8BB9C76E95B7D65 /* OnboardingReceiveStep.swift in Sources */,

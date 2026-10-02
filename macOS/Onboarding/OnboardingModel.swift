@@ -23,7 +23,9 @@ final class OnboardingModel {
     /// 시트를 띄우는 메인 창(먼저 뜬 창). 창이 여럿이어도 한 창에만 뜬다
     private(set) var hostWindow: UUID?
 
-    @ObservationIgnored private weak var services: AppServices?
+    @ObservationIgnored weak var services: AppServices?
+    /// 바로 앞 판정의 막힘(첫 연결 지표가 같은 막힘을 두 번 세지 않게)
+    @ObservationIgnored var lastBlocker: OnboardingProgress.Blocker?
 
     init(services: AppServices? = nil) {
         self.services = services
@@ -41,11 +43,16 @@ final class OnboardingModel {
         chosenRoot = nil
         install = nil
         toolTask = nil
+        lastBlocker = nil
         isPresented = true
+        recordStart()
         services?.integration.refresh()
     }
 
-    func close() { isPresented = false }
+    func close() {
+        recordEnd(finished: false)
+        isPresented = false
+    }
 
     /// 메인 창이 뜰 때. 맡은 창이 없으면 이 창이 맡는다
     func claimHost(_ window: UUID) { if hostWindow == nil { hostWindow = window } }
@@ -58,6 +65,7 @@ final class OnboardingModel {
     /// 「끝」: 다시 자동으로 뜨지 않게 기억한다.
     func finish() {
         UserDefaults.standard.set(true, forKey: OnboardingProgress.completedKey)
+        recordEnd(finished: true)
         isPresented = false
     }
 
@@ -69,13 +77,15 @@ final class OnboardingModel {
     func prepareInstall() {
         let tools = AgentProvider.allCases.filter { selected.contains($0) }
         if let install, install.providers == tools, install.action == .install, install.phase != .ready { return }
-        install = OnboardingTask(providers: tools, action: .install, home: home) { [weak self] in
+        install = OnboardingTask(providers: tools, action: .install, home: home,
+                                 report: reporter(.install)) { [weak self] in
             self?.services?.integration.refresh()
         }
     }
 
     func startToolTask(_ provider: AgentProvider, _ action: IntegrationPlan.Action) {
-        toolTask = OnboardingTask(providers: [provider], action: action, home: home) { [weak self] in
+        toolTask = OnboardingTask(providers: [provider], action: action, home: home,
+                                  report: action == .install ? reporter(.tools) : { _ in }) { [weak self] in
             self?.services?.integration.refresh()
         }
     }

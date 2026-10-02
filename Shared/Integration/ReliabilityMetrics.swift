@@ -17,6 +17,8 @@ public struct ReliabilityMetrics: Codable, Equatable, Sendable {
     public var resumeSeconds: [Double] = []
     public var failures = Failures()
     public var recovery = Recovery()
+    /// 첫 연결(온보딩) 시도들(TRK-45)
+    public var onboarding = OnboardingMetrics()
 
     public struct Failures: Codable, Equatable, Sendable {
         /// 로컬 서버를 열지 못함
@@ -52,6 +54,8 @@ public struct ReliabilityMetrics: Codable, Equatable, Sendable {
         resumeSeconds = try c.decodeIfPresent([Double].self, forKey: .resumeSeconds) ?? []
         failures = try c.decodeIfPresent(Failures.self, forKey: .failures) ?? Failures()
         recovery = try c.decodeIfPresent(Recovery.self, forKey: .recovery) ?? Recovery()
+        // 읽지 못해도 나머지 지표는 살린다
+        onboarding = (try? c.decodeIfPresent(OnboardingMetrics.self, forKey: .onboarding)) ?? OnboardingMetrics()
     }
 
     /// 실시간 훅 한 건. 시각이 거꾸로면(시계 조정) 0으로.
@@ -118,6 +122,6 @@ public struct ReliabilityMetrics: Codable, Equatable, Sendable {
             latency("수신→저장", saveMs), latency("수신→화면", displayMs), resume,
             "연동 실패: 서버 시작 \(failures.server) · 형식 오류 \(failures.invalidInput) · 저장 실패 \(failures.saveFailed)",
             "복구: 미처리 기록 흡수 \(recovery.absorbed) · 보존 \(recovery.preserved) · 격리 \(recovery.quarantined) · 세션 정리 \(recovery.sessionsClosed)",
-        ]
+        ] + onboarding.diagnosticLines()
     }
 }

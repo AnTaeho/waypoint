@@ -20,7 +20,7 @@ struct OnboardingReceiveStep: View {
             if case .serverDown(let reason) = progress.blocker {
                 HStack(spacing: Theme.Spacing.m) {
                     Text(reason).foregroundStyle(Theme.Onboarding.problem)
-                    Button("다시 시도") { services.retryIntegration() }
+                    Button("다시 시도") { services.onboarding.retryServer() }
                 }
                 .font(Theme.captionLarge)
             } else if case .unlinked = progress.blocker, let text = OnboardingText.blocker(progress.blocker!) {
