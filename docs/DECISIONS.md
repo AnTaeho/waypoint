@@ -422,9 +422,27 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 해제해도 `~/.claude/waypoint/`·`~/.codex/waypoint/`의 스크립트는 남긴다 | 열린 세션이 이전 설정으로 스크립트를 부른다(파이썬 설치기와 같은 까닭) | 지우기 | 계획의 `remove` 분기 |
 | MCP는 `claude mcp add/remove` CLI로, `~/.claude.json`은 읽기만. CLI가 없거나 실패하면 그 단계만 결과에 남기고 파일은 둔다 | `~/.claude.json`은 Claude Code가 자주 쓰는 큰 파일이다. 파일과 MCP는 서로 독립이라 MCP 실패로 훅까지 되돌릴 까닭이 없다. 메인 세션 결정 | 직접 편집, 실패하면 전부 되돌리기 | `ClaudeCommandRunner`·`Result.isPartial` |
 | 다른 포트의 Waypoint 주소(`http://127.0.0.1:<포트>/mcp`)로 등록돼 있으면 지우고 다시 등록, 다른 주소면 건너뜀 | 평소용↔Dev 전환을 설치기 하나로. 남의 서버는 건드리지 않는다 | 다른 주소도 멈춤 | `ClaudeInstallPlanner.planMCP` |
-| Dev 설치도 사용자 범위에 한다(평소용 항목을 바꿔 끼움) | 카드 지시(`AppInstance` 기준 포트 선택). 이 Mac처럼 평소용이 늘 켜져 있으면 Dev는 실측 폴더(`dev-probe-setup.sh`)가 맞다 — TRK-44에서 Dev 설치를 막을지 정한다 | Dev는 프로젝트 범위 | `IntegrationInstallContext.instance` |
+| Dev 설치도 사용자 범위에 한다(평소용 항목을 바꿔 끼움) | 카드 지시(`AppInstance` 기준 포트 선택). 이 Mac처럼 평소용이 늘 켜져 있으면 Dev는 실측 폴더(`dev-probe-setup.sh`)가 맞다 — TRK-44에서 Dev의 실제 홈 설치를 막기로 정했다(「온보딩 화면 (TRK-44)」) | Dev는 프로젝트 범위 | `IntegrationInstallContext.instance` |
 | Codex는 `install-codex.py`를 그대로 옮기고 같은 입력에서 결과 파일을 바이트 비교한다(`install.json`의 `backup`만 다름). 바뀔 것이 없으면 쓰지 않는 것만 다르다 | Codex는 훅을 해시로 신뢰한다. 같은 `hooks.json`이어야 다시 설치해도 신뢰가 풀리지 않는다 | 새로 설계 | `CodexInstallPlanner` |
 | TOML은 필요한 것만 읽는 작은 해석기(`MiniTOML`) | 외부 의존성 없이 구조 오류·`mcp_servers.waypoint`·`features.hooks`만 알면 된다. `tomllib`보다 날짜·숫자 검사가 느슨하다 | 외부 TOML 라이브러리 | `MiniTOML` |
 | 이번 카드엔 디버그 진입점을 두지 않았다 | 테스트(임시 홈·가짜 CLI)로 모든 경로를 돌렸고, 실제 홈에 쓰는 진입점은 위험만 늘린다 | Debug 메뉴 | — |
 
 검증: 임시 홈에서 처음 설치·재설치(빈 계획)·해제(사용자 설정 바이트 복원)·Dev 전환·두 번째 쓰기 실패 되돌림·백업 권한·가짜 `claude` CLI. Codex는 Homebrew python3로 파이썬 설치기와 결과 비교. 이 Mac의 실제 설정을 임시 홈에 복사(읽기만)해 Claude·Codex 모두 빈 계획임을 확인했다. 실제 `~/.claude`·`~/.claude.json`·`~/.codex`·`~/.agents`에는 쓰지 않았고 `claude mcp`도 실제 홈으로 돌리지 않았다.
+
+## 2026-10-02 — 온보딩 화면 (TRK-44)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| Dev 앱은 실제 홈에 설치·해제하지 않는다(버튼 비활성 + 까닭 한 줄). Debug 빌드의 `WAYPOINT_INTEGRATION_HOME`이 있으면 그 폴더를 홈으로 써서 허용하고 Release는 변수를 무시한다. 판정은 `IntegrationHomePolicy`(순수, 테스트). TRK-43 표의 Dev 행을 이 카드에서 정했다. 메인 세션 결정 | 평소용이 늘 켜진 이 Mac에서 Dev가 사용자 범위에 설치하면 평소용 연결이 47822로 바뀌어 기록이 끊긴다. 확인용 홈이 있어야 화면·설치를 실제로 돌려 볼 수 있다 | Dev도 사용자 범위에 설치(TRK-43 그대로) | `IntegrationHomePolicy.installBlock`·`IntegrationEnvironment` |
+| Dev가 막혀 있으면 「확인 필요」 상태(평소용 포트로 연결됨)도 막힌 까닭으로 보인다 | Dev가 실제 홈을 보면 평소용 연결이 늘 포트 불일치로 나온다. Dev에서는 고칠 수 없으니 그 까닭이 맞다 | 확인 필요 문구 그대로 | `OnboardingProgress.blocker(.install)` |
+| 첫 실행 자동 표시는 프로젝트가 보관 포함 하나도 없고 「끝」을 누른 적이 없을 때만. 「닫기」는 끝낸 것으로 기억하지 않는다. 메인 세션 결정(조건), 닫기 처리는 이 카드 판단 | 이 Mac처럼 프로젝트가 있으면 뜨지 않아야 한다. 프로젝트 없이 닫았다면 다음 실행에 다시 보이는 편이 낫다 | 닫아도 끝낸 것으로 | `OnboardingProgress.shouldAutoPresent`·`OnboardingModel.finish` |
+| 다시 열기는 연동 상태 패널 「연결 설정」과 메뉴 막대 「연결 설정…」. 다시 설치·연결 해제는 도구 단계에서 도구마다, 해제도 계획을 보이고 확인한 뒤 적용. 메인 세션 결정 | 연동 상태를 보는 곳에서 고치러 간다. 설정 창은 사용량 표시뿐이라 두지 않았다 | 설정 창 | `IntegrationHealthPanel`·`MenuBarContent`·`OnboardingToolsStep` |
+| 온보딩은 메인 창 시트. 진행 상태(`OnboardingModel`)는 `AppServices`가 들어 창을 닫았다 열어도 이어진다 | 메인 창이 없는 메뉴 막대 상태에서도 다시 열면 같은 자리로. 등록 창(별도 창)과 함께 떠도 겹치지 않는다 | 별도 창 | `RootView.sheet`·`AppServices.onboarding` |
+| 폴더를 고르면 `ProjectDraft.folder`로 초안을 만들어 기존 등록 창에 넣는다. 이름 = 폴더 이름, 키 = `ProjectKey.suggest(이름, 폴더)`, 지침 문서 = 폴더 바로 아래 `AGENTS.md`·`CLAUDE.md`·`.claude/CLAUDE.md` 중 있는 것. 이미 등록된 폴더면 고른 것으로 본다. 보관된 프로젝트면 막는다. 메인 세션 결정(경로), 필드는 이 카드 판단 | `project_init`과 같은 등록 규칙·창을 쓴다. 앱은 LLM을 부르지 않으므로 개요·스택·카드를 지어내지 않고, `/tracker init` 스킬이 꼽는 지침 파일 중 이름이 정해진 것만 찾는다. 보관 프로젝트 폴더는 기록을 받지 않는다 | `docs/` 아래까지 훑기 | `ProjectDraft.folder`·`OnboardingModel.choose` |
+| 「첫 기록」은 온보딩을 연 뒤 활동(`IntegrationReceipt.at`)의, 프로젝트에 연결된 기록. 연결 안 된 기록이면 그 사실을 보이고 계속 기다린다. 판정은 `OnboardingProgress`(순수, 테스트). 메인 세션 결정 | 늦게 재전송된 옛 기록(`at`이 앞)이 첫 기록으로 잡히지 않게. 등록 밖 폴더의 기록은 카드에 안 쌓인다 | 수신 시각(`receivedAt`) 기준 | `OnboardingProgress.received` |
+| 연결·첫 기록 단계는 2초마다 `IntegrationMonitor.refresh`, 끝은 사용자가 「끝」. 메인 세션 결정 | 기록 수신은 바로 반영되지만 설치 상태는 파일을 다시 읽어야 한다 | 10초 점검만 | `OnboardingView.poll` |
+| 계획 화면은 설치기의 `summary` 대신 파일 `~` 경로 + 새로 만듦/바꿈/지움(`before`/`after`로 판정), 명령은 「Claude Code에 Waypoint 등록」, 건너뜀은 「… 건너뜀 · 까닭」 | `summary`에는 훅·MCP·스크립트 같은 만든 쪽 용어가 들어 있다. 설치 동작은 바꾸지 않는다. Codex 설치기의 멈춤 문구(`conflict`)는 원문을 그대로 원인으로 보인다 | 설치기 문구 고치기(범위 밖) | `OnboardingText` |
+| 다시 시도는 다시 계획해 바로 적용한다. 계획에 오류가 하나라도 있으면 적용하지 않는다 | 이미 확인한 일이고 끝난 도구는 빈 계획이라 건너뛴다. 「계획 이후 바뀜」 오류는 다시 계획해야 풀린다. 한쪽만 적용되면 어디까지 됐는지 헷갈린다 | 다시 시도도 확인 화면 | `OnboardingTask.retry`·`canApply` |
+| Debug 실행 인자 `-WaypointOnboarding tools\|install\|apply\|project\|receive`, `-WaypointOnboardingFolder <경로>`(확인 창 없이 등록) | 손 없이 단계별 화면을 창 하나로 캡처하려고. `apply`는 확인용 홈이 있을 때만 적용한다. Release에는 없다 | — | `OnboardingLaunch` |
+
+검증: `WAYPOINT_INTEGRATION_HOME`·`WAYPOINT_SUPPORT_DIR`를 임시 폴더로 Dev를 뒤에서 띄워 첫 실행 자동 표시(도구), 연결 계획, 적용 결과(임시 홈에 Claude·Codex 설치, `claude mcp add`도 임시 홈의 `.claude.json`에 47822로), 첫 기록 대기, 끝 화면을 시트 창 하나만 캡처했다. 끝 화면은 임시 홈에 깔린 훅 명령으로 가짜 `SessionStart`(등록한 임시 폴더)를 47822에 보내 넘어가는 것을 봤다. 실제 홈으로 띄운 Dev는 연결 단계에서 막히는 것을 봤다(설정 파일은 읽기만). 실제 `~/.claude`·`~/.codex`·`~/.agents`에는 쓰지 않았다.
