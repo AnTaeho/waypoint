@@ -86,7 +86,7 @@ public enum DashboardQuery {
 
         var pending: [Pending] = []
         // 끝난 세션은 줄이 되지 않는다. 상태 판정(끝난 까닭을 이벤트에서 찾을 수 있다)을 건너뛴다.
-        for session in project.sessions ?? [] where session.endedAt == nil {
+        for session in openSessions(of: project) {
             let state = SessionRules.state(of: session, now: now, stallTimeout: stallTimeout)
             let work: CardWorkState
             switch state {
@@ -159,7 +159,7 @@ public enum DashboardQuery {
             }
         }
         // 카드 없이 도는 메인 세션도 작업중·멈춤에 센다(대시보드 줄과 같은 기준).
-        for session in project.sessions ?? [] where session.kind == .main && session.endedAt == nil {
+        for session in openSessions(of: project) where session.kind == .main {
             guard !session.openCardSessions.contains(where: { $0.card != nil }),
                   SessionRules.hasUnassignedWork(session, now: now, stallTimeout: stallTimeout) else { continue }
             switch SessionRules.state(of: session, now: now, stallTimeout: stallTimeout) {
@@ -178,11 +178,36 @@ public enum DashboardQuery {
     }
 
     /// 이벤트·세션 활동·카드 수정 중 가장 늦은 시각. 아무것도 없으면 nil.
-    /// 이벤트는 훅마다 쌓이므로 전체를 읽지 않고 `lastEventAt` 캐시를 쓴다.
+    /// 이벤트는 훅마다 쌓이므로 전체를 읽지 않고 `lastEventAt` 캐시를 쓴다. 세션도 쌓이므로 가장 늦은 것만 읽는다.
     public static func lastActivityAt(of project: Project) -> Date? {
-        let times: [Date] = [project.lastEventAt].compactMap { $0 }
-            + (project.sessions ?? []).map(\.lastSeenAt)
+        let times: [Date] = [project.lastEventAt, latestSessionActivity(of: project)].compactMap { $0 }
             + (project.cards ?? []).map(\.updatedAt)
         return times.max()
+    }
+
+    /// 이 프로젝트의 끝나지 않은 세션(순서 없음). 끝난 세션은 계속 쌓이므로(큰 기록에서 1,600개) 관계(`project.sessions`)
+    /// 전체를 돌지 않고 질의로 좁힌다(TRK-66). 질의는 저장 전 변경(새 세션, 끝남·되살림)도 본다.
+    static func openSessions(of project: Project) -> [Session] {
+        guard let context = project.modelContext else { return (project.sessions ?? []).filter { $0.endedAt == nil } }
+        let projectID = project.id
+        var descriptor = FetchDescriptor<Session>(predicate: #Predicate<Session> {
+            $0.endedAt == nil && $0.project?.id == projectID
+        })
+        // 상태 판정이 하위 세션을 읽는다(서브에이전트 100개가 넘는 세션이 있다). 하나씩 읽지 않게 같이 가져온다.
+        descriptor.relationshipKeyPathsForPrefetching = [\.children]
+        return ((try? context.fetch(descriptor)) ?? []).filter { $0.project === project }
+    }
+
+    /// 세션 중 가장 늦은 `lastSeenAt`. 저장소에서는 가장 늦은 몇 개만 읽고, 저장 전 바뀐 세션은 메모리 값으로 더한다
+    /// (저장소 값이 옛 값이거나 다른 프로젝트로 옮겨 가는 중이어도 맞게).
+    static func latestSessionActivity(of project: Project) -> Date? {
+        guard let context = project.modelContext else { return (project.sessions ?? []).map(\.lastSeenAt).max() }
+        let pending = (context.insertedModelsArray + context.changedModelsArray).compactMap { $0 as? Session }
+        let projectID = project.id
+        var descriptor = FetchDescriptor<Session>(predicate: #Predicate<Session> { $0.project?.id == projectID },
+                                                  sortBy: [SortDescriptor(\.lastSeenAt, order: .reverse)])
+        descriptor.fetchLimit = pending.count + 1
+        let stored = (try? context.fetch(descriptor)) ?? []
+        return (stored + pending).filter { $0.project === project && !$0.isDeleted }.map(\.lastSeenAt).max()
     }
 }

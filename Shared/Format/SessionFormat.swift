@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 public enum SessionFormat {
 
@@ -72,22 +73,60 @@ public enum SessionFormat {
 
     /// 이 카드·세션의 가장 최근 `file.changed` 경로의 파일 이름. 없으면 nil.
     public static func recentFileName(card: Card, session: Session) -> String? {
-        let latest = (card.events ?? [])
-            .filter { $0.type == .fileChanged && $0.session === session }
-            .max { $0.at < $1.at }
+        guard let context = session.modelContext else {
+            return fileName(of: (card.events ?? []).filter { $0.type == .fileChanged && $0.session === session }
+                .max { $0.at < $1.at })
+        }
+        let raw = EventType.fileChanged.rawValue
+        let cardID = card.persistentModelID, sessionID = session.persistentModelID
+        let predicate = #Predicate<Event> {
+            $0.typeRaw == raw && $0.card?.persistentModelID == cardID && $0.session?.persistentModelID == sessionID
+        }
+        let latest = latestEvent(in: context, predicate) { event in
+            event.type == .fileChanged && event.card === card && event.session === session
+        }
         return fileName(of: latest)
     }
 
     /// 카드 없는 세션 줄: 이 세션과 그 서브에이전트가 카드 없이 남긴 가장 최근 `file.changed`의 파일 이름. 없으면 nil.
     public static func recentFileName(session: Session) -> String? {
-        var sessions: [Session] = [session]
-        sessions.append(contentsOf: session.children ?? [])
-        var latest: Event?
-        for event in sessions.flatMap({ $0.events ?? [] })
-        where event.type == .fileChanged && event.card == nil && event.at > (latest?.at ?? .distantPast) {
-            latest = event
+        let owners = [session] + (session.children ?? [])
+        guard let context = session.modelContext else {
+            let events: [Event] = owners.flatMap { $0.events ?? [] }
+            return fileName(of: events.filter { $0.type == .fileChanged && $0.card == nil }.max { $0.at < $1.at })
         }
-        return fileName(of: latest)
+        let raw = EventType.fileChanged.rawValue
+        let sessionID = session.persistentModelID
+        let ownPredicate = #Predicate<Event> {
+            $0.typeRaw == raw && $0.card == nil && $0.session?.persistentModelID == sessionID
+        }
+        let own = latestEvent(in: context, ownPredicate) { event in
+            event.type == .fileChanged && event.card == nil && event.session === session
+        }
+        // 서브에이전트가 여럿이어도(100개 넘는 세션이 있다) 질의 하나로 본다.
+        let children = (session.children ?? []).map(\.persistentModelID)
+        let childPredicate = #Predicate<Event> { event in
+            event.typeRaw == raw && event.card == nil
+                && (event.session.flatMap { children.contains($0.persistentModelID) } ?? false)
+        }
+        let child = children.isEmpty ? nil : latestEvent(in: context, childPredicate) { event in
+            event.type == .fileChanged && event.card == nil && event.session?.parent === session
+        }
+        // 같은 시각이면 세션 자신의 것(전 구현은 세션 → 서브에이전트 순으로 돌았다)
+        guard let child, child.at > (own?.at ?? .distantPast) else { return fileName(of: own) }
+        return fileName(of: child)
+    }
+
+    /// 조건에 맞는 이벤트 중 가장 늦은 것. 긴 세션은 이벤트가 1,000건을 넘는다. 대시보드가 세션을 매번 새로 읽으므로
+    /// (TRK-66) 관계를 다 읽으면 그릴 때마다 이벤트를 하나씩 다시 읽는다. 저장소에서는 가장 늦은 몇 건만 읽고, 저장 전에 넣거나
+    /// 바꾼 이벤트는 메모리 값(`matches`)으로 다시 본다.
+    static func latestEvent(in context: ModelContext, _ predicate: Predicate<Event>,
+                            matches: (Event) -> Bool) -> Event? {
+        let pending = (context.insertedModelsArray + context.changedModelsArray).compactMap { $0 as? Event }
+        var descriptor = FetchDescriptor<Event>(predicate: predicate, sortBy: [SortDescriptor(\.at, order: .reverse)])
+        descriptor.fetchLimit = pending.count + 1
+        let stored = (try? context.fetch(descriptor)) ?? []
+        return (stored + pending).filter { !$0.isDeleted && matches($0) }.max { $0.at < $1.at }
     }
 
     private static func fileName(of event: Event?) -> String? {
