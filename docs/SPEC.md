@@ -666,3 +666,47 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 - 쓴 뒤에는 지침 목록을 다시 모은다(홈 바로 아래 파일은 감시하지 않으므로).
 
 검증: `GuidanceFileWriteTests`(쓰기·백업 내용·권한 0700/0600·원래 권한 유지·50개 정리·같은 밀리초 순서·복원 전 백업·지운 파일 복원·디스크 변경과 사라진 파일 거절·여러 파일 중 하나만 바뀌어도 아무것도 안 씀·기억 지우기와 되돌리기(바이트까지)·색인 바뀐 뒤 되돌리기 거절·색인 없는 파일·`MEMORY.md` 없는 폴더·파일 없는 색인 줄·한 파일을 가리키는 색인 줄 여럿·애매한 색인·기억 내용 고치기·Codex DB 쓰기 거절·잘못된 규칙 저장 거절), `CommandRulesCheckTests`(자체 검사 통과·거절과 줄 번호, Codex 오류 출력 읽기, 가짜 실행 파일로 시간 초과·실행 실패 → 「검사 못 함」·저장 안 함, `codex`가 있을 때만 실제 CLI로 맞는 파일·빈 파일·검사 명령을 막는 규칙·잘못된 결정값(줄 2)·닫히지 않은 괄호·모르는 이름), `GuidanceOpenSessionsTests`, `GuideItemTargetTests`(파일 대상 6종, 보기만 4종). 모든 테스트는 임시 폴더만 쓴다.
+
+## 저장소 백업·복구 (2026-10-02, TRK-46)
+
+업데이트나 깨진 파일 때문에 기록을 잃지 않게 한다. 코드는 `Shared/Store/`(`WaypointSchema`·`StoreBackup`·`StoreLaunch`·`SQLiteFile`), 앱은 `WaypointStore.openForLaunch`로 연다(macOS·iOS 같은 `App/WaypointApp.swift`).
+
+### 저장 형식 판
+
+- 지금 모델을 `WaypointSchemaV1`(1.0.0)로 고정하고 `WaypointMigrationPlan`(판 하나, 단계 없음)으로 연다. 모델 정의·저장 형식은 그대로라 판을 붙이기 전 저장소가 그대로 열린다(`StoreSchemaTests`: 판 없는 `Schema`로 만든 저장소, 이 Mac 실제 저장소의 사본 — 프로젝트 4·카드 110·이벤트 4628, CloudKit 끔).
+- **다음 판을 더할 때**: ① 지금 모델 클래스를 `WaypointSchemaV1` 안으로 옮겨 그 판의 모습을 얼린다(`static var models`가 그 안의 타입을 가리키게) ② 바꾼 모델로 `WaypointSchemaV2`(예: 1.1.0)를 만든다 ③ `WaypointMigrationPlan.schemas`에 V2를 더하고 `stages`에 `.lightweight(fromVersion:toVersion:)`(CloudKit 스키마는 필드를 더하기만 하므로 속성 더하기·옵셔널·기본값 안에서 바꾼다. 사용자 정의 단계가 미러링과 맞는지는 쓸 때 확인) ④ `WaypointStore.schema`를 V2로, `currentSchemaVersion`이 V2를 읽게 ⑤ V1 저장소를 만들어 V2로 여는 테스트를 더한다. 판이 바뀌면 처음 여는 실행이 열기 전에 `upgrade` 백업을 뜬다.
+
+### 백업
+
+- 자리 `<저장 폴더>/store-backups/<UTC yyyyMMddTHHmmss.SSSZ>-<사유>/`(0700), 안에 저장소 파일(0600)과 `info.json`(사유·시각·앱 버전·빌드·판·뜬 방법·파일별 바이트). 앱 버전·빌드·판은 그 백업의 저장소를 마지막으로 연 앱이다(판 기록이 없던 저장소면 `unknown`/`unknown`/1.0.0). `info.json`을 마지막에 쓰므로 없으면 끝나지 않은 백업으로 보고 정리 때 지운다. 최근 7개만 남긴다(같은 밀리초면 1 ms 뒤로 밀어 이름순 = 시각순).
+- 사유: `upgrade` — 앱 버전·빌드·판이 `store-version.json`(지난번 연 판, 열기에 성공한 뒤에 쓴다)과 다르거나 그 파일이 없을 때(TRK-46 이전 앱이 쓰던 저장소의 첫 실행 포함), 컨테이너를 열기 전. `daily` — 마지막 백업이 24시간보다 오래면 실행할 때. `manual` — 열린 상태(화면은 TRK-47). `beforeRestore` — 예약 복원 바로 전.
+- 방법: 열기 전(`upgrade`·`daily`·`beforeRestore`)은 store·-wal·-shm 파일 복사(`beforeRestore`는 옮기기). 열린 상태(`manual`)는 SQLite 온라인 백업(`sqlite3_backup_*`, 읽기 전용 원본 연결): WAL에만 있는 변경까지 담긴 한 시점의 사본을 롤백 저널 모드 파일 하나로 남긴다.
+- `Waypoint_ckAssets/`는 넣지 않는다. 동기화가 큰 첨부를 내려받아 두는 캐시이고, 모델에 `.externalStorage` 속성이 없으며, 이 Mac의 폴더도 비어 있다(2026-10-02 확인).
+- 백업이 실패해도(디스크 등) 열기는 막지 않고 로그에만 남긴다.
+
+### 열기 순서와 복구
+
+1. 예약 복원(`pending-restore.json`)이 있으면 지운 뒤: 지금 저장소를 `beforeRestore` 백업으로 옮기고 → 예약한 백업을 저장소 자리에 복사 → `store-restore.json`(`kind: manual`). 예약한 백업이 없거나 크기가 맞지 않으면 건너뛴다. 중간에 실패하면 옮긴 파일을 제자리로 돌려놓는다.
+2. 복원하지 않았으면 `upgrade` 또는 `daily` 백업.
+3. 연다. 성공하면 `store-version.json`을 쓴다.
+4. 실패하고 저장소 파일이 있으면: store·-wal·-shm을 `<저장 폴더>/store-failed/<UTC 시각>/`(0700)로 옮기고 `failure.json`(원인, `quick_check` 결과)을 남긴다. 지우지 않는다. 백업을 최신순으로 하나씩 저장소 자리에 복사해 `PRAGMA quick_check`(읽기 전용) → 열기를 해 보고, 처음 열리는 것을 쓴다(`store-restore.json`, `kind: automatic`, 쓴 백업·옮긴 폴더·원인). 이번 실행이 방금 뜬 백업이 깨진 저장소의 사본일 수 있어서 최신 하나만 보지 않는다. 안 맞는 사본은 지운다(백업 폴더는 그대로).
+5. 열리는 백업이 없으면 옮긴 파일을 제자리로 돌려놓고 처음 오류로 멈춘다(지금처럼 원인 메시지). 저장소 파일이 없는데 못 열었으면 저장소 탓이 아니므로 복구하지 않는다.
+
+- 저장소 자리에 백업을 놓기 전에는 store·-wal·-shm이 하나도 남아 있지 않아야 한다(남은 -wal이 다른 저장소 파일에 붙으면 조용히 깨진다).
+- 실패 원인을 가리지 않는다: 깨진 파일과 판이 맞지 않는 저장소(예: 새 판으로 옮긴 뒤 옛 앱을 다시 설치) 모두 복구 대상이다. 그래서 일시적인 원인이었다면 더 오래된 백업으로 돌아갈 수 있지만, 열지 못한 파일이 `store-failed/`에 그대로 남는다.
+- 알림: macOS 연동 상태 패널의 미처리 기록 아래 한 줄(「기록을 열지 못해 <백업 시각> 백업으로 되돌림」, 예약 복원은 「<백업 시각> 백업으로 되돌림」) + 「알림 확인」(기록 파일을 지운다). `/integration/status`의 `storeRestore`. 복원 목록·예약 화면은 TRK-47.
+
+### 수동 복원 API (TRK-47 화면용)
+
+`StoreBackup(storeURL:)`의 `list()`(최신순), `backupOpenStore(stamp:at:)`(manual), `scheduleRestore(_:)`·`scheduledRestore()`·`cancelScheduledRestore()`. 열린 저장소를 바꿔 끼우지 않는다. 적용은 다음 실행의 1단계.
+
+### CloudKit과의 관계
+
+복원은 이 기기의 저장소 파일만 되돌린다. CloudKit 쪽 기록은 건드리지 않는다.
+
+- **확인함(저장소 사본 실측)**: 미러링 상태가 저장소 파일 안에 있다 — 레코드 메타데이터(`ANSCKRECORDMETADATA` 5036행), 영역 `com.apple.coredata.cloudkit.zone`의 서버 변경 토큰과 마지막 가져오기 시각(`ANSCKRECORDZONEMETADATA.ZCURRENTCHANGETOKEN`·`ZLASTFETCHDATE`), 마지막으로 내보낸 기록 이력 토큰(`ANSCKMETADATAENTRY`의 `NSCloudKitMirroringDelegateLastHistoryTokenKey`), 기록 이력(`ATRANSACTION`·`ACHANGE`). 그래서 백업을 되돌리면 동기화 상태도 백업 시점으로 함께 돌아간다.
+- **확인함(Apple 문서, `CKFetchRecordZoneChangesOperation`)**: 이전 서버 변경 토큰을 주면 CloudKit은 그 뒤에 생긴 변경만 돌려준다.
+- **확인 못 함**: `NSPersistentCloudKitContainer`가 복원한 저장소의 옛 토큰으로 다음 가져오기를 해서 백업 이후 다른 기기·이 기기가 올린 변경을 다시 받는지(내부 동작이라 Apple 문서에 없다). 백업 뒤 서버에서 바뀐 레코드가 복원한 로컬 값을 덮는지, 백업 뒤 지운 레코드가 다시 지워지는지. 옛 토큰이 만료돼 전체를 다시 받는 경우가 있는지(제3자 글에만 있다). CloudKit을 켠 복원 실측은 하지 않았다(Dev 실측은 `WAYPOINT_SUPPORT_DIR`로 CloudKit이 꺼진다).
+- 그래서 지금 말할 수 있는 것: 깨진 로컬 파일을 되살리는 데에는 쓸 수 있다. 동기화를 켠 채 「예전 데이터로 되돌리기」로 쓰면 서버의 이후 변경을 다시 받아 되돌림이 일부 풀릴 수 있다(확인 못 함). 기기 실측은 남은 일.
+
+검증: `StoreBackupTests`(판 기록 없는 저장소 = upgrade·빌드 바뀜 → 열기 전 upgrade·같은 판은 없음·daily 24시간·7개 유지와 끝나지 않은 백업 정리·같은 밀리초 순서·0700/0600과 저장 폴더 권한 그대로·첨부 캐시 제외·깨진 저장소 → 보존 폴더 + 앞의 정상 백업 복원 + 열림·백업이 못 쓰면 실패 그대로 + 파일 제자리·저장소 없으면 복구 안 함·온라인 백업으로 복구(남은 -wal 없이)·열린 저장소 온라인 백업의 일관성과 열림·예약 복원·정리에도 남는 예약 대상·없는 예약 백업), `StoreSchemaTests`. Dev 실측은 docs/RELIABILITY.md 「저장소 백업·복구(TRK-46)」.

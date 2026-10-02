@@ -449,3 +449,21 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | Debug 실행 인자 `-WaypointOnboarding tools\|install\|apply\|project\|receive`, `-WaypointOnboardingFolder <경로>`(확인 창 없이 등록) | 손 없이 단계별 화면을 창 하나로 캡처하려고. `apply`는 확인용 홈이 있을 때만 적용한다. Release에는 없다 | — | `OnboardingLaunch` |
 
 검증: `WAYPOINT_INTEGRATION_HOME`·`WAYPOINT_SUPPORT_DIR`를 임시 폴더로 Dev를 뒤에서 띄워 첫 실행 자동 표시(도구), 연결 계획, 적용 결과(임시 홈에 Claude·Codex 설치, `claude mcp add`도 임시 홈의 `.claude.json`에 47822로), 첫 기록 대기, 끝 화면을 시트 창 하나만 캡처했다. 끝 화면은 임시 홈에 깔린 훅 명령으로 가짜 `SessionStart`(등록한 임시 폴더)를 47822에 보내 넘어가는 것을 봤다. 실제 홈으로 띄운 Dev는 연결 단계에서 막히는 것을 봤다(설정 파일은 읽기만). 실제 `~/.claude`·`~/.codex`·`~/.agents`에는 쓰지 않았다.
+
+## 2026-10-02 — 저장소 판·백업·복구 (TRK-46)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 지금 모델을 `WaypointSchemaV1`(1.0.0)로 감싸고 빈 `WaypointMigrationPlan`으로 연다. 모델 클래스는 옮기지 않았다(다음 판을 더할 때 V1 안으로 얼린다). 메인 세션 결정 | 판이 붙어 있어야 다음 판에서 옮기기 단계를 적을 수 있다. 실제 저장소 사본과 판 없는 저장소가 그대로 열리는 것을 확인했다 | 다음 판이 필요할 때 처음 붙이기 | `WaypointStore.schema`를 `Schema([...])`로, `migrationPlan` 인자 빼기 |
+| 열기 전 백업은 파일 복사, 열린 상태(`manual`)는 SQLite 온라인 백업. 둘을 다 둔다 | 열기 전에는 쓰는 쪽이 없어 복사가 바이트 그대로이고 깨진 파일도 그대로 남긴다(SQLite 백업은 깨진 파일에서 실패한다). 열린 상태는 WAL·쓰기 중이라 복사로는 일관성이 없다 | 둘 다 SQLite 백업 | `StoreLaunch.backupBeforeOpening`이 `backupOpenStore`를 부르게 |
+| 최근 7개 유지(사유 구분 없이) | 실제 저장소 30 MB 안팎 × 7 ≈ 200 MB. daily가 한 주 치를 덮는다 | 사유별 개수, 10개 | `StoreBackup.keep` |
+| 복구는 백업을 최신순으로 훑어 `quick_check` + 열기가 되는 첫 백업을 쓴다 | 이번 실행이 열기 전에 뜬 백업이 깨진 저장소의 사본일 수 있다(테스트 `brokenStoreIsMovedAsideAndRestored`로 재현) | 최신 하나만 | `StoreLaunch.recover`의 반복을 첫 항목으로 |
+| 실패 원인을 가리지 않고 복구한다. 다 안 되면 옮긴 파일을 제자리로 돌려놓고 멈춘다 | 판이 안 맞는 저장소(옛 앱 재설치)도 살릴 수 있다. 일시적 원인이었어도 원본이 `store-failed/`에 남는다. 다 실패했을 때 반쯤 바뀐 자리를 남기지 않는다 | `quick_check`가 실패할 때만 복구 | `StoreLaunch.open`에서 `SQLiteFile.quickCheck(storeURL)`이 true면 바로 던지기 |
+| 예약 복원은 지금 저장소를 `beforeRestore` 백업으로 **옮긴다**(복사 후 지우지 않음). 정리할 때 예약 대상과 그 백업은 지키고, 예약 파일은 처리 시작 때 지운다 | 지우는 단계가 없고 빠르다. 7개 정리가 복원할 백업을 지우지 않게. 중간에 죽어도 다음 실행에서 되풀이하지 않게 | 복사 | `StoreLaunch.applyScheduledRestore` |
+| 판 기록은 `<저장 폴더>/store-version.json`(앱 버전·빌드·판), 열기에 성공한 뒤에 쓴다. 파일이 없고 저장소가 있으면 `upgrade` | TRK-46 이전 저장소의 첫 실행이 곧 업데이트다. UserDefaults는 `WAYPOINT_SUPPORT_DIR`를 따르지 않아 확인용 폴더와 섞인다 | UserDefaults | `StoreLaunch.versionFileName` |
+| 복원 알림은 `store-restore.json` + 연동 상태 패널 미처리 기록 아래 한 줄과 「알림 확인」, `/integration/status`의 `storeRestore` | 화면은 TRK-47이 만든다. 그전까지도 사람이 알아채고 HTTP로 확인할 수 있게. 기존 「알림 확인」 모양을 따랐다 | UserDefaults·알림 센터 | `IntegrationHealthPanel`의 `storeRestore` 블록 |
+| 저장 폴더 자체의 권한은 바꾸지 않는다(없을 때 만들기만). 백업·보존 폴더만 0700 | 평소용 `~/Library/Application Support/Waypoint`의 기존 권한을 업데이트가 몰래 바꾸지 않게(Dev 실측에서 처음 구현이 0700으로 바꾸는 것을 보고 고쳤다) | 저장 폴더도 0700 | — |
+| `daily`는 실행할 때만 본다(카드 그대로) | 지시 범위. 평소용은 로그인 항목이라 거의 다시 시작하지 않아 실제로는 드물게 돈다 → 알려진 한계 | 10초 점검에 온라인 백업으로 하루 한 번 | `AppServices.refreshStates`에 `isDailyDue` + `backupOpenStore` |
+| CloudKit: 복원은 로컬만 되돌린다. 미러링 상태(레코드 메타데이터·서버 변경 토큰·이력 토큰)가 저장소 파일 안에 있음은 사본에서 확인, 옛 토큰 뒤 변경만 받는다는 것은 `CKFetchRecordZoneChangesOperation` 문서로 확인. 복원 뒤 `NSPersistentCloudKitContainer`가 실제로 그 뒤 변경을 다시 받는지, 서버 값이 복원값을 덮는지, 토큰 만료 시 동작은 **확인 못 함** | Apple 문서에 내부 동작이 없고 CloudKit을 켠 복원 실측은 범위 밖(Dev 실측은 CloudKit 꺼짐) | — | 실측 뒤 SPEC 「CloudKit과의 관계」 고치기 |
+
+검증: `swift test` 전체 통과, macOS Debug·iOS Simulator 빌드. Dev 실측(스크래치 저장 폴더, CloudKit 꺼짐)은 docs/RELIABILITY.md.
