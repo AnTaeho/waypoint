@@ -75,13 +75,12 @@ run_check() {
     echo "    → Xcode > Settings… > Accounts > + > Apple Account 로 팀 계정에 로그인"
     missing=1
   fi
+  # 키체인에 없어도 막지 않는다: 자동 서명 export가 Xcode 클라우드 관리 Developer ID 인증서로 서명한다(2026-10-02 확인).
   if has_developer_id_cert; then
     echo "  ✓ Developer ID Application 인증서: 키체인에 있음"
   else
-    echo "  ✗ Developer ID Application 인증서가 키체인에 없음"
-    echo "    → Xcode > Settings… > Accounts > (팀 계정) > Manage Certificates… > 왼쪽 아래 + > Developer ID Application"
-    echo "      (Xcode가 클라우드 관리 인증서로 서명할 수도 있다. 이 경우에도 export 단계가 되는지 scripts/release-mac.sh --skip-notarize로 확인)"
-    missing=1
+    echo "  ✓ Developer ID Application 인증서: 키체인에 없음 — export 때 Xcode 클라우드 관리 인증서로 서명"
+    echo "    (export가 인증서 오류로 실패하면 Xcode > Settings… > Accounts > (팀) > Manage Certificates… > + > Developer ID Application)"
   fi
   state="$(notary_profile_state)"
   case "$state" in
@@ -246,7 +245,8 @@ grep -q '^CodeDirectory .*(runtime)' "$WORK/codesign-info.txt" || fail "하드�
 grep '^Authority=' "$WORK/codesign-info.txt" | sed 's/^/  /'
 ENT="$WORK/entitlements.plist"
 codesign -d --entitlements - --xml "$APP" > "$ENT" 2>/dev/null || fail "엔타이틀먼트를 읽지 못함"
-ent_get() { /usr/libexec/PlistBuddy -c "Print :$1" "$ENT" 2>/dev/null | tr -s ' \n' ' ' | sed 's/^ //;s/ $//'; }
+# 배열은 PlistBuddy가 「Array { … }」로 찍는다. 값만 남긴다.
+ent_get() { /usr/libexec/PlistBuddy -c "Print :$1" "$ENT" 2>/dev/null | tr -s ' \n' ' ' | sed 's/^ //;s/ $//;s/^Array { //;s/ }$//'; }
 containers="$(ent_get com.apple.developer.icloud-container-identifiers)"
 environment="$(ent_get com.apple.developer.icloud-container-environment)"
 aps="$(ent_get com.apple.developer.aps-environment)"
