@@ -69,6 +69,18 @@ diff /tmp/schema-dev.ckdb /tmp/schema-prod.ckdb                # 차이가 없�
 
 이번에 실행하지 않았다(토큰 필요). `cktool import-schema`는 `--environment`를 받지만 Production에 바로 넣을 수 있는지는 **확인 못 함** — Production 배포는 Console의 Deploy로 한다.
 
+### 5. 하드닝 런타임에서 앱이 도는지 (첫 배포 전 한 번)
+
+배포 빌드만 하드닝 런타임을 켠다(`project.yml`은 NO). 앱은 `Process`로 `claude`·`codex`를 띄우고 `NSWorkspace`로 터미널을 연다. 예외 엔타이틀먼트 없이 되는지는 배포 앱을 실행하지 않아 **확인 못 함**. 같은 설정의 Dev 빌드로 본다:
+
+```sh
+xcodebuild -project Waypoint.xcodeproj -scheme Waypoint -destination 'platform=macOS' \
+  -derivedDataPath .build/xcode-hardened -allowProvisioningUpdates ENABLE_HARDENED_RUNTIME=YES build
+open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
+```
+
+실측 폴더에서 훅 수신(47822), 카드의 터미널 열기, 연동 상태 진단이 평소 Dev와 같은지 확인한다. 되면 `project.yml`에서 켜서 평소용과 배포 빌드를 맞출지 정한다.
+
 ## 단계와 기대 출력
 
 `scripts/release-mac.sh` 한 번이 아래를 차례로 한다. 단계마다 `· …` 한 줄을 출력하고, 실패하면 이유를 출력하고 exit 1. 같은 내용이 `dist/<이름>-summary.txt`에 남는다(실패해도).
