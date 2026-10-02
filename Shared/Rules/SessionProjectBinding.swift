@@ -3,6 +3,9 @@ import SwiftData
 
 /// 한 대화가 프로젝트를 전환해도 이전 카드·이벤트의 소속은 바꾸지 않는다.
 public enum SessionProjectBinding {
+    /// `note` 이벤트 payload의 `kind` 값: 세션이 다른 프로젝트로 옮겨 붙었다(`from`·`to` 키).
+    public static let boundNoteKind = "project.bound"
+
     @discardableResult
     public static func bind(_ session: Session, to project: Project, at date: Date,
                             in context: ModelContext) -> [String] {
@@ -19,7 +22,7 @@ public enum SessionProjectBinding {
         session.gitBranch = GitInfo.branch(at: project.rootPath)
         if date > session.lastSeenAt { session.lastSeenAt = date }
         Event.record(.note, in: context, project: project, session: session, at: date,
-                     payload: ["kind": .string("project.bound"), "from": .string(previous ?? ""),
+                     payload: ["kind": .string(boundNoteKind), "from": .string(previous ?? ""),
                                "to": .string(project.key)])
         return detached
     }

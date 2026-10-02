@@ -105,6 +105,7 @@ struct RootView: View {
         .onDisappear { services?.mainWindowCount -= 1 }
         .guideLaunch(selection: $selection, projectMode: $projectMode)
         .onboardingSheet(services)
+        .settingsLaunch()
     }
 
     private var inspectorTitle: String {

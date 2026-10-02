@@ -178,3 +178,25 @@ scripts/dev-probe-setup.sh --remove ~/workspace/waypoint-probe # 되돌리기
 - 서명: `project.yml`의 `DEVELOPMENT_TEAM`·`CODE_SIGN_IDENTITY`·`CODE_SIGN_ENTITLEMENTS…`를 빼고 `install-local.sh`에 `CODE_SIGN_IDENTITY=-`를 되돌리면 M6 전 애드혹 빌드. CloudKit은 함께 빼야 한다.
 - iPhone 앱: 기기에서 앱을 길게 눌러 삭제.
 - 인스턴스 분리 자체: `project.yml`의 `configs: Debug:` 블록을 지우고 `xcodegen generate`. Debug가 다시 `dev.antaeho.waypoint`가 되어 평소용과 같은 포트·저장소를 쓴다(둘을 동시에 켜지 않는다).
+
+## 기록 탭 실측 (TRK-47)
+
+실제 저장소는 열지 않는다. 평소용이 뜬 백업 폴더 하나를 스크래치 폴더로 복사해 쓴다.
+
+```sh
+P=<스크래치>/records-probe; mkdir -p $P/support $P/out
+cp "$HOME/Library/Application Support/Waypoint/store-backups/<최근 폴더>/"Waypoint.store* $P/support/
+APP=.build/xcode/Build/Products/Debug/Waypoint.app
+ENV="--env WAYPOINT_SUPPORT_DIR=$P/support --env WAYPOINT_CLOUDKIT=0 --env WAYPOINT_RELAUNCH_HIDDEN=1"
+open -g -j $ENV $APP --args -WaypointSettingsTab records -WaypointExport $P/out/all.json   # 창 + 전체 내보내기
+open -g -j $ENV $APP --args -WaypointBackupNow 1 -WaypointExport $P/out/one.json -WaypointExportProject <키>
+open -g -j $ENV $APP --args -WaypointRestore <백업 폴더 이름|latest>   # 예약 → 다시 시작
+open -g -j $ENV $APP --args -WaypointWipe 1                            # 지우기 → 다시 시작
+osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
+```
+
+- 한 번에 하나씩, 앞 인스턴스를 끈 뒤 띄운다(꺼지는 중이면 `open`이 -600으로 실패한다).
+- 설정 창은 `-WaypointSettingsTab records`로 메인 창이 뜰 때 열린다. 아래 구역은 `-WaypointSettingsScroll bottom`. 창 번호는 `CGWindowListCopyWindowInfo`(이름 「기록」), `screencapture -x -o -l <번호>`.
+- 다시 시작은 `WAYPOINT_*` 변수를 넘기고 인자는 넘기지 않는다. `WAYPOINT_RELAUNCH_HIDDEN=1`이면 다시 뜬 앱도 숨긴 채(`-j`).
+- 확인: 백업은 `$P/support/store-backups/*/info.json`, 복원은 `store-restore.json`과 `curl -s 127.0.0.1:47822/integration/status`의 `storeRestore`, 지우기는 `sqlite3 "file:$P/support/Waypoint.store?mode=ro"`의 `ZPROJECT`·`ZCARD`… 행 수.
+- 복원이 실제로 되돌리는지 보려면 백업 뒤 `POST 127.0.0.1:47822/hooks/SessionStart`(등록된 폴더 `cwd`, 새 `session_id`)로 세션을 하나 더하고 복원 뒤 그 세션이 없는지 본다.

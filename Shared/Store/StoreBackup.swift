@@ -16,6 +16,8 @@ public struct StoreBackup: Sendable {
         case manual
         /// 예약한 복원 바로 전(열기 전)
         case beforeRestore
+        /// 모든 기록 지우기 바로 전(열린 상태, TRK-47). 이 값을 모르는 옛 앱은 이 백업을 목록·정리에서 건너뛴다.
+        case beforeDelete
     }
 
     /// 뜬 방법. 열기 전에는 파일 복사(store·-wal·-shm), 열린 상태에서는 SQLite 온라인 백업(파일 하나).

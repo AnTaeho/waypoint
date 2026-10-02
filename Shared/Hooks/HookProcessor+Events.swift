@@ -23,7 +23,7 @@ extension HookProcessor {
             let duplicate = isRedeliveredPrompt(input, text: prompt, in: session, at: date)
             if !duplicate {
                 let ownership = (session.events ?? []).filter {
-                    $0.at <= date && ($0.type == .sessionStart || $0.payloadValues["kind"]?.stringValue == "project.bound")
+                    $0.at <= date && ($0.type == .sessionStart || $0.payloadValues["kind"]?.stringValue == SessionProjectBinding.boundNoteKind)
                 }.max { $0.at < $1.at }
                 let project = ownership?.project ?? matchProject(input.cwd) ?? session.project
                 let cards = (session.cardSessions ?? []).filter {

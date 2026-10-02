@@ -38,6 +38,8 @@ final class AppServices {
     /// 떠 있는 동안의 daily 저장소 백업(10초 점검이 판정, 백업은 백그라운드). iOS는 실행 때만.
     @ObservationIgnored let dailyBackup = (try? WaypointStore.defaultStoreURL())
         .map { StoreDailyBackup(storeURL: $0, stamp: .current()) }
+    /// 설정 창 「기록」 탭의 백업·복원·내보내기·지우기(TRK-47)
+    @ObservationIgnored private(set) lazy var records = RecordsModel(container: container, daily: dailyBackup)
     @ObservationIgnored let container: ModelContainer
     @ObservationIgnored var processor: HookProcessor?
     @ObservationIgnored private var server: LocalServer?
@@ -148,6 +150,7 @@ final class AppServices {
         self.timer = timer
         observeLifecycle()
         OnboardingLaunch.start(onboarding, container: container)
+        RecordsLaunch.start(records)
     }
 
     /// iPhone에서 온 변경(CloudKit 가져오기)을 메인 context에 들인다(`RemoteCardMerge`). 그대로 두면 iPhone에서

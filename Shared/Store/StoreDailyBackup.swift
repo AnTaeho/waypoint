@@ -49,6 +49,29 @@ public final class StoreDailyBackup: @unchecked Sendable {
         }
     }
 
+    /// 지금 바로 뜬다(기록 탭 「지금 백업」·지우기 전, TRK-47). 24시간 판정은 보지 않고, 다른 백업이 도는 중이면 nil.
+    /// 온라인 백업과 정리(`prune`)가 겹치지 않게 daily와 같은 진행 중 표시를 쓴다. 부른 스레드에서 돈다.
+    @discardableResult
+    public func runNow(reason: StoreBackup.Reason, now: Date = Date()) throws -> StoreBackup.Entry? {
+        guard claimNow() else { return nil }
+        do {
+            let entry = try backup.backupOpenStore(reason: reason, stamp: stamp, at: now)
+            finish(entry)
+            return entry
+        } catch {
+            finish(nil)
+            throw error
+        }
+    }
+
+    func claimNow() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !running else { return false }
+        running = true
+        return true
+    }
+
     /// 판정은 부른 스레드에서, 백업은 백그라운드 큐에서. 시작했으면 true.
     @discardableResult
     public func startIfDue(now: Date = Date()) -> Bool {

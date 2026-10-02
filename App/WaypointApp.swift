@@ -58,6 +58,8 @@ struct WaypointApp: App {
 
         Settings {
             SettingsView()
+                .modelContainer(container)
+                .environment(services)
         }
         #endif
     }
