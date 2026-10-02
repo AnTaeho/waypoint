@@ -17,89 +17,97 @@ public enum UnfiledWork {
         public let session: Session
         /// 바뀐 파일(프로젝트 기준 상대 경로), 많이 바뀐 것부터. `items(limit:)` 밖의 항목은 비어 있다.
         public let files: [String]
-        /// 카드 없는 `file.changed` 수
-        public let eventCount: Int
     }
 
-    /// 이 프로젝트의 정리 안 된 작업, 최근 것부터. `SessionStart` 응답 안에서 불리므로(훅 타임아웃 1초) 질의를 이 프로젝트·
-    /// 최근 14일로 묶고, 세션은 ID만 먼저 가져온 뒤 카드 없는 파일 변경이 있는 세션만 읽는다. 파일 목록(payload)은 `limit`개만 채운다.
+    /// 이 프로젝트의 정리 안 된 작업, 최근 것부터. `SessionStart` 응답 안에서 불리므로(훅 타임아웃 1초) 세션은 `sessionIDs`로
+    /// 고르고, 파일 목록(payload)은 앞의 `limit`개 세션 것만 읽는다.
     /// `excluding`: 지금 블록을 받는 세션(재개로 다시 열린 세션이 자기 자신을 보지 않게).
     public static func items(for project: Project, now: Date, limit: Int = .max, excluding current: Session? = nil) -> [Item] {
         guard let context = project.modelContext else { return [] }
-        let cutoff = now.addingTimeInterval(-window)
-        let main = SessionKind.main.rawValue
-        let projectID = project.id
-        var ended = Set((try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: #Predicate<Session> {
-            $0.kindRaw == main && $0.lastSeenAt >= cutoff && $0.endedAt != nil && $0.project?.id == projectID
-        }))) ?? [])
-        if let current { ended.remove(current.persistentModelID) }
-        guard !ended.isEmpty else { return [] }
-        let raw = EventType.fileChanged.rawValue
-        let events = (try? context.fetch(FetchDescriptor<Event>(predicate: #Predicate<Event> {
-            $0.typeRaw == raw && $0.at >= cutoff && $0.card == nil && $0.project?.id == projectID
-        }))) ?? []
-
-        // 이벤트의 세션(서브에이전트면 부모) → 끝난 메인 세션. 같은 세션은 한 번만 읽는다.
-        var owner: [PersistentIdentifier: PersistentIdentifier?] = [:]
-        func mainID(of id: PersistentIdentifier, _ session: Session?) -> PersistentIdentifier? {
-            if ended.contains(id) { return id }
-            if let known = owner[id] { return known }
-            let parent = session?.kind == .subagent ? session?.parent?.persistentModelID : nil
-            let result = parent.flatMap { ended.contains($0) ? $0 : nil }
-            owner[id] = result
-            return result
+        let ids = Array(sessionIDs(for: project, in: context, now: now, excluding: current))
+        guard !ids.isEmpty else { return [] }
+        // 한 번에 읽는다(세션마다 따로 읽지 않게).
+        let found = ((try? context.fetch(FetchDescriptor<Session>(predicate: #Predicate<Session> {
+            ids.contains($0.persistentModelID)
+        }))) ?? []).sorted {
+            $0.lastSeenAt != $1.lastSeenAt ? $0.lastSeenAt > $1.lastSeenAt : $0.id < $1.id
         }
-        var grouped: [PersistentIdentifier: [Event]] = [:]
-        for event in events {
-            guard let session = event.session, let id = mainID(of: session.persistentModelID, session) else { continue }
-            grouped[id, default: []].append(event)
-        }
-        guard !grouped.isEmpty else { return [] }
-        let filed = filedSessionIDs(for: project)
-        let found = grouped.compactMap { id, events -> (Session, [Event])? in
-            guard let session = context.model(for: id) as? Session, session.endedAt != nil,
-                  !filed.contains(session.id), !everAttached(session)
-            else { return nil }
-            return (session, events)
-        }.sorted { $0.0.lastSeenAt > $1.0.lastSeenAt }
-        return found.enumerated().map { index, entry in
-            Item(session: entry.0, files: index < limit ? paths(entry.1) : [], eventCount: entry.1.count)
+        return found.enumerated().map { index, session in
+            Item(session: session, files: index < limit ? paths(changes(of: session, project: project, in: context, now: now)) : [])
         }
     }
 
-    /// `items(for:now:)`의 개수만. 상황판처럼 자주 다시 그리는 곳용이다: 카드 없는 `file.changed`를 모두 읽지 않고,
-    /// 조건이 맞는 끝난 메인 세션(넘김·연결 기록 없음, 카드에 붙은 적 없음)마다 그 세션·서브에이전트의 카드 없는
-    /// 파일 변경이 있는지만 센다(`fetchCount`). 실제 저장소 사본(프로젝트 4개)에서 `items` 40–95 ms → 이 경로 7–12 ms(기계 부하에 따라).
+    /// `items(for:now:)`의 개수만(파일 목록·정렬 없이). 상황판이 다시 그릴 때마다 부른다.
     public static func count(for project: Project, now: Date) -> Int {
         guard let context = project.modelContext else { return 0 }
+        return sessionIDs(for: project, in: context, now: now, excluding: nil).count
+    }
+
+    /// 조건에 맞는 세션의 ID, 순서 없음.
+    ///
+    /// 세션·이벤트 객체를 많이 읽지 않게 조건을 질의(하위 질의 포함)로 넘기고 ID만 받는다(TRK-66). 질의 수는 기록 양과 상관없이
+    /// 고정이다. 끝난 세션마다 `fetchCount`를 부르던 예전 방식은 끝난 세션 1,600개 저장소에서 대시보드를 한 번 그릴 때 4초 넘게 걸렸고,
+    /// 이 프로젝트의 파일 변경을 모두 읽어 세션별로 묶는 방식도 2,500건에서 50 ms를 넘었다.
+    static func sessionIDs(for project: Project, in context: ModelContext, now: Date,
+                           excluding current: Session?) -> Set<PersistentIdentifier> {
         let cutoff = now.addingTimeInterval(-window)
         let main = SessionKind.main.rawValue
-        let projectID = project.id
-        let ids = (try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: #Predicate<Session> {
-            $0.kindRaw == main && $0.lastSeenAt >= cutoff && $0.endedAt != nil && $0.project?.id == projectID
-        }))) ?? []
-        guard !ids.isEmpty else { return 0 }
-        let filed = filedSessionIDs(for: project)
+        let subagent = SessionKind.subagent.rawValue
         let raw = EventType.fileChanged.rawValue
-        let projectPID = project.persistentModelID
-        // 관계는 `persistentModelID`로 비교한다(`?.id` 비교보다 빠르다).
-        func hasChange(_ session: Session) -> Bool {
-            let owners = [session] + (session.children ?? []).filter { $0.kind == .subagent }
-            return owners.contains { owner in
-                let sid = owner.persistentModelID
-                var descriptor = FetchDescriptor<Event>(predicate: #Predicate<Event> {
-                    $0.typeRaw == raw && $0.card == nil && $0.session?.persistentModelID == sid
-                        && $0.project?.persistentModelID == projectPID && $0.at >= cutoff
-                })
-                descriptor.fetchLimit = 1
-                return ((try? context.fetchCount(descriptor)) ?? 0) > 0
-            }
+        let projectID = project.id
+        // 끝난 메인 세션 중 이 프로젝트에 최근 14일 카드 없는 파일 변경을 직접 또는 서브에이전트가 남긴 것. ID만 받는다.
+        let changed = #Predicate<Session> { session in
+            session.kindRaw == main && session.lastSeenAt >= cutoff && session.endedAt != nil
+                && session.project?.id == projectID
+                && ((session.events?.contains {
+                    $0.typeRaw == raw && $0.at >= cutoff && $0.card == nil && $0.project?.id == projectID
+                } ?? false)
+                    || (session.children?.contains { child in
+                        child.kindRaw == subagent && (child.events?.contains {
+                            $0.typeRaw == raw && $0.at >= cutoff && $0.card == nil && $0.project?.id == projectID
+                        } ?? false)
+                    } ?? false))
         }
-        return ids.reduce(0) { total, id in
-            guard let session = context.model(for: id) as? Session, session.endedAt != nil,
-                  !filed.contains(session.id), !everAttached(session), hasChange(session) else { return total }
-            return total + 1
+        var found = Set((try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: changed))) ?? [])
+        if let current { found.remove(current.persistentModelID) }
+        guard !found.isEmpty else { return [] }
+        // 세션이나 하위 세션이 카드에 붙은 적 있는 것(`everAttached`)은 뺀다.
+        let past = Date.distantPast
+        let attached = #Predicate<Session> { session in
+            session.kindRaw == main && session.lastSeenAt >= cutoff && session.endedAt != nil
+                && session.project?.id == projectID
+                && ((session.cardSessions?.contains { $0.attachedAt > past } ?? false)
+                    || (session.children?.contains { child in
+                        child.cardSessions?.contains { $0.attachedAt > past } ?? false
+                    } ?? false))
         }
+        found.subtract((try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: attached))) ?? [])
+        guard !found.isEmpty else { return [] }
+        // 이미 처리한(넘김·연결 기록) 세션
+        let filed = Array(filedSessionIDs(for: project))
+        if !filed.isEmpty {
+            found.subtract((try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: #Predicate<Session> {
+                filed.contains($0.id)
+            }))) ?? [])
+        }
+        // 저장 전에 다시 열린 세션은 뺀다(저장된 값은 질의가 이미 걸렀다). 세션 객체를 하나씩 읽지 않으려고 바뀐 것만 본다.
+        for case let session as Session in context.insertedModelsArray + context.changedModelsArray where session.endedAt == nil {
+            found.remove(session.persistentModelID)
+        }
+        return found
+    }
+
+    /// 세션(과 서브에이전트)이 이 프로젝트에 최근 14일 남긴 카드 없는 `file.changed`.
+    static func changes(of session: Session, project: Project, in context: ModelContext, now: Date) -> [Event] {
+        let cutoff = now.addingTimeInterval(-window)
+        let raw = EventType.fileChanged.rawValue
+        let projectID = project.id
+        // 서브에이전트가 많아도 질의 하나로
+        let owners = ([session] + (session.children ?? []).filter { $0.kind == .subagent }).map(\.persistentModelID)
+        return (try? context.fetch(FetchDescriptor<Event>(predicate: #Predicate<Event> { event in
+            event.typeRaw == raw && event.card == nil && event.at >= cutoff && event.project?.id == projectID
+                && (event.session.flatMap { owners.contains($0.persistentModelID) } ?? false)
+        }))) ?? []
     }
 
     /// 세션이나 그 서브에이전트가 카드에 붙은 적이 있는가(지금 풀렸어도).

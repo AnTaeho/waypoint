@@ -576,3 +576,13 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | `HookHarness`는 체크아웃 찾기를 끈다(내 판단) | 실측 픽스처의 경로(`~/workspace/waypoint-probe`)가 이 Mac에서는 실제 git 저장소라 기계마다 payload가 달라진다. 체크아웃은 임시 저장소 테스트로 따로 본다 | 그대로 | `HookSupport.swift` |
 
 검증: `swift test` 716개 중 714개 통과(실패 2개는 `RealInstallStateTests` — 저장소 tracker 스킬을 바꿔 이 Mac에 설치된 스킬과 달라졌다, 머지 뒤 동기화하면 통과), macOS Debug·iOS 빌드. Dev 재현 다섯 단계·지연은 docs/RELIABILITY.md 「동시 작업 겹침 (TRK-17)」.
+
+## 2026-10-02 — 큰 기록 성능 (TRK-66)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 정리 안 된 작업·작업중 줄·사이드바 개수를 관계 순회 대신 질의(하위 질의 포함)로 좁힌다. 캐시와 메인 스레드 밖 계산은 하지 않는다(내 판단) | 결과가 같은 가장 단순한 방법이고 Dev 사본 `SessionStart` p95 8초 → 0.1초, 대시보드 한 번 1.5초 이상 → 13 ms. 캐시는 무효화 규칙이, 메인 밖 계산은 화면 쪽 구조가 커진다 | 저장 때 비우는 캐시, 별도 `ModelContext` | `UnfiledWork.sessionIDs`·`DashboardQuery.openSessions`·`latestSessionActivity` |
+| 최근 파일 이름도 질의로 바꾼다(지시서 범위 밖, 내 판단) | 세션을 매번 새로 읽으면 전 구현이 긴 세션의 이벤트 1,000여 건을 그릴 때마다 다시 읽어 실제 사본 대시보드가 1.5초(CPU)로 느려졌다. 위 결정과 함께여야 한다 | `rows`만 되돌리기 | `SessionFormat.recentFileName`·`latestEvent` |
+| `UnfiledWork.Item.eventCount`를 뺐다(내 판단) | 쓰는 곳이 없고, 모든 세션의 변경 수를 세려면 이벤트를 다 읽어야 한다 | 블록에 보이는 것만 채우기 | `Item` |
+
+검증: `swift test` 720개 통과, macOS Debug 빌드. 전후 숫자는 docs/RELIABILITY.md 「큰 기록 성능 (TRK-66)」.
