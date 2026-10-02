@@ -92,6 +92,16 @@ xcrun devicectl device process launch --console --terminate-existing \
 
 원본 SVG는 `design/icon/`(mac-·ios-, stable·dev). 에셋은 `App/Assets.xcassets`의 `AppIcon`(평소용)·`AppIconDev`(Debug 구성). 바꿀 때는 SVG를 1024 PNG로 그린 뒤 macOS용은 `sips -z`로 16–512 @1x/@2x를, iOS용은 1024 한 장(알파 없이)을 넣는다.
 
+## 연동 설치
+
+사용자 범위 연동(Claude 훅·상태줄 중계·MCP·tracker 스킬, Codex 훅·MCP·스킬)은 앱 안 설치기가 기준이다(`Shared/Integration/Installer/`, `docs/SPEC.md` 「앱 안 연동 설치기」). 설치 화면은 온보딩(TRK-44)에서 붙는다.
+
+- 앱 번들에 `integration/`의 훅 스크립트·상태줄 중계·Codex 브리지·tracker 스킬이 리소스로 들어간다(`project.yml`). 저장소 파일이 원본이므로 그 파일을 고치면 앱을 다시 빌드한다.
+- 백업: 저장 폴더의 `integration-backups/<시각>-<8자>/`(`paths.json`에 원래 경로). 평소용은 `~/Library/Application Support/Waypoint/`, Dev는 `Waypoint-Dev/`.
+- Dev로 설치하면 사용자 범위 항목이 47822를 가리키게 바뀐다(평소용 항목을 바꿔 끼움). 평소용이 늘 켜져 있는 이 Mac에서는 Dev를 사용자 범위에 설치하지 않고 아래 실측 폴더를 쓴다.
+- `scripts/install-codex.py`·`dev-probe-setup.sh`는 개발용으로 남는다. Codex 쪽은 앱 설치기와 같은 파일을 쓴다(`CodexInstallerTests`).
+- 이 Mac의 실제 설치를 그대로 인식하는지는 `RealInstallStateTests`가 실제 설정을 임시 홈에 복사(읽기만)해 빈 계획인지 본다.
+
 ## 실측 폴더
 
 ```sh

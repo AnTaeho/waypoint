@@ -4,7 +4,7 @@
 
 ## 설치
 
-저장소 루트에서 `python3 scripts/install-codex.py`를 실행한다(Python 3.11+). 개발용은 `--dev`로 47822에 연결한다. 기존 훅은 함께 유지하고, MCP는 Waypoint가 관리하는 블록만 추가·갱신한다. 설정 백업은 `~/.codex/waypoint/backups/`에 남긴다. 개인 설정·신뢰를 우회하는 옵션은 쓰지 않는다.
+기준은 앱 안 설치기(`Shared/Integration/Installer/CodexInstallPlanner.swift`)다. 같은 입력이면 이 스크립트와 같은 `hooks.json`·`config.toml`·스크립트·스킬을 쓰고(`CodexInstallerTests`가 임시 홈에서 비교), 백업은 Waypoint 저장 폴더 `integration-backups/`에 남긴다. 둘 중 하나를 고치면 다른 쪽도 고친다. 개발 중에는 저장소 루트에서 `python3 scripts/install-codex.py`를 실행한다(Python 3.11+). 개발용은 `--dev`로 47822에 연결한다. 기존 훅은 함께 유지하고, MCP는 Waypoint가 관리하는 블록만 추가·갱신한다. 설정 백업은 `~/.codex/waypoint/backups/`에 남긴다. 개인 설정·신뢰를 우회하는 옵션은 쓰지 않는다.
 
 Codex를 새로 시작해 `/hooks`에서 각 Waypoint 훅을 검토·신뢰한다. 플러그인/프로젝트 훅과 중복 설치하지 않는다. `/mcp`에서 waypoint가 연결돼 있는지 확인한다. `features.hooks=false`이면 설치기가 멈추므로 사용자가 해당 설정을 먼저 확인한다.
 

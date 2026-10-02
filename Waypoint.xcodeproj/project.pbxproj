@@ -12,6 +12,7 @@
 		066348EEF1E9E22B44507986 /* GuideReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5C68F1762AE0ED6284C1FB /* GuideReader.swift */; platformFilters = (macos, ); };
 		0B6EE3FA1492790873E387C7 /* GuidanceSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23428B13475D5E2645B371A /* GuidanceSections.swift */; platformFilters = (macos, ); };
 		0D73B49177EC0BFBA92E61AB /* DashboardContinue.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1F713FBA97C05AE11B404DC /* DashboardContinue.swift */; platformFilters = (macos, ); };
+		10DC95153D5D0E84E925296E /* waypoint-statusline-tap.sh in Resources */ = {isa = PBXBuildFile; fileRef = 31A79837626B5C5DC1071B39 /* waypoint-statusline-tap.sh */; platformFilters = (macos, ); };
 		148A26ACB6E1689190AE1F40 /* IntegrationDiagnosticButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBB730665453005307C7DE13 /* IntegrationDiagnosticButton.swift */; platformFilters = (macos, ); };
 		157129890D1A3B79ABF3BB1A /* GuideConflictView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B86E6820B9D752F18548D4 /* GuideConflictView.swift */; platformFilters = (macos, ); };
 		16BB5F41B2B10C5F88C383FB /* GuidanceContentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D548F1E521B52F8CFB72CB63 /* GuidanceContentViews.swift */; platformFilters = (macos, ); };
@@ -53,6 +54,7 @@
 		60D8AD7C833441AC71F2DBF4 /* Theme+Integration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59B811F1DE3AC3DC226F1C4E /* Theme+Integration.swift */; };
 		63C993348C2590184352F18D /* GuidanceItemsView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AF75CAA2434B36EAADEE33 /* GuidanceItemsView+Actions.swift */; platformFilters = (macos, ); };
 		64DA885EA5000630F5FE0452 /* ProjectBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3905FDAF71CEBAF40695A08 /* ProjectBoardView.swift */; platformFilters = (macos, ); };
+		664F7F251DB8D0EBA16ED7F6 /* waypoint-hook.sh in Resources */ = {isa = PBXBuildFile; fileRef = 077351F456AF1ADAC9E0A6C2 /* waypoint-hook.sh */; platformFilters = (macos, ); };
 		678C65EC66445DBD7A7F916E /* BoardSessionTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BA220A766EFABD5B33123B /* BoardSessionTileView.swift */; platformFilters = (macos, ); };
 		6BF8F5047D1E0882C2152162 /* InitChecklists.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55C4D1900BA2387763F86D8 /* InitChecklists.swift */; platformFilters = (macos, ); };
 		6FB4D68DBA55E3DD18293286 /* Theme+Dashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558C8C4DB87D7F169087BD9F /* Theme+Dashboard.swift */; };
@@ -101,6 +103,7 @@
 		D10A29C3803ADF8D5E2CD201 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5EFA63C55AFCFD2F3957B6CE /* OFL.txt */; };
 		D3DD134762B554E9BB91285B /* RecentEventsInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B848F2A827633BD98960A5 /* RecentEventsInspector.swift */; platformFilters = (macos, ); };
 		D8EE3D4CE7307B30DCB801F3 /* GuidanceSourceItems.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA61CAEBF91C29342654802E /* GuidanceSourceItems.swift */; platformFilters = (macos, ); };
+		DA90FDFBA45C36ED52F9FE9D /* waypoint-codex-hook.sh in Resources */ = {isa = PBXBuildFile; fileRef = 82D1410EF459AD29712EC9B8 /* waypoint-codex-hook.sh */; platformFilters = (macos, ); };
 		DC0430C6F87952400D5E0F45 /* IntegrationStatusButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799B6BB6C2822534A015D8FA /* IntegrationStatusButton.swift */; platformFilters = (macos, ); };
 		DDE9D86FA9C5AC75BC50F8D9 /* RootInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4A7D7AF9C02C92C35E3D73 /* RootInspector.swift */; platformFilters = (macos, ); };
 		DE0AB3A437643C60E16F0D6F /* DashboardSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5451E3F0EEC533B30989C6CB /* DashboardSearch.swift */; platformFilters = (macos, ); };
@@ -119,6 +122,7 @@
 		F2BFAF7D13041C989D1F079B /* IntegrationHealthPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876A07410CA71E7DB935B6F5 /* IntegrationHealthPanel.swift */; platformFilters = (macos, ); };
 		F84D9B85D9FE4BAE3412783F /* GuidanceSourceDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69DF0AE17F02D6640A675F1 /* GuidanceSourceDetail.swift */; platformFilters = (macos, ); };
 		F88A2578EB35CD881C57E559 /* Theme+Activity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01894E1C4419F426D74B4896 /* Theme+Activity.swift */; };
+		FC60F99043689EEED49F728B /* SKILL.md in Resources */ = {isa = PBXBuildFile; fileRef = 68D517A1F9B1FF416C9EAA5D /* SKILL.md */; platformFilters = (macos, ); };
 		FC6C73EC6FDF95584A01134B /* MenuBarContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */; platformFilters = (macos, ); };
 		FFCDCD6B48543A16F71A64DE /* DashboardProjects.swift in Sources */ = {isa = PBXBuildFile; fileRef = F603F82B6B84386F16E6A0D8 /* DashboardProjects.swift */; platformFilters = (macos, ); };
 /* End PBXBuildFile section */
@@ -127,6 +131,7 @@
 		01894E1C4419F426D74B4896 /* Theme+Activity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme+Activity.swift"; sourceTree = "<group>"; };
 		03F4EC7A40B6A8FAE8629FA1 /* BoardSessionBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardSessionBox.swift; sourceTree = "<group>"; };
 		05AF75CAA2434B36EAADEE33 /* GuidanceItemsView+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GuidanceItemsView+Actions.swift"; sourceTree = "<group>"; };
+		077351F456AF1ADAC9E0A6C2 /* waypoint-hook.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "waypoint-hook.sh"; sourceTree = "<group>"; };
 		087B3204C74D79283C85C13B /* MarkdownInline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownInline.swift; sourceTree = "<group>"; };
 		09475FCBA9E35F2B22254CED /* AppServices+Integration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServices+Integration.swift"; sourceTree = "<group>"; };
 		0AFD74B8FE74F101F4476C1B /* ActivityFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFilters.swift; sourceTree = "<group>"; };
@@ -149,6 +154,7 @@
 		2CA506015F36BD8C792F971D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		2DFA0F3D0A8C7712C125F541 /* PhoneHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneHomeView.swift; sourceTree = "<group>"; };
 		2EF3CC91475AFCB54D6E49BE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		31A79837626B5C5DC1071B39 /* waypoint-statusline-tap.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "waypoint-statusline-tap.sh"; sourceTree = "<group>"; };
 		330BEB710FEA0D0239C8E18B /* CardResumeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardResumeSheet.swift; sourceTree = "<group>"; };
 		3C30269DEA92A22D30679441 /* GuideInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideInspector.swift; sourceTree = "<group>"; };
 		3F3BE9B8CD1A8C96EBD9A09E /* waypoint */ = {isa = PBXFileReference; lastKnownFileType = folder; name = waypoint; path = .; sourceTree = SOURCE_ROOT; };
@@ -170,6 +176,7 @@
 		60588B3D4D8F4FFA5A1DE9AE /* InitFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitFields.swift; sourceTree = "<group>"; };
 		63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitor.swift; sourceTree = "<group>"; };
 		648F1BD947F2221E3616CC24 /* SidebarSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSelection.swift; sourceTree = "<group>"; };
+		68D517A1F9B1FF416C9EAA5D /* SKILL.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SKILL.md; sourceTree = "<group>"; };
 		6A0176C4A79A86838A7FD38E /* DashboardStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardStats.swift; sourceTree = "<group>"; };
 		6B903AF94CDCA771BFD44463 /* GuidanceBackupSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceBackupSheet.swift; sourceTree = "<group>"; };
 		6C18EA4602AB47F5CA4872BB /* ReliabilityMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReliabilityMetricsSection.swift; sourceTree = "<group>"; };
@@ -182,6 +189,7 @@
 		799B6BB6C2822534A015D8FA /* IntegrationStatusButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationStatusButton.swift; sourceTree = "<group>"; };
 		7B5F681EF62D7092B4EB128F /* InitPathStackRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitPathStackRow.swift; sourceTree = "<group>"; };
 		8208066D1C74F68869BF5909 /* NanumSquareRoundEB.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundEB.ttf; sourceTree = "<group>"; };
+		82D1410EF459AD29712EC9B8 /* waypoint-codex-hook.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "waypoint-codex-hook.sh"; sourceTree = "<group>"; };
 		83B5E7102286FAE2A09F9FD6 /* BoardColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardColumnView.swift; sourceTree = "<group>"; };
 		86B0741D1F70BCF8E90D1B8F /* PhoneIdeaSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneIdeaSection.swift; sourceTree = "<group>"; };
 		876A07410CA71E7DB935B6F5 /* IntegrationHealthPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationHealthPanel.swift; sourceTree = "<group>"; };
@@ -445,6 +453,25 @@
 			path = GuideItems;
 			sourceTree = "<group>";
 		};
+		6DB6A5700A5C99A6D1D63F8B /* integration */ = {
+			isa = PBXGroup;
+			children = (
+				AA7740CF9F62553F92DCE556 /* codex */,
+				EA05BB7881DBC2E54A925D79 /* hooks */,
+				CBB866E14737ADFDDF96B824 /* skills */,
+				782D3D961582CCAE1B261578 /* statusline */,
+			);
+			path = integration;
+			sourceTree = "<group>";
+		};
+		782D3D961582CCAE1B261578 /* statusline */ = {
+			isa = PBXGroup;
+			children = (
+				31A79837626B5C5DC1071B39 /* waypoint-statusline-tap.sh */,
+			);
+			path = statusline;
+			sourceTree = "<group>";
+		};
 		9AD13A9C19AE151779A25A60 /* MenuBar */ = {
 			isa = PBXGroup;
 			children = (
@@ -466,6 +493,14 @@
 				C4063ED94790ADDCAF7370C1 /* InitWindowController.swift */,
 			);
 			path = Init;
+			sourceTree = "<group>";
+		};
+		AA7740CF9F62553F92DCE556 /* codex */ = {
+			isa = PBXGroup;
+			children = (
+				82D1410EF459AD29712EC9B8 /* waypoint-codex-hook.sh */,
+			);
+			path = codex;
 			sourceTree = "<group>";
 		};
 		B6AF6AAC9701D1D702BCE5A1 /* iOS */ = {
@@ -506,6 +541,14 @@
 			path = Integration;
 			sourceTree = "<group>";
 		};
+		CBB866E14737ADFDDF96B824 /* skills */ = {
+			isa = PBXGroup;
+			children = (
+				ED5B2FA4FBF1C059D334AE4B /* tracker */,
+			);
+			path = skills;
+			sourceTree = "<group>";
+		};
 		D375A5968A791C220749573E /* Usage */ = {
 			isa = PBXGroup;
 			children = (
@@ -519,11 +562,28 @@
 			isa = PBXGroup;
 			children = (
 				4E35DD7639881259D9DC5B12 /* App */,
+				6DB6A5700A5C99A6D1D63F8B /* integration */,
 				B6AF6AAC9701D1D702BCE5A1 /* iOS */,
 				3DE652F447DAB890DB9FC8C1 /* macOS */,
 				5A050900D5A0A9BEC0FD86AF /* Packages */,
 				48DBDF277774A48A4A61A668 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		EA05BB7881DBC2E54A925D79 /* hooks */ = {
+			isa = PBXGroup;
+			children = (
+				077351F456AF1ADAC9E0A6C2 /* waypoint-hook.sh */,
+			);
+			path = hooks;
+			sourceTree = "<group>";
+		};
+		ED5B2FA4FBF1C059D334AE4B /* tracker */ = {
+			isa = PBXGroup;
+			children = (
+				68D517A1F9B1FF416C9EAA5D /* SKILL.md */,
+			);
+			path = tracker;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -597,6 +657,10 @@
 				302718CFFF0EBCE13D5CDA0C /* NanumSquareRoundL.ttf in Resources */,
 				26E1CB786EC452F721D1A251 /* NanumSquareRoundR.ttf in Resources */,
 				D10A29C3803ADF8D5E2CD201 /* OFL.txt in Resources */,
+				FC60F99043689EEED49F728B /* SKILL.md in Resources */,
+				DA90FDFBA45C36ED52F9FE9D /* waypoint-codex-hook.sh in Resources */,
+				664F7F251DB8D0EBA16ED7F6 /* waypoint-hook.sh in Resources */,
+				10DC95153D5D0E84E925296E /* waypoint-statusline-tap.sh in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
