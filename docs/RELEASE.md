@@ -4,13 +4,16 @@
 
 ```sh
 scripts/release-mac.sh --check            # 준비 점검만
-scripts/release-mac.sh                    # 배포 빌드 + 공증(Xcode 계정)
+scripts/release-mac.sh                    # 배포 빌드 + 공증(Xcode 계정), iCloud 끔
+scripts/release-mac.sh --icloud           # iCloud를 켠 배포 빌드(Production 스키마 배포 뒤에만)
 scripts/release-mac.sh --version 0.1.0    # 마케팅 버전을 이번만 덮어서
 scripts/release-mac.sh --skip-notarize    # 공증 전까지(내부 확인용)
 scripts/release-mac.sh --resume-notarize .build/release-mac/Waypoint.xcarchive   # 끊긴 공증 대기를 이어서
 ```
 
 공증 대기 조절: `--poll-interval <초>`(기본 300), `--notarize-timeout <분>`(기본 180). 앱 암호 프로필로 공증하려면 `--notary-profile <이름>`(아래 「사전 준비 3」).
+
+**iCloud는 기본으로 끈다.** 배포 빌드는 archive에 `WAYPOINT_ICLOUD=NO`를 넘겨 앱 Info.plist `WaypointICloud`가 `NO`가 되고, 앱은 CloudKit을 열지 않는다(`AppInstance.cloudKitContainer`, 기록은 그 Mac에만). Production 스키마를 배포하지 않았고(「사전 준비 4」), 스키마 없이 켜진 앱이 어떻게 되는지 확인하지 못해서다. 사용자 결정. 스키마를 배포한 뒤에는 `--icloud`로 켠다. 엔타이틀먼트(컨테이너·Production)는 켜든 끄든 같다. 평소용(`install-local.sh`)·Debug·iOS는 `project.yml` 기본값 `WAYPOINT_ICLOUD: YES`라 그대로 켜져 있다.
 
 만든 앱은 이 Mac에서 실행하지 않는다. 번들 ID가 평소용(`dev.antaeho.waypoint`)과 같아 평소용 포트 47821과 저장 폴더를 같이 쓴다. 확인은 아래 정적 검사로만 한다.
 
@@ -47,7 +50,9 @@ export가 인증서 오류(「No signing certificate "Developer ID Application" 
 3. 확인: `xcrun notarytool history --keychain-profile waypoint-notary`가 오류 없이 목록(처음엔 비어 있음)을 출력한다.
 4. 실행: `scripts/release-mac.sh --notary-profile waypoint-notary`(zip 제출 → `--wait` → `stapler staple`).
 
-### 4. CloudKit Production 스키마
+### 4. CloudKit Production 스키마 — `--icloud`로 켤 때만
+
+기본 배포 빌드는 iCloud를 끄므로 이 절은 필요 없다. `--check`도 `--icloud`를 줄 때만 이 항목을 보인다.
 
 Developer ID 앱은 CloudKit **Production** 환경을 쓴다(export 결과 엔타이틀먼트 `com.apple.developer.icloud-container-environment = Production`, 아래 「이번 실제 결과」). 평소용(`install-local.sh`, Apple Development 서명)과 Debug는 Development 환경을 쓴다. Production에 스키마가 없으면 외부 사용자 앱이 레코드를 올리지 못해 동기화가 되지 않는다.
 
@@ -101,7 +106,7 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 | 첫 실행 온보딩 | 지표에 시도 1회 기록(창은 숨김이라 화면은 안 봄) |
 | 터미널 열기 | 실행 안 함(화면을 가져감). 코드는 `NSWorkspace.open`만 써서 Apple Events 엔타이틀먼트가 필요 없다 |
 | `claude`·`codex` 하위 프로세스 | 실행 안 함(Release엔 화면 없이 설치기를 부르는 경로가 없음). 하드닝 런타임은 `Process` 실행을 막지 않는다 — 일반 사항, 이 앱에서 확인 못 함 |
-| iCloud(Production) | **확인 못 함**. `WAYPOINT_SUPPORT_DIR`을 주면 앱이 iCloud를 끈다(`AppInstance.cloudKitContainer`). 켜려면 실제 저장 폴더를 써야 해서 평소용 기록과 섞인다. Production 스키마가 없을 때 앱이 어떻게 되는지 모른다 |
+| iCloud(Production) | 베타 빌드는 끈다(`WaypointICloud=NO`, 위 「iCloud는 기본으로 끈다」). 켰을 때는 **확인 못 함**. `WAYPOINT_SUPPORT_DIR`을 주면 앱이 iCloud를 끈다(`AppInstance.cloudKitContainer`). 켜려면 실제 저장 폴더를 써야 해서 평소용 기록과 섞인다. Production 스키마가 없을 때 앱이 어떻게 되는지 모른다 |
 
 
 ## 단계와 기대 출력
@@ -111,9 +116,9 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 | 단계 | 하는 일 | 성공 출력 |
 |---|---|---|
 | 사전 점검 | 깨끗한 트리(아니면 바로 멈춤), 빌드 번호·버전, Xcode 팀, `--notary-profile`을 줬으면 그 프로필 | `· 사전 점검: 통과(…)` |
-| archive | `xcodebuild archive` Release, `generic/platform=macOS`, `-allowProvisioningUpdates`, `MARKETING_VERSION`·`CURRENT_PROJECT_VERSION`·`ENABLE_HARDENED_RUNTIME=YES` 덮기. 로그 `.build/release-mac/archive.log` | `· archive: 성공(…)` |
+| archive | `xcodebuild archive` Release, `generic/platform=macOS`, `-allowProvisioningUpdates`, `MARKETING_VERSION`·`CURRENT_PROJECT_VERSION`·`ENABLE_HARDENED_RUNTIME=YES`·`WAYPOINT_ICLOUD`(기본 `NO`, `--icloud`면 `YES`) 덮기. 로그 `.build/release-mac/archive.log` | `· archive: 성공(…, WAYPOINT_ICLOUD=NO)` |
 | export | `-exportArchive`, ExportOptions(method `developer-id`, signingStyle `automatic`, teamID, 스크립트가 `.build/release-mac/ExportOptions.plist`로 만든다) | `· export: 성공(developer-id, …)` |
-| 서명 검증 | Info.plist의 번들 ID·버전·빌드, `codesign --verify --deep --strict`, Authority가 Developer ID·팀, 하드닝 런타임, 엔타이틀먼트 컨테이너·`icloud-container-environment`(Production이어야 함)·`aps-environment` 출력 | `Authority=…` 세 줄, 엔타이틀먼트 세 줄, `· 서명 검증: 통과(…)` |
+| 서명 검증 | Info.plist의 번들 ID·버전·빌드·`WaypointICloud`(이번 실행의 값과 다르면 실패), `codesign --verify --deep --strict`, Authority가 Developer ID·팀, 하드닝 런타임, 엔타이틀먼트 컨테이너·`icloud-container-environment`(Production이어야 함)·`aps-environment` 출력 | `Info.plist WaypointICloud: NO`, `Authority=…` 세 줄, 엔타이틀먼트 세 줄, `· 서명 검증: 통과(…, WaypointICloud=NO)` |
 | 공증 제출 | ExportOptions `destination` `upload`로 `-exportArchive`(Xcode 계정, 로그 `.build/release-mac/upload.log`). 제출 시각은 아카이브 `Info.plist`의 `Distributions[]` 마지막 upload 항목에서 읽는다 | `· 공증 제출: 성공(Xcode 계정, <시각>, …)` |
 | 공증 대기 | `-exportNotarizedApp`을 `--poll-interval`초마다 다시 부른다. 출력이 「is processing and not ready for distribution」이면 기다리고, 다른 오류면 출력 원문을 보이고 바로 실패. `--notarize-timeout`분을 넘기면 실패(이어 하기 명령을 알려 준다). Ctrl-C도 같은 안내 | 확인마다 `  HH:MM 처리 중 — 제출 뒤 N분, …` 한 줄, 끝나면 `· 공증: 수락(제출 뒤 N분째 확인, …)` |
 | 공증된 앱 검증 | 받은 앱(`.build/release-mac/notarized/Waypoint.app`)은 따로 서명된 번들이라 서명 검증을 한 번 더, `stapler validate`(이미 staple됨) | `· 공증된 앱 서명 검증: 통과(…)`, `· staple: 확인(The validate action worked!)` |
@@ -124,7 +129,7 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 
 - `Waypoint-<버전>-<빌드>.zip` — 참여자에게 주는 파일
 - `Waypoint-<버전>-<빌드>.zip.sha256`
-- `Waypoint-<버전>-<빌드>-summary.txt` — 시각·커밋·Xcode·단계 결과
+- `Waypoint-<버전>-<빌드>-summary.txt` — 시각·커밋·버전·`iCloud: 끔(WaypointICloud=NO)` 또는 `켬`·Xcode·단계 결과
 - `Waypoint-<버전>-<빌드>-notarize.log` — 마지막 `-exportNotarizedApp` 출력(`--notary-profile`이면 `-notary-log.json`에 notarytool 로그)
 - 이름 끝: `--allow-dirty`로 변경이 있을 때 `-dirty`, `--skip-notarize`면 `-unnotarized`
 
@@ -138,7 +143,7 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 scripts/release-mac.sh --resume-notarize .build/release-mac/Waypoint.xcarchive
 ```
 
-버전·빌드는 아카이브 `Info.plist`에서, 산출물 이름과 커밋은 옆의 `release-state.txt`(같은 빌드일 때)에서 읽는다. 아카이브에 upload 기록이 없으면 멈춘다(exit 2). 작업 트리 상태는 보지 않는다. 평소용 설치의 `.build/release`와 겹치지 않는다.
+버전·빌드는 아카이브 `Info.plist`에서, iCloud 켬·끔은 아카이브 안 앱(`Products/Applications/Waypoint.app/Contents/Info.plist`)의 `WaypointICloud`에서(키가 없는 옛 아카이브는 켬), 산출물 이름과 커밋은 옆의 `release-state.txt`(같은 빌드일 때)에서 읽는다. 아카이브에 upload 기록이 없으면 멈춘다(exit 2). `--icloud`와 같이 쓸 수 없다. 작업 트리 상태는 보지 않는다. 평소용 설치의 `.build/release`와 겹치지 않는다.
 
 ## 검증 명령
 
@@ -222,6 +227,7 @@ zip을 풀어 본 앱도 `spctl` accepted(`Notarized Developer ID`), `stapler va
 | `archive 실패` | 화면의 마지막 오류와 `.build/release-mac/archive.log`. 평소 빌드(`install-local.sh`의 빌드 단계)와 같은 원인인지 본다 |
 | `Developer ID export 실패` | `.build/release-mac/export.log`. 인증서 오류면 「사전 준비 2」로 인증서를 만든다. 프로파일 오류면 Xcode 계정 로그인 상태를 확인하고 다시 |
 | `CloudKit 환경이 Production이 아님` | export가 개발용 서명으로 됐다는 뜻. ExportOptions method가 `developer-id`인지, Xcode 계정 권한을 본다 |
+| `Info.plist WaypointICloud가 …` | archive 줄의 `WAYPOINT_ICLOUD=`와 `Config/Waypoint-macOS-Info.plist`(`$(WAYPOINT_ICLOUD)`), `project.yml`의 `INFOPLIST_FILE[sdk=macosx*]`를 본다. `xcodegen generate`를 했는지 |
 | `하드닝 런타임이 꺼져 있음` | archive 줄의 `ENABLE_HARDENED_RUNTIME=YES`가 빠졌는지 본다 |
 | `공증 실패: 상태 'Invalid'`(`--notary-profile`) | `dist/<이름>-notary-log.json`의 `issues`를 본다. 고친 뒤 커밋하고 다시(빌드 번호가 바뀐다) |
 | `Gatekeeper가 받지 않음` | `xcrun stapler validate`, 공증 로그. staple 직후 바로 실패하면 몇 분 뒤 다시 |

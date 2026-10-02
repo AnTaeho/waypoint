@@ -79,6 +79,34 @@ class ReleaseArgumentTests(unittest.TestCase):
         for option in ("--poll-interval", "--notarize-timeout", "--notary-profile", "--resume-notarize"):
             self.assertIn(option, result.stdout)
         self.assertIn("검증은 정적 검사만", result.stdout)  # 머리말 끝까지 출력되는지
+        self.assertIn("--icloud", result.stdout)
+
+    def test_icloud_cannot_combine_with_resume(self):
+        for args in (("--resume-notarize", "x", "--icloud"), ("--icloud", "--resume-notarize=x")):
+            result = self.release(*args)
+            self.assertEqual(result.returncode, 2, args)
+            self.assertIn("같이 쓸 수 없음", result.stderr)
+
+    def test_check_shows_icloud_default_off(self):
+        """--check의 iCloud 줄. Xcode·키체인 명령은 가짜로 바꿔 아무것도 건드리지 않는다."""
+        with tempfile.TemporaryDirectory(prefix="waypoint-release-check-") as directory:
+            bin_dir = pathlib.Path(directory)
+            for name, body in (("xcodebuild", 'echo "Xcode 0.0"'),
+                               ("defaults", 'echo "teamID = 2FCXA77MC5;"'),
+                               ("security", "exit 0")):
+                tool = bin_dir / name
+                tool.write_text("#!/bin/sh\n" + body + "\n")
+                tool.chmod(0o755)
+            env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}")
+            def check(*args):
+                return subprocess.run(["/bin/bash", str(RELEASE), "--check", *args],
+                                      capture_output=True, text=True, env=env).stdout
+            off = check()
+            self.assertIn("iCloud: 끔(베타 기본", off)
+            self.assertNotIn("Production 스키마", off)
+            on = check("--icloud")
+            self.assertIn("iCloud: 켬(--icloud", on)
+            self.assertIn("Production 스키마", on)
 
     def test_poll_interval_and_timeout_must_be_positive_integers(self):
         for args in (("--poll-interval", "0"), ("--poll-interval", "abc"), ("--notarize-timeout", "1.5"), ("--poll-interval",)):

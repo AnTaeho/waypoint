@@ -182,6 +182,7 @@
 		330BEB710FEA0D0239C8E18B /* CardResumeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardResumeSheet.swift; sourceTree = "<group>"; };
 		3C30269DEA92A22D30679441 /* GuideInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideInspector.swift; sourceTree = "<group>"; };
 		3E0E5DC15221D133DDE0C5D6 /* RecordsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsModel.swift; sourceTree = "<group>"; };
+		3F3BE9B8CD1A8C96EBD9A09E /* waypoint */ = {isa = PBXFileReference; lastKnownFileType = folder; name = waypoint; path = .; sourceTree = SOURCE_ROOT; };
 		3F79E43D0AD5525DEAADCE1F /* CardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
 		410C8FC8610805C122D0DAFE /* ActivitySessionSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySessionSection.swift; sourceTree = "<group>"; };
 		47AB3D0381D1A7DBA5C8D4F2 /* Theme+Guidance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme+Guidance.swift"; sourceTree = "<group>"; };
@@ -241,7 +242,6 @@
 		A34DEBE029DF6C711921EBEC /* FontRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontRegistry.swift; sourceTree = "<group>"; };
 		A55C4D1900BA2387763F86D8 /* InitChecklists.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitChecklists.swift; sourceTree = "<group>"; };
 		A5B19AC1674F72746238E04B /* CardResumeSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardResumeSummaryView.swift; sourceTree = "<group>"; };
-		A5E90ACDEC504233A2D034E2 /* agent-adc77f0b12926c18c */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "agent-adc77f0b12926c18c"; path = .; sourceTree = SOURCE_ROOT; };
 		ACBCD2447746E61675252C68 /* GuidanceItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceItemRow.swift; sourceTree = "<group>"; };
 		AFB8A9125DC79C85E7E2AA2A /* PhoneWorkCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneWorkCard.swift; sourceTree = "<group>"; };
 		B2A7C8940CD504E024CBC818 /* ActivityEventRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEventRow.swift; sourceTree = "<group>"; };
@@ -501,7 +501,7 @@
 		5A050900D5A0A9BEC0FD86AF /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				A5E90ACDEC504233A2D034E2 /* agent-adc77f0b12926c18c */,
+				3F3BE9B8CD1A8C96EBD9A09E /* waypoint */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -883,6 +883,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_FILE[sdk=iphoneos*]" = "Config/Waypoint-iOS-Info.plist";
 				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "Config/Waypoint-iOS-Info.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = "Config/Waypoint-macOS-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Waypoint Dev";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -905,6 +906,7 @@
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WAYPOINT_CONTAINER = iCloud.dev.antaeho.waypoint.dev;
+				WAYPOINT_ICLOUD = YES;
 			};
 			name = Debug;
 		};
@@ -1048,6 +1050,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_FILE[sdk=iphoneos*]" = "Config/Waypoint-iOS-Info.plist";
 				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "Config/Waypoint-iOS-Info.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = "Config/Waypoint-macOS-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Waypoint;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -1070,6 +1073,7 @@
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WAYPOINT_CONTAINER = iCloud.dev.antaeho.waypoint;
+				WAYPOINT_ICLOUD = YES;
 			};
 			name = Release;
 		};

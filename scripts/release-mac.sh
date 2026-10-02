@@ -2,10 +2,12 @@
 # 외부 베타용 macOS 앱을 만든다: 사전 점검 → archive → Developer ID export → 서명 검증 → 공증(Xcode 계정) → Gatekeeper 확인
 # → dist/Waypoint-<버전>-<빌드>.zip, .sha256, -summary.txt. 절차와 사람이 할 준비는 docs/RELEASE.md.
 #
-# 사용: scripts/release-mac.sh [--check] [--skip-notarize] [--allow-dirty] [--version X.Y.Z]
+# 사용: scripts/release-mac.sh [--check] [--icloud] [--skip-notarize] [--allow-dirty] [--version X.Y.Z]
 #                              [--poll-interval 초] [--notarize-timeout 분] [--notary-profile 이름]
 #       scripts/release-mac.sh --resume-notarize <xcarchive>
 #   --check                준비가 됐는지만 본다(빌드 안 함). 없는 것과 할 일을 한 줄씩 출력한다.
+#   --icloud               iCloud 동기화를 켜고 빌드한다. 기본은 끔(WAYPOINT_ICLOUD=NO, 기록은 그 Mac에만).
+#                          CloudKit Production 스키마를 배포한 뒤에만 쓴다.
 #   --skip-notarize        공증 전까지만(내부 확인용). 산출물 이름 끝에 -unnotarized.
 #   --allow-dirty          커밋 안 된 변경이 있어도 진행(개발용). 산출물 이름에 -dirty.
 #   --version X.Y.Z        마케팅 버전을 이 값으로(project.yml은 고치지 않음).
@@ -29,11 +31,12 @@ DIST="$ROOT/dist"
 usage_error() { echo "release-mac: $*" >&2; exit 2; }
 is_positive_int() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
 
-check_only=0; skip_notarize=0; allow_dirty=0; version_arg=""
+check_only=0; skip_notarize=0; allow_dirty=0; version_arg=""; icloud=0
 notary_profile=""; poll_interval=300; notarize_timeout=180; resume_archive=""; resume=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --check) check_only=1 ;;
+    --icloud) icloud=1 ;;
     --skip-notarize) skip_notarize=1 ;;
     --allow-dirty) allow_dirty=1 ;;
     --version|--poll-interval|--notarize-timeout|--notary-profile|--resume-notarize)
@@ -51,7 +54,7 @@ while [ $# -gt 0 ]; do
     --notarize-timeout=*) notarize_timeout="${1#--notarize-timeout=}" ;;
     --notary-profile=*) notary_profile="${1#--notary-profile=}" ;;
     --resume-notarize=*) resume_archive="${1#--resume-notarize=}"; resume=1 ;;
-    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) usage_error "모르는 인자: $1 (--help)" ;;
   esac
   shift
@@ -65,10 +68,18 @@ if [ "$resume" = 1 ]; then
   [ -z "$notary_profile" ] || usage_error "--resume-notarize는 Xcode 계정 공증만 이어 한다(--notary-profile과 같이 쓸 수 없음)"
   [ -z "$version_arg" ] || usage_error "--resume-notarize는 버전을 아카이브에서 읽는다(--version과 같이 쓸 수 없음)"
   [ "$check_only" = 0 ] || usage_error "--resume-notarize와 --check는 같이 쓸 수 없음"
+  [ "$icloud" = 0 ] || usage_error "--resume-notarize는 iCloud 설정을 아카이브에서 읽는다(--icloud와 같이 쓸 수 없음)"
 fi
 if [ "$skip_notarize" = 1 ] && [ -n "$notary_profile" ]; then
   usage_error "--skip-notarize와 --notary-profile은 같이 쓸 수 없음"
 fi
+
+# iCloud 빌드 스위치. 앱 Info.plist WaypointICloud로 들어가고, NO면 앱이 CloudKit을 열지 않는다(AppInstance.cloudKitContainer).
+# 엔타이틀먼트(컨테이너·Production)는 켜든 끄든 그대로다.
+icloud_setting() { [ "$1" = 1 ] && echo YES || echo NO; }
+icloud_label() { [ "$1" = YES ] && echo 켬 || echo 끔; }
+ICLOUD_SETTING="$(icloud_setting "$icloud")"
+ICLOUD_EXPECTED="$ICLOUD_SETTING"   # 서명 검증이 앱 Info.plist에서 기대하는 원래 값(이어 하기는 아카이브 값, 비어 있을 수 있음)
 
 # ── 점검 항목. 각각 0(됨)/1(안 됨)을 돌려주고, 안 될 때 사람이 할 일을 FIX에 남긴다 ─────────────
 FIX=""
@@ -151,9 +162,14 @@ run_check() {
     echo "  ✗ 버전·빌드 번호를 정하지 못함(project.yml MARKETING_VERSION, git 커밋 확인)"
     missing=1
   fi
-  echo "  ? CloudKit Production 스키마: 이 스크립트로는 확인 못 함"
-  echo "    → https://icloud.developer.apple.com > CloudKit Database > $CONTAINER > Production에 Record Type이 있는지 확인"
-  echo "      (없으면 Development에서 Deploy Schema Changes…, docs/RELEASE.md 「CloudKit Production 스키마」)"
+  if [ "$icloud" = 1 ]; then
+    echo "  ✓ iCloud: 켬(--icloud, WAYPOINT_ICLOUD=YES)"
+    echo "  ? CloudKit Production 스키마: 이 스크립트로는 확인 못 함"
+    echo "    → https://icloud.developer.apple.com > CloudKit Database > $CONTAINER > Production에 Record Type이 있는지 확인"
+    echo "      (없으면 Development에서 Deploy Schema Changes…, docs/RELEASE.md 「CloudKit Production 스키마」)"
+  else
+    echo "  ✓ iCloud: 끔(베타 기본, WAYPOINT_ICLOUD=NO — 기록은 그 Mac에만. 켜려면 --icloud)"
+  fi
   if [ "$missing" = 0 ]; then
     echo "준비됨: scripts/release-mac.sh"
   else
@@ -194,6 +210,7 @@ write_summary() {
     echo "시각: $(date '+%Y-%m-%d %H:%M:%S %z')"
     echo "커밋: $COMMIT$( [ "$dirty" = 1 ] && echo ' (커밋 안 된 변경 포함)')"
     echo "버전: $VERSION  빌드: $BUILD  팀: $TEAM_ID"
+    echo "iCloud: $(icloud_label "$ICLOUD_SETTING")(WaypointICloud=$ICLOUD_SETTING)"
     echo "Xcode: $(xcodebuild -version 2>/dev/null | tr '\n' ' ')"
     echo
     for s in ${STEPS[@]+"${STEPS[@]}"}; do echo "- $s"; done
@@ -215,6 +232,10 @@ verify_signature() {
   local app="$1" info authority containers environment aps
   info="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' -c 'Print CFBundleShortVersionString' -c 'Print CFBundleVersion' "$app/Contents/Info.plist" 2>/dev/null | tr '\n' ' ')"
   [ "$info" = "$BUNDLE_ID $VERSION $BUILD " ] || fail "Info.plist가 예상과 다름: '$info'(예상 '$BUNDLE_ID $VERSION $BUILD', $app)"
+  local icloud_value
+  icloud_value="$(/usr/libexec/PlistBuddy -c 'Print :WaypointICloud' "$app/Contents/Info.plist" 2>/dev/null)"
+  echo "  Info.plist WaypointICloud: ${icloud_value:-(없음)}"
+  [ "$icloud_value" = "$ICLOUD_EXPECTED" ] || fail "Info.plist WaypointICloud가 ${icloud_value:-(없음)}(예상 ${ICLOUD_EXPECTED:-(없음)}, $app)"
   codesign --verify --deep --strict --verbose=2 "$app" > "$WORK/codesign-verify.txt" 2>&1 \
     || fail "codesign --verify 실패($app): $(tail -3 "$WORK/codesign-verify.txt" | tr '\n' ' ')"
   codesign -dv --verbose=4 "$app" > "$WORK/codesign-info.txt" 2>&1
@@ -239,7 +260,7 @@ verify_signature() {
   if grep -q 'com.apple.security.cs\.' "$ENT"; then
     echo "  주의: 하드닝 런타임 예외 엔타이틀먼트가 있음: $(grep -o 'com.apple.security.cs\.[a-z.-]*' "$ENT" | tr '\n' ' ')"
   fi
-  SIGN_SUMMARY="$authority, 하드닝 런타임, $CONTAINER $environment, aps $aps"
+  SIGN_SUMMARY="$authority, 하드닝 런타임, $CONTAINER $environment, aps $aps, WaypointICloud=$icloud_value"
 }
 # 배열은 PlistBuddy가 「Array { … }」로 찍는다. 값만 남긴다.
 ent_get() { /usr/libexec/PlistBuddy -c "Print :$1" "$ENT" 2>/dev/null | tr -s ' \n' ' ' | sed 's/^ //;s/ $//;s/^Array { //;s/ }$//'; }
@@ -289,6 +310,10 @@ if [ "$resume" = 1 ]; then
   VERSION="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleShortVersionString' "$props" 2>/dev/null)"
   BUILD="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' "$props" 2>/dev/null)"
   [ -n "$VERSION" ] && [ -n "$BUILD" ] || usage_error "--resume-notarize: 아카이브 Info.plist에서 버전·빌드를 읽지 못함: $props"
+  # iCloud 스위치는 아카이브 안 앱의 Info.plist에서. 키가 없으면(이 스위치 전 아카이브) 앱이 켬으로 돈다.
+  ICLOUD_EXPECTED="$(/usr/libexec/PlistBuddy -c 'Print :WaypointICloud' "$ARCHIVE/Products/Applications/Waypoint.app/Contents/Info.plist" 2>/dev/null)"
+  ICLOUD_SETTING=YES
+  [ "$ICLOUD_EXPECTED" = NO ] && ICLOUD_SETTING=NO
   idx="$(last_upload_index "$ARCHIVE")" || usage_error "--resume-notarize: 이 아카이브에 공증 제출(upload) 기록이 없음: $ARCHIVE"
   submitted_iso="$(/usr/libexec/PlistBuddy -c "Print :Distributions:$idx:uploadEvent:date" "$props" 2>/dev/null)"
   SUBMIT_EPOCH="$(iso_epoch "$submitted_iso")"
@@ -300,7 +325,7 @@ if [ "$resume" = 1 ]; then
     COMMIT="$(sed -n 's/^commit=//p' "$state_file")"
     [ "$(sed -n 's/^dirty=//p' "$state_file")" = 1 ] && dirty=1
   fi
-  echo "Waypoint $VERSION ($BUILD) 공증 이어 하기 → dist/$NAME.zip"
+  echo "Waypoint $VERSION ($BUILD) 공증 이어 하기 → dist/$NAME.zip (iCloud $(icloud_label "$ICLOUD_SETTING"))"
   mkdir -p "$WORK" "$DIST"
   if [ -n "$SUBMIT_EPOCH" ]; then
     record "이어 하기: $ARCHIVE (제출 $(date -r "$SUBMIT_EPOCH" '+%Y-%m-%d %H:%M:%S %z'))"
@@ -324,7 +349,7 @@ else
   NAME="Waypoint-$VERSION-$BUILD"
   [ "$dirty" = 1 ] && NAME="$NAME-dirty"
   [ "$skip_notarize" = 1 ] && NAME="$NAME-unnotarized"
-  echo "Waypoint $VERSION ($BUILD) → dist/$NAME.zip"
+  echo "Waypoint $VERSION ($BUILD) → dist/$NAME.zip (iCloud $(icloud_label "$ICLOUD_SETTING"))"
 
   has_xcode_team || fail "Xcode 계정에 팀 $TEAM_ID 가 없음(scripts/release-mac.sh --check)"
   if [ -n "$notary_profile" ]; then
@@ -344,17 +369,19 @@ else
   APP="$EXPORT/Waypoint.app"
 
   # 2. archive. 하드닝 런타임은 공증 필수라 여기서만 켠다(project.yml은 평소용 install-local.sh도 써서 그대로 둔다).
+  #    iCloud는 기본 끔(WAYPOINT_ICLOUD=NO). project.yml 기본 YES는 평소용·개발용 몫.
   log="$WORK/archive.log"
   if ! xcodebuild -project "$ROOT/Waypoint.xcodeproj" -scheme Waypoint -configuration Release \
       -destination 'generic/platform=macOS' -derivedDataPath "$WORK/DerivedData" -archivePath "$ARCHIVE" \
       -allowProvisioningUpdates \
       MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" ENABLE_HARDENED_RUNTIME=YES \
+      WAYPOINT_ICLOUD="$ICLOUD_SETTING" \
       archive > "$log" 2>&1; then
     report_build_failure "$log"
     fail "archive 실패(전체 로그: $log)"
   fi
   printf 'name=%s\nbuild=%s\ncommit=%s\ndirty=%s\n' "$NAME" "$BUILD" "$COMMIT" "$dirty" > "$WORK/release-state.txt"
-  record "archive: 성공($ARCHIVE)"
+  record "archive: 성공($ARCHIVE, WAYPOINT_ICLOUD=$ICLOUD_SETTING)"
 
   # 3. Developer ID export(자동 서명). ExportOptions는 여기서 만든다. destination: export(파일로) / upload(공증 제출)
   export_options() {
