@@ -463,7 +463,7 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 판 기록은 `<저장 폴더>/store-version.json`(앱 버전·빌드·판), 열기에 성공한 뒤에 쓴다. 파일이 없고 저장소가 있으면 `upgrade` | TRK-46 이전 저장소의 첫 실행이 곧 업데이트다. UserDefaults는 `WAYPOINT_SUPPORT_DIR`를 따르지 않아 확인용 폴더와 섞인다 | UserDefaults | `StoreLaunch.versionFileName` |
 | 복원 알림은 `store-restore.json` + 연동 상태 패널 미처리 기록 아래 한 줄과 「알림 확인」, `/integration/status`의 `storeRestore` | 화면은 TRK-47이 만든다. 그전까지도 사람이 알아채고 HTTP로 확인할 수 있게. 기존 「알림 확인」 모양을 따랐다 | UserDefaults·알림 센터 | `IntegrationHealthPanel`의 `storeRestore` 블록 |
 | 저장 폴더 자체의 권한은 바꾸지 않는다(없을 때 만들기만). 백업·보존 폴더만 0700 | 평소용 `~/Library/Application Support/Waypoint`의 기존 권한을 업데이트가 몰래 바꾸지 않게(Dev 실측에서 처음 구현이 0700으로 바꾸는 것을 보고 고쳤다) | 저장 폴더도 0700 | — |
-| `daily`는 실행할 때만 본다(카드 그대로) | 지시 범위. 평소용은 로그인 항목이라 거의 다시 시작하지 않아 실제로는 드물게 돈다 → 알려진 한계 | 10초 점검에 온라인 백업으로 하루 한 번 | `AppServices.refreshStates`에 `isDailyDue` + `backupOpenStore` |
+| `daily`는 실행할 때와, macOS에서는 떠 있는 동안 10초 점검마다 본다(`StoreDailyBackup`, 열린 저장소 → SQLite 온라인 백업, 백그라운드, 한 번에 하나, 실패하면 다음 점검에서 다시). iOS는 실행 때만. 메인 세션 결정 | 평소용은 로그인 항목이라 거의 다시 시작하지 않아 실행 때만으로는 하루 한 번이 되지 않는다 | 실행 때만 | `AppServices.refreshStates`의 `dailyBackup?.startIfDue` 한 줄 |
 | CloudKit: 복원은 로컬만 되돌린다. 미러링 상태(레코드 메타데이터·서버 변경 토큰·이력 토큰)가 저장소 파일 안에 있음은 사본에서 확인, 옛 토큰 뒤 변경만 받는다는 것은 `CKFetchRecordZoneChangesOperation` 문서로 확인. 복원 뒤 `NSPersistentCloudKitContainer`가 실제로 그 뒤 변경을 다시 받는지, 서버 값이 복원값을 덮는지, 토큰 만료 시 동작은 **확인 못 함** | Apple 문서에 내부 동작이 없고 CloudKit을 켠 복원 실측은 범위 밖(Dev 실측은 CloudKit 꺼짐) | — | 실측 뒤 SPEC 「CloudKit과의 관계」 고치기 |
 
 검증: `swift test` 전체 통과, macOS Debug·iOS Simulator 빌드. Dev 실측(스크래치 저장 폴더, CloudKit 꺼짐)은 docs/RELIABILITY.md.
