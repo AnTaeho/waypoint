@@ -480,9 +480,11 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 키체인에 Developer ID 인증서가 없어도 `--check`가 막지 않는다(내 판단) | 실측에서 자동 서명 export가 Xcode 클라우드 관리 인증서로 `Developer ID Application: Taeho An (2FCXA77MC5)` 서명을 했다 | 인증서를 필수로 | `run_check`의 인증서 항목에 `missing=1` |
 | 중간 결과는 `.build/release-mac/`, 산출물은 `dist/`(gitignore) | 평소용 설치가 읽는 `.build/release`와 겹치지 않게 | 같은 DerivedData | — |
 | 만든 앱은 실행하지 않고 codesign·spctl·plutil 정적 검사만. 메인 세션 결정 | 번들 ID가 평소용과 같아 47821·저장소를 건드린다 | — | — |
+| 공증 기본은 Xcode 계정: upload export로 제출하고 `-exportNotarizedApp`을 기본 300초마다(최대 180분) 다시 불러 공증·staple된 앱을 받는다. notarytool은 `--notary-profile`을 줄 때만. 사용자 지시 | 앱 전용 암호가 필요 없다. 이미 쓰는 Xcode 계정 로그인으로 된다(실측: 제출 15:18 → 약 45분 뒤 수락, spctl accepted) | notarytool 키체인 프로필(앱 암호) | `release-mac.sh` 공증 단계의 기본 분기를 notarytool로 |
+| 완료 판정은 `-exportNotarizedApp`의 결과와 「is processing」 문구로만, 다른 오류는 바로 실패. 받은 앱에 서명 검증을 한 번 더. 끊기면 `--resume-notarize <xcarchive>`로 대기부터(이름은 내 판단) | 수락 뒤에도 아카이브 plist의 `processingEvent.state`가 `processing`으로 남았다. 받은 앱은 export 앱과 따로 서명된 번들이다. 첫 공증이 45분이라 끊긴 뒤 다시 제출하지 않게 | plist 상태 읽기, 재제출 | `wait_notarized_app`, `--resume-notarize` 분기 |
 | CloudKit: Developer ID 앱은 Production 환경(export 엔타이틀먼트로 확인). Production 스키마 배포는 사람이 Console에서 한다. 메인 세션 결정 | 외부 사용자는 Production만 쓴다. 스키마 배포는 되돌릴 수 없는 외부 변경 | `cktool`로 자동화 | — |
 
-검증: `scripts/release-mac.sh --skip-notarize` 성공(archive·export·서명 검증, `spctl`은 공증 전이라 거부), `python3 scripts/test_build_failure_report.py` 통과. 공증은 `waypoint-notary` 프로필이 없어 못 함. 결과 원문은 docs/RELEASE.md 「이번 실제 결과」.
+검증: `scripts/release-mac.sh --skip-notarize` 성공(archive·export·서명 검증, `spctl`은 공증 전이라 거부), `python3 scripts/test_build_failure_report.py` 통과. 공증은 Xcode 계정 경로로 확인했다(docs/RELEASE.md 「Xcode 계정 공증 실측」). 결과 원문은 docs/RELEASE.md 「이번 실제 결과」.
 
 ## 2026-10-02 — 기록 탭 (TRK-47)
 

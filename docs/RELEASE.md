@@ -4,10 +4,13 @@
 
 ```sh
 scripts/release-mac.sh --check            # 준비 점검만
-scripts/release-mac.sh                    # 배포 빌드 + 공증
+scripts/release-mac.sh                    # 배포 빌드 + 공증(Xcode 계정)
 scripts/release-mac.sh --version 0.1.0    # 마케팅 버전을 이번만 덮어서
 scripts/release-mac.sh --skip-notarize    # 공증 전까지(내부 확인용)
+scripts/release-mac.sh --resume-notarize .build/release-mac/Waypoint.xcarchive   # 끊긴 공증 대기를 이어서
 ```
+
+공증 대기 조절: `--poll-interval <초>`(기본 300), `--notarize-timeout <분>`(기본 180). 앱 암호 프로필로 공증하려면 `--notary-profile <이름>`(아래 「사전 준비 3」).
 
 만든 앱은 이 Mac에서 실행하지 않는다. 번들 ID가 평소용(`dev.antaeho.waypoint`)과 같아 평소용 포트 47821과 저장 폴더를 같이 쓴다. 확인은 아래 정적 검사로만 한다.
 
@@ -29,7 +32,11 @@ export가 인증서 오류(「No signing certificate "Developer ID Application" 
 2. 왼쪽 아래 + > Developer ID Application
 3. `security find-identity -v -p codesigning`에 `Developer ID Application: Taeho An (2FCXA77MC5)`가 보이면 된다.
 
-### 3. 공증 자격 증명 프로필 `waypoint-notary`
+### 3. 공증 — Xcode 계정이면 따로 할 일 없음
+
+기본 공증은 1의 Xcode 계정 로그인으로 한다. 스크립트가 ExportOptions `destination`을 `upload`로 준 `-exportArchive`로 아카이브를 공증 서버에 올리고, `xcodebuild -exportNotarizedApp`으로 공증·staple된 앱을 받는다. 앱 전용 암호나 키체인 프로필은 필요 없다.
+
+#### (대안) notarytool 프로필 — `--notary-profile <이름>`을 줄 때만
 
 1. https://account.apple.com 로그인 > 로그인 및 보안 > 앱 암호 > 앱 암호 생성(이름: `waypoint-notary`). 나온 암호를 복사한다.
 2. 터미널에서:
@@ -38,6 +45,7 @@ export가 인증서 오류(「No signing certificate "Developer ID Application" 
    ```
    암호를 물으면 1의 앱 암호를 붙여 넣는다. 프로필은 로그인 키체인에 저장된다.
 3. 확인: `xcrun notarytool history --keychain-profile waypoint-notary`가 오류 없이 목록(처음엔 비어 있음)을 출력한다.
+4. 실행: `scripts/release-mac.sh --notary-profile waypoint-notary`(zip 제출 → `--wait` → `stapler staple`).
 
 ### 4. CloudKit Production 스키마
 
@@ -87,31 +95,42 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 
 | 단계 | 하는 일 | 성공 출력 |
 |---|---|---|
-| 사전 점검 | 깨끗한 트리(아니면 바로 멈춤), 빌드 번호·버전, Xcode 팀, 공증 프로필(`--skip-notarize`면 생략) | `· 사전 점검: 통과(…)` |
+| 사전 점검 | 깨끗한 트리(아니면 바로 멈춤), 빌드 번호·버전, Xcode 팀, `--notary-profile`을 줬으면 그 프로필 | `· 사전 점검: 통과(…)` |
 | archive | `xcodebuild archive` Release, `generic/platform=macOS`, `-allowProvisioningUpdates`, `MARKETING_VERSION`·`CURRENT_PROJECT_VERSION`·`ENABLE_HARDENED_RUNTIME=YES` 덮기. 로그 `.build/release-mac/archive.log` | `· archive: 성공(…)` |
 | export | `-exportArchive`, ExportOptions(method `developer-id`, signingStyle `automatic`, teamID, 스크립트가 `.build/release-mac/ExportOptions.plist`로 만든다) | `· export: 성공(developer-id, …)` |
 | 서명 검증 | Info.plist의 번들 ID·버전·빌드, `codesign --verify --deep --strict`, Authority가 Developer ID·팀, 하드닝 런타임, 엔타이틀먼트 컨테이너·`icloud-container-environment`(Production이어야 함)·`aps-environment` 출력 | `Authority=…` 세 줄, 엔타이틀먼트 세 줄, `· 서명 검증: 통과(…)` |
-| 공증 | `ditto -c -k --keepParent` → `notarytool submit --keychain-profile waypoint-notary --wait`. 결과와 상관없이 `notarytool log`를 `dist/<이름>-notary-log.json`에 남긴다 | `· 공증: Accepted(제출 <id>, …)` |
-| staple | `stapler staple` + `stapler validate` | `· staple: 성공` |
+| 공증 제출 | ExportOptions `destination` `upload`로 `-exportArchive`(Xcode 계정, 로그 `.build/release-mac/upload.log`). 제출 시각은 아카이브 `Info.plist`의 `Distributions[]` 마지막 upload 항목에서 읽는다 | `· 공증 제출: 성공(Xcode 계정, <시각>, …)` |
+| 공증 대기 | `-exportNotarizedApp`을 `--poll-interval`초마다 다시 부른다. 출력이 「is processing and not ready for distribution」이면 기다리고, 다른 오류면 출력 원문을 보이고 바로 실패. `--notarize-timeout`분을 넘기면 실패(이어 하기 명령을 알려 준다). Ctrl-C도 같은 안내 | 확인마다 `  HH:MM 처리 중 — 제출 뒤 N분, …` 한 줄, 끝나면 `· 공증: 수락(제출 뒤 N분째 확인, …)` |
+| 공증된 앱 검증 | 받은 앱(`.build/release-mac/notarized/Waypoint.app`)은 따로 서명된 번들이라 서명 검증을 한 번 더, `stapler validate`(이미 staple됨) | `· 공증된 앱 서명 검증: 통과(…)`, `· staple: 확인(The validate action worked!)` |
 | Gatekeeper | `spctl -a -vvv -t exec`. 공증 빌드는 `accepted`, `source=Notarized Developer ID`여야 한다. `--skip-notarize`는 거부가 정상이라 기록만 | `· Gatekeeper: 통과(…)` |
-| 산출물 | staple된 앱으로 zip을 다시 만들고 SHA256 | `완료: dist/<이름>.zip` |
+| 산출물 | 공증·staple된 앱으로 zip을 만들고 SHA256 | `완료: dist/<이름>.zip` |
 
 산출물(`dist/`, git에 안 올림):
 
 - `Waypoint-<버전>-<빌드>.zip` — 참여자에게 주는 파일
 - `Waypoint-<버전>-<빌드>.zip.sha256`
 - `Waypoint-<버전>-<빌드>-summary.txt` — 시각·커밋·Xcode·단계 결과
-- `Waypoint-<버전>-<빌드>-notary-log.json` — 공증 로그
+- `Waypoint-<버전>-<빌드>-notarize.log` — 마지막 `-exportNotarizedApp` 출력(`--notary-profile`이면 `-notary-log.json`에 notarytool 로그)
 - 이름 끝: `--allow-dirty`로 변경이 있을 때 `-dirty`, `--skip-notarize`면 `-unnotarized`
 
-중간 결과는 `.build/release-mac/`(archive, export된 앱, 로그, `codesign-info.txt`, `entitlements.plist`). 매번 지우고 새로 만든다. 평소용 설치의 `.build/release`와 겹치지 않는다.
+중간 결과는 `.build/release-mac/`(archive, export된 앱, 공증된 앱 `notarized/`, 로그, `codesign-info.txt`, `entitlements.plist`, 이어 하기용 `release-state.txt`). 새 빌드마다 지우고 새로 만든다(`--resume-notarize`는 지우지 않는다).
+
+### 이어 하기
+
+공증 대기 중 터미널이 닫히거나 Ctrl-C, 시간 초과로 끝나도 제출은 서버에서 계속된다. 다시 제출하지 않고 대기부터 잇는다:
+
+```sh
+scripts/release-mac.sh --resume-notarize .build/release-mac/Waypoint.xcarchive
+```
+
+버전·빌드는 아카이브 `Info.plist`에서, 산출물 이름과 커밋은 옆의 `release-state.txt`(같은 빌드일 때)에서 읽는다. 아카이브에 upload 기록이 없으면 멈춘다(exit 2). 작업 트리 상태는 보지 않는다. 평소용 설치의 `.build/release`와 겹치지 않는다.
 
 ## 검증 명령
 
 스크립트가 하는 것과 같다. 손으로 다시 볼 때:
 
 ```sh
-APP=.build/release-mac/export/Waypoint.app
+APP=.build/release-mac/notarized/Waypoint.app   # 공증 전 확인이면 export/Waypoint.app
 codesign --verify --deep --strict --verbose=2 $APP
 codesign -dv --verbose=4 $APP 2>&1 | grep -E '^(Authority|TeamIdentifier|CodeDirectory)'
 codesign -d --entitlements - --xml $APP | plutil -p -
@@ -147,20 +166,30 @@ shasum -a 256 -c dist/Waypoint-<버전>-<빌드>.zip.sha256   # dist/에서
 - 엔타이틀먼트 전체: `application-identifier 2FCXA77MC5.dev.antaeho.waypoint`, `aps-environment production`, `icloud-container-environment Production`, `icloud-container-identifiers [iCloud.dev.antaeho.waypoint]`, `icloud-services [CloudKit]`, `team-identifier`. 하드닝 런타임 예외(`com.apple.security.cs.*`)는 없다.
 - 프로파일: `embedded.provisionprofile` = 「Mac Team Direct Provisioning Profile: dev.antaeho.waypoint」(Xcode가 export 때 만듦, 만료 2044-09-27, 모든 기기).
 - `spctl` 거부(`Unnotarized Developer ID`)는 공증 전이라 정상이다.
-- 공증·staple·공증 후 `spctl`은 프로필이 없어 **아직 못 함**.
+- 이때는 공증을 하지 않았다(아래 Xcode 계정 공증 실측).
+
+### Xcode 계정 공증 실측 (2026-10-02, 빌드 220, 메인 세션이 손으로)
+
+- `xcodebuild -exportArchive … -exportOptionsPlist <destination upload> -allowProvisioningUpdates` → `Uploaded Waypoint`, `** EXPORT SUCCEEDED **`. 제출 15:18(아카이브 `Distributions[]`의 `uploadEvent.date` `2026-10-02T06:18:36Z`).
+- 처리 중 `-exportNotarizedApp` → `error: Archive "…" is processing and not ready for distribution.`
+- 수락까지 약 45분(첫 공증). 그 뒤 `-exportNotarizedApp` 성공 → `xcrun stapler validate` `The validate action worked!`, `spctl -a -vvv -t exec` `accepted`, `source=Notarized Developer ID`.
+- 수락 뒤에도 아카이브 `Info.plist`의 `processingEvent.state`는 `processing`으로 남았다. 그래서 스크립트는 완료를 plist로 판단하지 않고 `-exportNotarizedApp`의 결과로만 본다.
+- 이 아카이브로 `--resume-notarize`를 돌려 성공 경로(서명 재검증·staple 확인·spctl accepted·zip)를 확인했다.
 
 ## 실패할 때
 
 | 증상 | 할 일 |
 |---|---|
 | `커밋 안 된 변경이 있음` | 커밋한다. 확인만이면 `--allow-dirty`(이름에 `-dirty`, 외부 배포 금지) |
-| `공증 프로필 'waypoint-notary' 을 쓸 수 없음(missing)` | 「사전 준비 3」. 공증 없이 확인만이면 `--skip-notarize` |
-| `공증 프로필 … (error: …)` | 네트워크·Apple ID 상태. 앱 암호를 지웠으면 다시 만들어 `store-credentials` |
+| `공증 제출 실패` | `.build/release-mac/upload.log`. Xcode 계정 로그인(「사전 준비 1」, `--check`)과 네트워크를 본다 |
+| `공증된 앱을 받지 못함` | 화면에 찍힌 `-exportNotarizedApp` 출력과 `dist/<이름>-notarize.log`. 거절(Invalid)이면 Xcode Organizer에서 그 아카이브의 공증 로그를 본다. 고친 뒤 커밋하고 다시 |
+| `공증 대기 …분 초과` | 서버가 아직 처리 중이다. 안내된 `--resume-notarize` 명령으로 나중에 잇는다 |
+| `공증 프로필 … 을 쓸 수 없음` | `--notary-profile`을 줬을 때만. 「사전 준비 3」의 대안 절차, 또는 `--notary-profile`을 빼고 Xcode 계정으로 |
 | `archive 실패` | 화면의 마지막 오류와 `.build/release-mac/archive.log`. 평소 빌드(`install-local.sh`의 빌드 단계)와 같은 원인인지 본다 |
 | `Developer ID export 실패` | `.build/release-mac/export.log`. 인증서 오류면 「사전 준비 2」로 인증서를 만든다. 프로파일 오류면 Xcode 계정 로그인 상태를 확인하고 다시 |
 | `CloudKit 환경이 Production이 아님` | export가 개발용 서명으로 됐다는 뜻. ExportOptions method가 `developer-id`인지, Xcode 계정 권한을 본다 |
 | `하드닝 런타임이 꺼져 있음` | archive 줄의 `ENABLE_HARDENED_RUNTIME=YES`가 빠졌는지 본다 |
-| `공증 실패: 상태 'Invalid'` | `dist/<이름>-notary-log.json`의 `issues`를 본다. 고친 뒤 커밋하고 다시(빌드 번호가 바뀐다) |
+| `공증 실패: 상태 'Invalid'`(`--notary-profile`) | `dist/<이름>-notary-log.json`의 `issues`를 본다. 고친 뒤 커밋하고 다시(빌드 번호가 바뀐다) |
 | `Gatekeeper가 받지 않음` | `xcrun stapler validate`, 공증 로그. staple 직후 바로 실패하면 몇 분 뒤 다시 |
 
 ## 버전과 빌드 번호
