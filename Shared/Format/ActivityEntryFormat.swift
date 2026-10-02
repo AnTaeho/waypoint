@@ -26,7 +26,7 @@ public enum ActivityEntryFormat {
             if reason == SessionSweep.reasonProcessGone { detail = "프로세스 종료 확인" }
         case .note:
             kind = p["kind"]?.stringValue ?? "note"
-            if kind == "project.bound" {
+            if kind == SessionProjectBinding.boundNoteKind {
                 text = "작업 프로젝트 연결"; detail = p["to"]?.stringValue ?? ""
             } else if kind == PromptRetention.promptKind, (p["text"]?.stringValue ?? "").isEmpty {
                 text = clearedPromptText

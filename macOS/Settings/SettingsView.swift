@@ -7,8 +7,31 @@ enum UsageSettings {
     static let showCodexKey = "usage.showCodex"
 }
 
-/// 설정 창(⌘,)
+/// 설정 창 탭. 고른 탭은 `WaypointSettingsTab`에 남는다(실행 인자 `-WaypointSettingsTab records`로도 고른다).
+enum SettingsTab: String {
+    case usage, records
+
+    static let storageKey = "WaypointSettingsTab"
+}
+
+/// 설정 창(⌘,): 사용량 · 기록
 struct SettingsView: View {
+    @AppStorage(SettingsTab.storageKey) private var tab: SettingsTab = .usage
+
+    var body: some View {
+        TabView(selection: $tab) {
+            UsageSettingsTab()
+                .tabItem { Label("사용량", systemImage: "gauge.with.dots.needle.50percent") }
+                .tag(SettingsTab.usage)
+            RecordsTab()
+                .tabItem { Label("기록", systemImage: "externaldrive") }
+                .tag(SettingsTab.records)
+        }
+    }
+}
+
+/// 「사용량」 탭
+struct UsageSettingsTab: View {
     @AppStorage(UsageSettings.showClaudeKey) private var showClaude = true
     @AppStorage(UsageSettings.showCodexKey) private var showCodex = true
 
