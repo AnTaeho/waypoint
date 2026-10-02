@@ -20,6 +20,8 @@ final class AppServices {
     let onboarding = OnboardingModel()
     /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
     let reliability = ReliabilityMonitor()
+    /// 이번이나 지난 실행에서 백업으로 저장소를 되돌린 기록(TRK-46). 사람이 확인하면 지운다.
+    var storeRestore = (try? WaypointStore.supportDirectory()).flatMap { StoreRestoreRecord.load(supportDirectory: $0) }
     /// 지침·기억 출처 목록(메모리에만). 서비스를 시작하면 생긴다.
     private(set) var guidance: GuidanceMonitor?
     /// 방금 등록한 프로젝트. 메인 창이 받아서 사이드바에서 고르고 비운다.

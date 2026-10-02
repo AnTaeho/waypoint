@@ -62,8 +62,8 @@ struct WaypointApp: App {
         #endif
     }
 
-    /// 저장소를 못 열면 보여 줄 것이 없고, 메모리 저장소로 넘어가면 새로 쌓인 기록을 조용히 잃는다.
-    /// 개인 앱이라 원인 메시지를 남기고 멈춘다.
+    /// 열기 전에 예약 복원·`upgrade`/`daily` 백업을 하고, 못 열면 깨진 파일을 옮겨 두고 백업으로 되돌린다(`StoreLaunch`).
+    /// 그래도 못 열면 보여 줄 것이 없고, 메모리 저장소로 넘어가면 새로 쌓인 기록을 조용히 잃는다. 원인 메시지를 남기고 멈춘다.
     private static func makeContainer() -> ModelContainer {
         do {
             if usesSampleData {
@@ -72,10 +72,14 @@ struct WaypointApp: App {
                 try SampleData.seedIfEmpty(container.mainContext)
                 return container
             }
-            return try WaypointStore.makeContainer(
+            let (container, outcome) = try WaypointStore.openForLaunch(
                 url: WaypointStore.defaultStoreURL(),
                 cloudKitContainer: AppInstance.current.cloudKitContainer()
             )
+            for entry in outcome.backups { NSLog("Waypoint 저장소 백업 \(entry.id)") }
+            if let restore = outcome.restore { NSLog("Waypoint 저장소 복원(\(restore.kind.rawValue)) \(restore.backupID)") }
+            for note in outcome.notes { NSLog("Waypoint 저장소 \(note)") }
+            return container
         } catch {
             fatalError("Waypoint 저장소를 열 수 없음: \(error)")
         }

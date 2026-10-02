@@ -41,6 +41,12 @@ struct IntegrationHealthPanel: View {
                             Text(issue).foregroundStyle(Theme.liveText)
                             Button("알림 확인") { services.integration.acknowledge() }
                         }
+                        if let restore = services.storeRestore {
+                            let backupAt = restore.backupCreatedAt.formatted(date: .abbreviated, time: .shortened)
+                            Text(restore.kind == .automatic ? "기록을 열지 못해 \(backupAt) 백업으로 되돌림" : "\(backupAt) 백업으로 되돌림")
+                                .foregroundStyle(Theme.liveText)
+                            Button("알림 확인") { services.acknowledgeStoreRestore() }
+                        }
                         if let at = services.integration.history.lastMCPAt {
                             Text("마지막 연결 요청 · \(at.formatted(date: .abbreviated, time: .standard))")
                         } else {
