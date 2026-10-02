@@ -50,7 +50,7 @@ public enum RecordScope {
             case .cards: "제목 · 본문 · 완료 조건 · 상태가 바뀐 때"
             case .sessions: "시작·끝 시각 · 작업 폴더 · 브랜치 · 요청을 보낸 시각"
             case .prompts: "내가 보낸 요청 앞 \(HookParsing.lastPromptLimit)자"
-            case .files: "경로 · 늘고 준 줄 수"
+            case .files: "경로 · 저장소 폴더 · 늘고 준 줄 수"
             case .commits: "해시 · 메시지 첫 줄"
             case .checks: "명령 · 결과 · 짧은 설명"
             case .notes: "카드 메모 · 다음 세션 메모 · 프로젝트 지금 상황"
@@ -138,7 +138,7 @@ public enum RecordScope {
         + keys(.cardStatus, .cards, ["from", "to"])
         + keys(.cardAttached, .cards, ["sessionId"])
         + keys(.cardDetached, .cards, ["sessionId", "reason"])
-        + keys(.fileChanged, .files, ["path", "added", "removed", "toolUseId"])
+        + keys(.fileChanged, .files, ["path", "added", "removed", "toolUseId", "checkout"])
         + keys(.commit, .commits, ["hash", "message", "toolUseId"])
         + keys(.check, .checks, ["command", "outcome", "source", "criterion", "criterionText", "detail", "exitCode",
                                  "provider", "toolUseId"])

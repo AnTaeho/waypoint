@@ -107,6 +107,7 @@ struct RootView: View {
         .onboardingSheet(services)
         .settingsLaunch()
         .windowSizeLaunch()
+        .cardLaunch($path)
     }
 
     private var inspectorTitle: String {

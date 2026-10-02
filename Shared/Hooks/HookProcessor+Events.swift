@@ -160,10 +160,13 @@ extension HookProcessor {
             guard let project = nearest ?? (file.path.hasPrefix("/") ? nil : acting.project) else { continue }
             let targets = unique(cards.filter { $0.project === project })
             let path = ProjectMatcher.relativePath(file.path, in: project, home: home)
+            var payload = tool.merging(["path": .string(path), "added": .int(file.added),
+                                        "removed": .int(file.removed)]) { $1 }
+            // 같은 파일 작업 중 판정(TRK-17): 그 파일의 git 작업 트리. worktree는 다른 값이 된다.
+            if let checkout = checkoutPath(file.path, cwd: input.cwd) { payload["checkout"] = .string(checkout) }
             for card in targets.isEmpty ? [Card?.none] : targets.map(Optional.some) {
                 Event.record(.fileChanged, in: context, project: project, card: card, session: acting, at: date,
-                             payload: tool.merging(["path": .string(path), "added": .int(file.added),
-                                                    "removed": .int(file.removed)]) { $1 })
+                             payload: payload)
             }
         }
         if let commit = HookParsing.commit(input), let project = commitProject {
@@ -218,6 +221,14 @@ extension HookProcessor {
     }
 
     // MARK: - 도우미
+
+    /// 바뀐 파일의 git 작업 트리 최상위. 상대 경로면 훅 `cwd` 기준으로 펼친다. 모르면 nil.
+    func checkoutPath(_ path: String, cwd: String) -> String? {
+        let expanded = ProjectMatcher.normalize(path, home: home)
+        let absolute = expanded.hasPrefix("/") ? expanded
+            : cwd.hasPrefix("/") ? (cwd as NSString).appendingPathComponent(expanded) : nil
+        return absolute.flatMap(checkoutRoot)
+    }
 
     /// 명령(커밋·검증)이 실행된 프로젝트. 도구 입력의 `workdir`/`cwd`가 있으면 그 폴더, 없으면 훅의 `cwd`
     /// (Claude가 `cd`하면 따라 바뀐다 — hooks 문서 「cwd follows Claude」). 훅 `cwd`가 등록 밖이면 세션의 프로젝트

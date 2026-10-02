@@ -5,6 +5,8 @@ struct DashboardWorkList: View {
     let rows: [DashboardRow]
     let now: Date
     @Binding var provider: AgentProvider?
+    /// 줄(`DashboardRow.id`)마다 같은 파일 작업 중
+    var overlaps: [String: [WorkOverlap.Overlap]] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.l) {
@@ -16,7 +18,7 @@ struct DashboardWorkList: View {
                 DashboardEmpty(message: provider == nil ? "진행 중인 작업이 없습니다." : "이 도구에서 진행 중인 작업이 없습니다.")
             }
             ForEach(rows) { row in
-                DashboardWorkTile(row: row, now: now)
+                DashboardWorkTile(row: row, now: now, overlaps: overlaps[row.id] ?? [])
                     .padding(.leading, isNested(row) ? Theme.Spacing.indent : 0)
             }
         }

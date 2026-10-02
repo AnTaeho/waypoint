@@ -24,6 +24,8 @@ struct SituationCardRow<Leading: View>: View {
     let card: Card
     var trailing: String?
     var muted = false
+    /// 제목 뒤 작은 강조 표시(같은 파일 작업 중)
+    var flag: String?
     @ViewBuilder var leading: () -> Leading
 
     var body: some View {
@@ -36,6 +38,9 @@ struct SituationCardRow<Leading: View>: View {
                     .foregroundStyle(muted ? Theme.textSecondary : Theme.text)
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: Theme.Spacing.s)
+                if let flag {
+                    Text(flag).font(Theme.Situation.meta).foregroundStyle(Theme.Overlap.text).fixedSize()
+                }
                 if let trailing {
                     Text(trailing).font(Theme.Situation.meta).foregroundStyle(Theme.textMuted).fixedSize()
                 }
@@ -49,7 +54,7 @@ struct SituationCardRow<Leading: View>: View {
 
 extension SituationCardRow where Leading == EmptyView {
     init(card: Card, trailing: String? = nil) {
-        self.init(card: card, trailing: trailing, muted: false) { EmptyView() }
+        self.init(card: card, trailing: trailing, muted: false, flag: nil) { EmptyView() }
     }
 }
 
@@ -58,7 +63,8 @@ struct SituationWorkRow: View {
     let item: ProjectSituation.WorkItem
 
     var body: some View {
-        SituationCardRow(card: item.card, trailing: trailing, muted: item.workState != .live) {
+        SituationCardRow(card: item.card, trailing: trailing, muted: item.workState != .live,
+                         flag: item.overlapFileCount > 0 ? "같은 파일 \(item.overlapFileCount)" : nil) {
             WorkStateDot(state: item.workState)
         }
     }

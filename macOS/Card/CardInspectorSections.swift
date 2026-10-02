@@ -19,6 +19,8 @@ private struct SubagentLink: Identifiable {
 struct ConnectedSessionBox: View {
     let session: Session
     let now: Date
+    /// 이 세션이 다른 작업과 같이 만지는 파일(TRK-17)
+    var overlaps: [WorkOverlap.Overlap] = []
     let open: (Card) -> Void
 
     var body: some View {
@@ -35,6 +37,7 @@ struct ConnectedSessionBox: View {
             }
             Text(SessionFormat.activityText(session, now: now))
                 .font(Theme.captionLarge).foregroundStyle(Theme.textMuted)
+            OverlapBadge(overlaps: overlaps)
             ForEach(subagentLinks) { item in
                 Button { open(item.card) } label: {
                     HStack(spacing: Theme.Spacing.s) {

@@ -5,6 +5,7 @@ import WaypointKit
 struct DashboardWorkTile: View {
     let row: DashboardRow
     let now: Date
+    var overlaps: [WorkOverlap.Overlap] = []
 
     var body: some View {
         if let card = row.card {
@@ -28,6 +29,7 @@ struct DashboardWorkTile: View {
                     Text(card.displayID).font(Theme.monoSmall).foregroundStyle(Theme.textMuted)
                 }
             }
+            OverlapBadge(overlaps: overlaps)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: Theme.Spacing.s) { session; Spacer(minLength: Theme.Spacing.s); file }
                 VStack(alignment: .leading, spacing: Theme.Spacing.s) { session; file }

@@ -39,7 +39,9 @@ struct HookHarness {
         context.insert(project)
         try context.save()
         self.project = project
-        self.processor = HookProcessor(context: context, home: "/Users/me", gitBranch: { _ in "feat/ocr-mapping" })
+        // 체크아웃은 이 Mac의 실제 폴더에 따라 달라지므로 끈다(TRK-17 테스트는 임시 저장소로 따로 본다).
+        self.processor = HookProcessor(context: context, home: "/Users/me", gitBranch: { _ in "feat/ocr-mapping" },
+                                       checkoutRoot: { _ in nil })
     }
 
     @discardableResult
