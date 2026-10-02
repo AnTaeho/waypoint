@@ -117,7 +117,7 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 
 ### 이어 하기
 
-공증 대기 중 터미널이 닫히거나 Ctrl-C, 시간 초과로 끝나도 제출은 서버에서 계속된다. 다시 제출하지 않고 대기부터 잇는다:
+공증 대기 중 터미널이 닫히거나 Ctrl-C, 시간 초과로 끝나도 제출은 서버에서 계속된다. 아래 명령은 대기부터 잇는다(제출은 한 번뿐):
 
 ```sh
 scripts/release-mac.sh --resume-notarize .build/release-mac/Waypoint.xcarchive
@@ -173,7 +173,7 @@ shasum -a 256 -c dist/Waypoint-<버전>-<빌드>.zip.sha256   # dist/에서
 - `xcodebuild -exportArchive … -exportOptionsPlist <destination upload> -allowProvisioningUpdates` → `Uploaded Waypoint`, `** EXPORT SUCCEEDED **`. 제출 15:18(아카이브 `Distributions[]`의 `uploadEvent.date` `2026-10-02T06:18:36Z`).
 - 처리 중 `-exportNotarizedApp` → `error: Archive "…" is processing and not ready for distribution.`
 - 수락까지 약 45분(첫 공증). 그 뒤 `-exportNotarizedApp` 성공 → `xcrun stapler validate` `The validate action worked!`, `spctl -a -vvv -t exec` `accepted`, `source=Notarized Developer ID`.
-- 수락 뒤에도 아카이브 `Info.plist`의 `processingEvent.state`는 `processing`으로 남았다. 그래서 스크립트는 완료를 plist로 판단하지 않고 `-exportNotarizedApp`의 결과로만 본다.
+- 수락 뒤에도 아카이브 `Info.plist`의 `processingEvent.state`는 `processing`으로 남았다. 그래서 스크립트는 완료를 `-exportNotarizedApp`의 결과로만 본다.
 - 이 아카이브로 `--resume-notarize`를 돌려 성공 경로(서명 재검증·staple 확인·spctl accepted·zip)를 확인했다.
 
 ### 스크립트 기본 실행 (2026-10-02, 커밋 891ea1c, 빌드 229)
