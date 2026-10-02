@@ -149,6 +149,33 @@ import Testing
         #expect(try support.mode(failed) == 0o700)
     }
 
+    /// `quick_check`는 통과하지만 열리지 않는 백업(판이 안 맞는 경우 등)은 놓은 사본을 거두고 다음 백업으로 간다.
+    @Test func backupThatPassesCheckButFailsToOpenIsSkipped() throws {
+        let support = try StoreTemp()
+        try support.seed(["OLD"])
+        let older = try #require(try support.backup.copyClosedStore(reason: .daily, stamp: old, at: t0))
+        try support.seed(["NEW"])
+        let newer = try #require(try support.backup.copyClosedStore(reason: .daily, stamp: old, at: t0 + 1))
+        try PrivateFile.write(try StoreBackup.encoder().encode(old), to: support.dir.appendingPathComponent(StoreLaunch.versionFileName))
+        try support.corrupt(with: Data(repeating: 0x44, count: 8192))
+        struct Mismatch: Error {}
+        var calls = 0
+        var placedOnSecondCall: [String] = []
+        let (container, outcome) = try support.launch(old).open(now: t0 + 60) { url -> ModelContainer in
+            calls += 1
+            if calls == 1 { return try WaypointStore.makeContainer(url: url) }  // 깨진 저장소 → 실패
+            if calls == 2 {
+                placedOnSecondCall = try support.keys(in: StoreBackup.Entry(url: support.dir, info: newer.info))
+                throw Mismatch()  // 최신 백업은 열리지 않는다고 친다
+            }
+            return try WaypointStore.makeContainer(url: url)
+        }
+        #expect(calls == 3)
+        #expect(placedOnSecondCall == ["NEW", "OLD"])
+        #expect(outcome.restore?.backupID == older.id)
+        #expect(try support.keys(container) == ["OLD"])
+    }
+
     @Test func withoutBackupFailureStaysAndFilesAreUntouched() throws {
         let support = try StoreTemp()
         let garbage = Data(repeating: 0x42, count: 8192)
