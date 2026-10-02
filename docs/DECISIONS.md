@@ -467,3 +467,19 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | CloudKit: 복원은 로컬만 되돌린다. 미러링 상태(레코드 메타데이터·서버 변경 토큰·이력 토큰)가 저장소 파일 안에 있음은 사본에서 확인, 옛 토큰 뒤 변경만 받는다는 것은 `CKFetchRecordZoneChangesOperation` 문서로 확인. 복원 뒤 `NSPersistentCloudKitContainer`가 실제로 그 뒤 변경을 다시 받는지, 서버 값이 복원값을 덮는지, 토큰 만료 시 동작은 **확인 못 함** | Apple 문서에 내부 동작이 없고 CloudKit을 켠 복원 실측은 범위 밖(Dev 실측은 CloudKit 꺼짐) | — | 실측 뒤 SPEC 「CloudKit과의 관계」 고치기 |
 
 검증: `swift test` 전체 통과, macOS Debug·iOS Simulator 빌드. Dev 실측(스크래치 저장 폴더, CloudKit 꺼짐)은 docs/RELIABILITY.md.
+
+## 2026-10-02 — 배포 빌드 (TRK-48)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 빌드 번호 = `git rev-list --count HEAD`, xcodebuild에 `CURRENT_PROJECT_VERSION=<n>`으로 넘긴다. `install-local.sh`도 같은 함수(`scripts/build-version.sh`). 메인 세션 결정 | 늘 증가하고 커밋과 이어진다. 번호가 고정(1)이면 새 빌드를 설치해도 TRK-46의 실행 전 백업이 생기지 않았다 | 날짜·시각 번호, `agvtool`로 파일 고치기 | 두 스크립트의 `CURRENT_PROJECT_VERSION=` 인자 빼기 |
+| 마케팅 버전은 `project.yml`이 원본, `--version X.Y.Z`로 그 빌드만 덮는다(파일은 고치지 않음). 메인 세션 결정 | 베타 때 번호만 바꿔 다시 내기 쉽게, 원본은 한 곳에 | 매번 `project.yml` 고치기 | `--version` 분기 빼기 |
+| 배포 스크립트는 더러운 트리에서 멈춘다. `--allow-dirty`는 개발용이고 산출물 이름에 `-dirty`를 붙인다(이름의 `-dirty`는 내 판단) | 빌드 번호가 커밋 수라 커밋 안 된 변경은 번호에 안 잡힌다. 섞인 산출물이 밖으로 나가지 않게 이름으로 표시 | 이름 표시 없이 허용 | `release-mac.sh`의 `-dirty` 줄 |
+| archive 단계에서만 `ENABLE_HARDENED_RUNTIME=YES`로 덮는다. `project.yml`은 NO 그대로(내 판단) | 공증은 하드닝 런타임이 필수다. `project.yml`을 바꾸면 평소용 빌드도 바뀐다. 앱은 `Process`·`NSWorkspace.open`만 써서 예외 엔타이틀먼트가 필요 없다(export 결과에 `com.apple.security.cs.*` 없음). 하드닝 런타임에서의 실제 동작은 앱을 실행하지 않아 **확인 못 함** | `project.yml`에서 켜기 | archive 줄의 `ENABLE_HARDENED_RUNTIME=YES` |
+| ExportOptions는 스크립트가 `.build/release-mac/ExportOptions.plist`로 만든다(내 판단) | 값이 셋(method `developer-id`, 자동 서명, teamID)이라 스크립트 안에서 읽히는 편이 낫고 저장소 파일이 늘지 않는다 | `Config/ExportOptions.plist` | 파일로 빼고 `-exportOptionsPlist` 경로만 바꾸기 |
+| 키체인에 Developer ID 인증서가 없어도 `--check`가 막지 않는다(내 판단) | 실측에서 자동 서명 export가 Xcode 클라우드 관리 인증서로 `Developer ID Application: Taeho An (2FCXA77MC5)` 서명을 했다 | 인증서를 필수로 | `run_check`의 인증서 항목에 `missing=1` |
+| 중간 결과는 `.build/release-mac/`, 산출물은 `dist/`(gitignore) | 평소용 설치가 읽는 `.build/release`와 겹치지 않게 | 같은 DerivedData | — |
+| 만든 앱은 실행하지 않고 codesign·spctl·plutil 정적 검사만. 메인 세션 결정 | 번들 ID가 평소용과 같아 47821·저장소를 건드린다 | — | — |
+| CloudKit: Developer ID 앱은 Production 환경(export 엔타이틀먼트로 확인). Production 스키마 배포는 사람이 Console에서 한다. 메인 세션 결정 | 외부 사용자는 Production만 쓴다. 스키마 배포는 되돌릴 수 없는 외부 변경 | `cktool`로 자동화 | — |
+
+검증: `scripts/release-mac.sh --skip-notarize` 성공(archive·export·서명 검증, `spctl`은 공증 전이라 거부), `python3 scripts/test_build_failure_report.py` 통과. 공증은 `waypoint-notary` 프로필이 없어 못 함. 결과 원문은 docs/RELEASE.md 「이번 실제 결과」.
