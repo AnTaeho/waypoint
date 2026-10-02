@@ -2,12 +2,12 @@ import SwiftData
 import SwiftUI
 import WaypointKit
 
-/// 지침 문서 화면: 위에 문서 줄(이름·상태·읽기/편집), 아래 본문(읽기·편집·충돌 비교).
+/// 지침 문서 화면: 위에 문서 줄(이름·상태·읽기/항목/편집), 아래 본문(읽기·항목·편집·충돌 비교).
 struct GuideView: View {
     let project: Project
     @Binding var selectedID: PersistentIdentifier?
 
-    @State private var mode: GuideMode = .read
+    @State private var mode: GuideMode = GuideLaunch.guideMode
 
     var body: some View {
         let docs = (project.guideDocs ?? []).sorted { $0.relPath.localizedStandardCompare($1.relPath) == .orderedAscending }
@@ -25,8 +25,8 @@ struct GuideView: View {
         .navigationTitle(project.name)
         .onChange(of: doc?.persistentModelID) { _, id in
             if selectedID != id { selectedID = id }
-            // 저장 안 한 편집이 있는 문서로 오면 편집으로
-            mode = doc?.draft != nil ? .edit : .read
+            // 저장 안 한 편집이 있는 문서로 오면 편집으로. 항목 보기는 문서를 바꿔도 그대로.
+            if doc?.draft != nil { mode = .edit } else if mode == .edit { mode = .read }
         }
         .onAppear {
             if selectedID != doc?.persistentModelID { selectedID = doc?.persistentModelID }
@@ -40,6 +40,9 @@ struct GuideView: View {
         } else {
             switch mode {
             case .read: GuideReader(content: doc.content)
+            case .items:
+                GuidanceItemsView(content: doc.content, format: .markdown,
+                                  writer: GuidanceItemWriter(target: .registered(doc)) { mode = .edit })
             case .edit: GuideEditor(doc: doc) { mode = .read }
             }
         }
@@ -47,5 +50,5 @@ struct GuideView: View {
 }
 
 enum GuideMode: Hashable {
-    case read, edit
+    case read, items, edit
 }
