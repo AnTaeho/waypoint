@@ -144,6 +144,7 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 - `env -i`로 띄운다. Claude Code 안에서 돌리면 `CLAUDECODE`·메시징 소켓 변수가 따라가 지금 세션으로 섞인다.
 - 임시 홈에는 로그인 정보가 없어 Claude는 훅·MCP까지만 돌고 모델 호출에서 「Not logged in」, Codex는 `401`로 끝난다. 실제 대화까지 보려면 사람이 임시 홈에서 로그인하고, Codex는 대화형 `/hooks`에서 신뢰한다. 실제 홈의 인증 파일을 복사하지 않는다.
 - 끝나면 실제 홈 설정(`~/.claude/settings.json`·`~/.codex/config.toml`·`hooks.json`·`~/.agents`)의 수정 시각·해시와 `~/.claude.json`의 `mcpServers`가 그대로인지 본다(`~/.claude.json` 전체는 돌고 있는 Claude Code가 늘 고쳐 쓴다).
+- 설치된 훅의 outbox는 `$HOME/Library/Application Support/Waypoint-Dev`, 곧 임시 홈 안으로 간다. 앱이 `$P/support`를 쓰므로 앱이 꺼진 동안 온 기록은 흡수되지 않는다. 앱을 켠 채로 잰다.
 - macOS에는 `timeout`이 없다. 시간 제한은 `perl -e 'alarm 150; exec @ARGV' …`.
 
 ## 실측 폴더
