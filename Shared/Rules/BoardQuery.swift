@@ -59,13 +59,18 @@ public enum BoardQuery {
     /// - 완료: `now - doneWindow`보다 뒤에 완료된 것만(딱 7일 전은 뺀다), 완료 시각 최신순
     public static func columns(for project: Project, now: Date) -> [BoardColumn: [BoardItem]] {
         let cards = project.cards ?? []
+        // 정렬 키를 먼저 읽어 둔다. 모델 속성 읽기가 비싸서 비교마다 읽으면 카드 수십 장에도 몇 ms가 든다.
         let ideas = cards.filter { $0.status == .idea }
-            .sorted { ($0.createdAt, $0.number) > ($1.createdAt, $1.number) }
+            .map { (card: $0, key: ($0.createdAt, $0.number)) }
+            .sorted { $0.key > $1.key }.map(\.card)
         let next = cards.filter { $0.status == .next }
-            .sorted { $0.number < $1.number }
+            .map { (card: $0, key: $0.number) }
+            .sorted { $0.key < $1.key }.map(\.card)
         let since = now.addingTimeInterval(-doneWindow)
-        let done = cards.filter { $0.status == .done && ($0.doneAt ?? .distantPast) > since }
-            .sorted { ($0.doneAt ?? .distantPast, $0.number) > ($1.doneAt ?? .distantPast, $1.number) }
+        let done = cards.filter { $0.status == .done }
+            .map { (card: $0, key: ($0.doneAt ?? .distantPast, $0.number)) }
+            .filter { $0.key.0 > since }
+            .sorted { $0.key > $1.key }.map(\.card)
         return [
             .idea: ideas.map { BoardItem(card: $0, depth: 0) },
             .next: next.map { BoardItem(card: $0, depth: 0) },

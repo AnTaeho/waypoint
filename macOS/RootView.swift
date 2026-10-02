@@ -106,6 +106,7 @@ struct RootView: View {
         .guideLaunch(selection: $selection, projectMode: $projectMode)
         .onboardingSheet(services)
         .settingsLaunch()
+        .windowSizeLaunch()
     }
 
     private var inspectorTitle: String {

@@ -105,7 +105,6 @@ enum Theme {
         /// 아이디어 카드 점선 테두리
         static let ideaCardDash: [CGFloat] = [5, 3]
         static let rowHeight: CGFloat = 34
-        static let projectRowHeight: CGFloat = 32
         static let inspectorWidth: CGFloat = 280
         static let progressHeight: CGFloat = 4
         static let cardBorder: CGFloat = 1
@@ -291,11 +290,6 @@ enum Theme {
         static let activeTitleMin: CGFloat = 200
         static let activeSession: CGFloat = 110
         static let activeElapsed: CGFloat = 80
-        static let projectFolder: ClosedRange<CGFloat> = 120...200
-        static let projectNameMin: CGFloat = 160
-        static let projectCount: CGFloat = 64
-        static let projectCountCompact: CGFloat = 48
-        static let projectActivity: CGFloat = 96
     }
 }
 

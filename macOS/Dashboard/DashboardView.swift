@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 import WaypointKit
 
-/// PC 통합 화면. 집계 → 진행 작업·이어가기 → 프로젝트 현황.
+/// PC 통합 화면. 집계 → 진행 작업·이어가기 → 상황판(프로젝트 타일).
 struct DashboardView: View {
     let searchText: String
     let selectProject: (Project) -> Void
@@ -29,36 +29,36 @@ struct DashboardView: View {
             return DashboardSearch.matches(card, query)
                 || card.project.map { DashboardSearch.matches($0, query) } == true
         }
-        let items = DashboardSearch.filter(projects, query: query)
-            .map { ProjectTableItem(project: $0, summary: DashboardQuery.summary(for: $0, now: now)) }
-            .sorted {
-                let a = $0.summary.lastActivityAt ?? .distantPast
-                let b = $1.summary.lastActivityAt ?? .distantPast
-                return a == b ? $0.project.key < $1.project.key : a > b
-            }
+        let tiles = ProjectSituation.board(
+            for: DashboardSearch.filter(projects, query: query), now: now, provider: provider,
+            cardFilter: DashboardSearch.cardFilter(query)
+        )
         return GeometryReader { proxy in
             let width = max(0, proxy.size.width - Theme.Spacing.pageH * 2)
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Spacing.section) {
-                    heading(overview)
-                    IntegrationStatusButton(compact: false)
-                    DashboardStats(overview: overview)
-                    if width >= Theme.Dashboard.twoColumnWidth {
-                        HStack(alignment: .top, spacing: Theme.Spacing.xl) {
+            ScrollViewReader { reader in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.section) {
+                        heading(overview)
+                        IntegrationStatusButton(compact: false)
+                        DashboardStats(overview: overview)
+                        if width >= Theme.Dashboard.twoColumnWidth {
+                            HStack(alignment: .top, spacing: Theme.Spacing.xl) {
+                                DashboardWorkList(rows: live, now: now, provider: $provider)
+                                    .frame(maxWidth: .infinity)
+                                DashboardContinue(rows: stalled, cards: notes, now: now)
+                                    .frame(width: Theme.Dashboard.contextWidth)
+                            }
+                        } else {
                             DashboardWorkList(rows: live, now: now, provider: $provider)
-                                .frame(maxWidth: .infinity)
                             DashboardContinue(rows: stalled, cards: notes, now: now)
-                                .frame(width: Theme.Dashboard.contextWidth)
                         }
-                    } else {
-                        DashboardWorkList(rows: live, now: now, provider: $provider)
-                        DashboardContinue(rows: stalled, cards: notes, now: now)
+                        SituationBoard(tiles: tiles, width: width, now: now, select: selectProject)
                     }
-                    DashboardProjects(items: items, now: now, select: selectProject)
+                    .padding(.horizontal, Theme.Spacing.pageH)
+                    .padding(.vertical, Theme.Spacing.pageV)
+                    .frame(width: proxy.size.width, alignment: .leading)
                 }
-                .padding(.horizontal, Theme.Spacing.pageH)
-                .padding(.vertical, Theme.Spacing.pageV)
-                .frame(width: proxy.size.width, alignment: .leading)
+                .dashboardScrollLaunch(reader)
             }
         }
     }

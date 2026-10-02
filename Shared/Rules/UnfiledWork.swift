@@ -67,6 +67,41 @@ public enum UnfiledWork {
         }
     }
 
+    /// `items(for:now:)`의 개수만. 상황판처럼 자주 다시 그리는 곳용이다: 카드 없는 `file.changed`를 모두 읽지 않고,
+    /// 조건이 맞는 끝난 메인 세션(넘김·연결 기록 없음, 카드에 붙은 적 없음)마다 그 세션·서브에이전트의 카드 없는
+    /// 파일 변경이 있는지만 센다(`fetchCount`). 실제 저장소 사본(프로젝트 4개)에서 `items` 40–95 ms → 이 경로 7–12 ms(기계 부하에 따라).
+    public static func count(for project: Project, now: Date) -> Int {
+        guard let context = project.modelContext else { return 0 }
+        let cutoff = now.addingTimeInterval(-window)
+        let main = SessionKind.main.rawValue
+        let projectID = project.id
+        let ids = (try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: #Predicate<Session> {
+            $0.kindRaw == main && $0.lastSeenAt >= cutoff && $0.endedAt != nil && $0.project?.id == projectID
+        }))) ?? []
+        guard !ids.isEmpty else { return 0 }
+        let filed = filedSessionIDs(for: project)
+        let raw = EventType.fileChanged.rawValue
+        let projectPID = project.persistentModelID
+        // 관계는 `persistentModelID`로 비교한다(`?.id` 비교보다 빠르다).
+        func hasChange(_ session: Session) -> Bool {
+            let owners = [session] + (session.children ?? []).filter { $0.kind == .subagent }
+            return owners.contains { owner in
+                let sid = owner.persistentModelID
+                var descriptor = FetchDescriptor<Event>(predicate: #Predicate<Event> {
+                    $0.typeRaw == raw && $0.card == nil && $0.session?.persistentModelID == sid
+                        && $0.project?.persistentModelID == projectPID && $0.at >= cutoff
+                })
+                descriptor.fetchLimit = 1
+                return ((try? context.fetchCount(descriptor)) ?? 0) > 0
+            }
+        }
+        return ids.reduce(0) { total, id in
+            guard let session = context.model(for: id) as? Session, session.endedAt != nil,
+                  !filed.contains(session.id), !everAttached(session), hasChange(session) else { return total }
+            return total + 1
+        }
+    }
+
     /// 세션이나 그 서브에이전트가 카드에 붙은 적이 있는가(지금 풀렸어도).
     public static func everAttached(_ session: Session) -> Bool {
         ([session] + (session.children ?? [])).contains { !($0.cardSessions ?? []).isEmpty }
