@@ -61,9 +61,10 @@ import Testing
             "Init/ProjectRegistry.swift": 1,
             "MCP/MCPTools.swift": 3,
             "MCP/MCPTools+Session.swift": 2,
+            "MCP/MCPTools+Status.swift": 3,
             "Hooks/HookProcessor.swift": 2,
             "Hooks/HookProcessor+Events.swift": 5,
-            "Rules/CardEditing.swift": 1,
+            "Rules/CardEditing.swift": 2,
             "Rules/CardEvidence.swift": 1,
             "Rules/CardLifecycle.swift": 6,
             "Rules/SessionProjectBinding.swift": 1,
@@ -117,6 +118,8 @@ import Testing
         _ = try mcp.ok("card_handoff", ["id": "PRB-1", "nextSessionNote": "다음"])
         _ = try mcp.ok("card_evidence", ["id": "PRB-1", "command": "swift test", "outcome": "pass", "criterion": 1,
                                          "detail": "654개", "sessionId": sid])
+        _ = try mcp.ok("card_update", ["id": "PRB-1", "criteria": [["text": "swift test", "done": true]]])
+        _ = try mcp.ok("project_status", ["project": "PRB", "text": "상황", "sessionId": sid])
         _ = try mcp.ok("card_update", ["id": "PRB-1", "status": "done"])
         let other = Project(key: "OTH", name: "other", rootPath: "~/other", createdAt: t0)
         mcp.context.insert(other)
@@ -124,6 +127,21 @@ import Testing
         _ = try mcp.ok("session_bind", ["project": "PRB", "sessionId": "5e1f0c2a-0000-4000-8000-0000000000ff",
                                         "cwd": "/Users/me/probe"])
         try collect(mcp.context)
+
+        // 정리 안 된 작업: 연결·넘김
+        let (filedContainer, filed) = try makeContext()
+        _ = filedContainer
+        let fp = makeProject(filed)
+        fp.makeCard(in: filed, title: "카드", at: t0)
+        for id in ["aaaaaaaa-0001", "bbbbbbbb-0002"] {
+            let s = makeSession(filed, fp, id: id, startedAt: t0)
+            s.endedAt = t0 + 10
+            Event.record(.fileChanged, in: filed, project: fp, session: s, at: t0 + 5, payload: ["path": "a.swift"])
+        }
+        let filer = MCPTools(context: filed, now: { t0 + 60 })
+        _ = try filer.call("work_file", ["sessionId": "aaaaaaaa", "cardId": "LDG-1"])
+        _ = try filer.call("work_file", ["sessionId": "bbbbbbbb"])
+        try collect(filed)
 
         // 지침 문서
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-scope-\(UUID().uuidString)")
@@ -139,7 +157,7 @@ import Testing
         #expect(unknown.sorted() == [], "표에 없는 payload 키")
         // 대표 키가 실제로 지나갔는지(생성 지점을 놓치지 않았는지)
         for type in [EventType.sessionStart, .sessionEnd, .cardCreated, .cardStatus, .cardAttached, .cardDetached,
-                     .fileChanged, .commit, .check, .note, .guideSynced] {
+                     .fileChanged, .commit, .check, .note, .guideSynced, .projectStatus, .sessionFiled] {
             #expect(seen.contains { $0.type == type }, "생성되지 않은 종류: \(type.rawValue)")
         }
         for kind in [MCPTools.handoffNoteKind, CardEditing.criterionNoteKind, PromptRetention.promptKind,

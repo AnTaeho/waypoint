@@ -134,6 +134,24 @@ extension MCPTools {
                 "sessionId": string("주입된 sessionId"),
             ], required: ["id", "command", "outcome"])
         ),
+        MCPToolDefinition(
+            name: "project_status",
+            description: "프로젝트 지금 상황(무엇이 진행 중이고 다음에 무엇을 할지)을 새로 쓴다. 최신 것이 시작 블록 「지금 상황」에 보인다. 600자·8줄 이내, 넘으면 오류. text를 빼면 최신 상황을 읽는다.",
+            inputSchema: schema([
+                "project": projectProperty,
+                "text": string("지금 상황 전체(이전 글을 대신한다). 진행 중인 것, 다음 할 것, 막힌 것을 짧게"),
+                "sessionId": string("주입된 sessionId"),
+                "provider": providerProperty,
+            ], required: ["project"])
+        ),
+        MCPToolDefinition(
+            name: "work_file",
+            description: "시작 블록 「정리 안 된 작업」의 세션 하나를 정리한다. cardId를 주면 그 세션의 파일 변경·커밋·검증 기록을 카드에 잇는다(카드 상태는 그대로). 빼면 정리할 것 없음으로 넘긴다.",
+            inputSchema: schema([
+                "sessionId": string("블록에 보인 세션 ID(앞 8자) 또는 전체 ID"),
+                "cardId": cardIdProperty.merging(["description": "이을 카드 ID(같은 프로젝트). 넘기려면 뺀다"]),
+            ], required: ["sessionId"])
+        ),
     ]
 
     static let projectProperty: JSONValue = [

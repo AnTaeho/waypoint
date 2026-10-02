@@ -32,10 +32,16 @@ extension AppServices {
         return .text(JSONValue.object([
             "history": history,
             "metrics": metrics,
+            "coverage": trackingCoverage().json,
             "pending": .number(Double(integration.queue.count)),
             "storeRestore": storeRestore.flatMap { try? StoreBackup.encoder().encode($0) }.flatMap { JSONValue.parse($0) } ?? .null,
             "queueUnreadable": .bool(integration.queue.unreadable)
         ]).serializedString)
+    }
+
+    /// 자동 갱신 지표(최근 30일). 요청 때 저장소에서 계산한다.
+    func trackingCoverage(now: Date = Date()) -> TrackingCoverage {
+        TrackingCoverage.compute(in: container.mainContext, now: now)
     }
 
     /// 저장소 복원 알림을 확인했다.

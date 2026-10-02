@@ -45,6 +45,12 @@ public enum ActivityEntryFormat {
             guard let record = CheckRecord(event: event) else { return nil }
             text = record.command
             detail = EvidenceFormat.historyText(record)
+        case .projectStatus:
+            guard let summary = p["summary"]?.stringValue, !summary.isEmpty else { return nil }
+            text = summary; detail = "지금 상황"
+        case .sessionFiled:
+            let card = p["cardId"]?.stringValue
+            text = card == nil ? "정리 안 된 작업 넘김" : "정리 안 된 작업 연결"; detail = card ?? ""
         case .cardCreated: text = "카드 생성"
         case .cardAttached: text = "세션 연결"
         case .cardDetached: text = CardHistoryFormat.line(for: event)?.text ?? "세션 연결 끝"

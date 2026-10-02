@@ -16,10 +16,10 @@ public enum SessionContext {
     }
 
     /// 블록 마지막 줄. 스킬이 이 블록을 보고 켜지게 한다.
-    public static let skillHint = "작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 tracker 스킬을 따른다."
+    public static let skillHint = "작업을 시작·전환하거나 한 단위를 끝낼 때마다, 나중에 할 일을 들으면 tracker 스킬을 따른다."
 
-    /// `Waypoint:`로 시작하는 블록: 프로젝트 키·이름, `sessionId`, 다음 할 일 상위 5개,
-    /// 이 프로젝트의 다른 작업중 카드, 직전 세션 메모(가장 최근에 `card_handoff`한 카드 하나).
+    /// `Waypoint:`로 시작하는 블록: 프로젝트 키·이름, `sessionId`, 지금 상황(최신 `project_status`), 다음 할 일 상위 5개,
+    /// 이 프로젝트의 다른 작업중 카드, 직전 세션 메모(가장 최근에 `card_handoff`한 카드 하나), 정리 안 된 작업(최대 3개).
     /// 형식은 `integration/skills/tracker/SKILL.md`와 맞춘다.
     public static func text(
         project: Project,
@@ -33,6 +33,11 @@ public enum SessionContext {
             "sessionId: \(session.id)",
         ]
         if session.provider == .codex { lines.append("provider: codex") }
+
+        if let status = ProjectStatus.latest(for: project) {
+            lines.append("지금 상황 (\(statusHeader(status, now: now))):")
+            lines += status.text.split(separator: "\n", omittingEmptySubsequences: true).map { "  \($0)" }
+        }
 
         let next = cards.filter { $0.status == .next }.sorted { $0.number < $1.number }.prefix(nextLimit)
         if !next.isEmpty {
@@ -56,10 +61,23 @@ public enum SessionContext {
             lines.append("직전 세션 메모 (\(card.displayID) \(card.title)):")
             lines += note.split(separator: "\n", omittingEmptySubsequences: true).map { "  \($0)" }
         }
+
+        let unfiled = UnfiledWork.items(for: project, now: now, limit: UnfiledWork.blockLimit)
+        if !unfiled.isEmpty {
+            lines.append("정리 안 된 작업:")
+            lines += unfiled.prefix(UnfiledWork.blockLimit).map { UnfiledWork.line($0, now: now) }
+            if unfiled.count > UnfiledWork.blockLimit { lines.append("- 외 \(unfiled.count - UnfiledWork.blockLimit)개") }
+        }
         lines.append(session.provider == .codex
-                     ? "작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 waypoint-tracker 스킬을 따른다."
+                     ? "작업을 시작·전환하거나 한 단위를 끝낼 때마다, 나중에 할 일을 들으면 waypoint-tracker 스킬을 따른다."
                      : skillHint)
         return lines.joined(separator: "\n")
+    }
+
+    /// 「3시간 전, Claude Code」「9월 20일, Codex, 오래됨」. 도구를 모르면 뺀다.
+    static func statusHeader(_ status: ProjectStatus.Entry, now: Date) -> String {
+        [TimeFormat.relative(status.at, now: now), status.provider?.name, status.isStale(now: now) ? "오래됨" : nil]
+            .compactMap { $0 }.joined(separator: ", ")
     }
 
     /// 다음 세션 메모가 있는 끝나지 않은 카드 중 가장 최근에 메모를 남긴 것.
