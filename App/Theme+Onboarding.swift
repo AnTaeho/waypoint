@@ -14,6 +14,8 @@ extension Theme {
         static let stepDot: CGFloat = 7
         /// 수신 대기 화면이 연결 상태를 다시 읽는 주기(초)
         static let refreshSeconds: Double = 2
+        /// 「복사됨」을 보이는 시간(초)
+        static let copiedSeconds: Double = 1.5
         static let ok = Theme.done
         static let problem = Theme.liveText
         static let muted = Theme.textMuted

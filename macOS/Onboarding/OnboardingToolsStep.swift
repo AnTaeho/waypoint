@@ -27,7 +27,7 @@ struct OnboardingToolsStep: View {
                     Text(provider.name).font(Theme.bodyMedium).foregroundStyle(Theme.text)
                 }
                 .toggleStyle(.checkbox)
-                Text(Self.status(installation))
+                Text(OnboardingText.installation(installation))
                     .font(Theme.captionLarge)
                     .foregroundStyle(state == .attention ? Theme.Onboarding.problem
                                      : state == .ready ? Theme.Onboarding.ok : Theme.Onboarding.muted)
@@ -58,11 +58,4 @@ struct OnboardingToolsStep: View {
         }
     }
 
-    static func status(_ installation: IntegrationInstallation?) -> String {
-        switch installation?.state {
-        case .ready: "연결됨"
-        case .attention: installation?.detail ?? "확인 필요"
-        case .missing, nil: "연결 안 됨"
-        }
-    }
 }

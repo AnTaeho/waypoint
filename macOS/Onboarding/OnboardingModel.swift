@@ -20,6 +20,9 @@ final class OnboardingModel {
     /// 도구 단계에서 도구 하나를 다시 설치·해제
     private(set) var toolTask: OnboardingTask?
 
+    /// 시트를 띄우는 메인 창(먼저 뜬 창). 창이 여럿이어도 한 창에만 뜬다
+    private(set) var hostWindow: UUID?
+
     @ObservationIgnored private weak var services: AppServices?
 
     init(services: AppServices? = nil) {
@@ -43,6 +46,14 @@ final class OnboardingModel {
     }
 
     func close() { isPresented = false }
+
+    /// 메인 창이 뜰 때. 맡은 창이 없으면 이 창이 맡는다
+    func claimHost(_ window: UUID) { if hostWindow == nil { hostWindow = window } }
+    /// 메인 창이 닫힐 때. 맡은 창이면 놓는다(다음에 보이는 창이 맡는다)
+    func releaseHost(_ window: UUID) { if hostWindow == window { hostWindow = nil } }
+
+    /// 이 창에 시트를 보일까
+    func shows(in window: UUID) -> Bool { isPresented && (hostWindow == nil || hostWindow == window) }
 
     /// 「끝」: 다시 자동으로 뜨지 않게 기억한다.
     func finish() {
