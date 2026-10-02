@@ -23,6 +23,19 @@ targets:
         destinationFilters: [macOS]
       - path: iOS
         destinationFilters: [iOS]
+      # 앱 안 연동 설치기(`IntegrationSources.bundle`)가 쓰는 원본. 저장소 파일을 빌드 때 그대로 복사한다(따로 두지 않는다).
+      - path: integration/hooks/waypoint-hook.sh
+        buildPhase: resources
+        destinationFilters: [macOS]
+      - path: integration/statusline/waypoint-statusline-tap.sh
+        buildPhase: resources
+        destinationFilters: [macOS]
+      - path: integration/codex/waypoint-codex-hook.sh
+        buildPhase: resources
+        destinationFilters: [macOS]
+      - path: integration/skills/tracker/SKILL.md
+        buildPhase: resources
+        destinationFilters: [macOS]
     dependencies:
       - package: WaypointKit
     settings:
