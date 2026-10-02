@@ -72,7 +72,7 @@ Card         id, project, number:Int, title, body(markdown),
              kind: task | idea | bug,
              status: idea | next | active | done | archived,
              parent: Card?, criteria:[Criterion], 
-             origin: claude | manual, originSessionId?,
+             origin: claude | codex | manual, originSessionId?,
              nextSessionNote?, statusBeforeActive?, createdAt, updatedAt, doneAt?
 
 Criterion    text, isDone
@@ -740,7 +740,7 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 - 「지금 백업」: 열린 저장소를 `manual`로 SQLite 온라인 백업(백그라운드). `StoreDailyBackup.runNow`로 daily와 같은 진행 중 표시를 써 겹치지 않는다.
 - 목록: `StoreBackup.list()` 최신순 한 줄 「시각 · 까닭 · 크기」. 까닭 `upgrade` 업데이트 전 · `daily` 매일 · `manual` 직접 · `beforeRestore` 복원 전 · `beforeDelete` 지우기 전. 「Finder에서 보기」.
 - 「복원…」 → 확인(다시 시작하며 되돌림, 지금 기록도 먼저 백업, iCloud가 그 뒤 바뀐 내용을 다시 받아 올 수 있음) → `scheduleRestore` → 다시 시작. 적용은 다음 실행의 열기 1단계(「저장소 백업·복구」).
-- 다시 시작(`AppRelaunch`): `/bin/sh -c`로 지금 PID가 끝나기를 0.2초 간격 최대 20초 기다린 뒤 `open -g <지금 번들 경로>`, 그다음 `NSApp.terminate`. 같은 번들 경로라 평소용·Dev가 저마다 자기만 다시 띄운다. `open`은 셸 환경을 넘기지 않아 `WAYPOINT_SUPPORT_DIR`·`WAYPOINT_PORT`·`WAYPOINT_CLOUDKIT`·`WAYPOINT_INTEGRATION_HOME`·`WAYPOINT_RELAUNCH_HIDDEN`을 `--env`로 넘긴다. 실행 인자는 넘기지 않는다. `WAYPOINT_RELAUNCH_HIDDEN=1`이면 `-j`.
+- 다시 시작(`AppRelaunch`): `/bin/sh -c`로 지금 PID가 끝나기를 0.2초 간격 최대 20초 기다린 뒤 `open <지금 번들 경로>`, 그다음 `NSApp.terminate`. 같은 번들 경로라 평소용·Dev가 저마다 자기만 다시 띄운다. `open`은 셸 환경을 넘기지 않아 `WAYPOINT_SUPPORT_DIR`·`WAYPOINT_PORT`·`WAYPOINT_CLOUDKIT`·`WAYPOINT_INTEGRATION_HOME`·`WAYPOINT_RELAUNCH_HIDDEN`을 `--env`로 넘긴다. 실행 인자는 넘기지 않는다. `WAYPOINT_RELAUNCH_HIDDEN=1`이면 `-g -j`(확인용).
 
 ### 내보내기 형식 (`RecordExport`, formatVersion 1)
 

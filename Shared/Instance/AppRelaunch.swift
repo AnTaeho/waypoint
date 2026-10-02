@@ -14,14 +14,14 @@ public enum AppRelaunch {
         AppInstance.supportDirectoryEnvironmentKey, "WAYPOINT_PORT", "WAYPOINT_CLOUDKIT",
         "WAYPOINT_INTEGRATION_HOME", hiddenKey,
     ]
-    /// 1이면 다시 열 때 창을 숨긴 채(`open -j`). 확인용 실행이 화면을 가져가지 않게.
+    /// 1이면 다시 열 때 뒤에서 숨긴 채(`open -g -j`). 확인용 실행이 화면을 가져가지 않게. 없으면 사람이 누른 복원·지우기라 앞에 연다.
     public static let hiddenKey = "WAYPOINT_RELAUNCH_HIDDEN"
     public static let timeout = 20
 
     /// `/bin/sh -c`에 넘길 명령.
     public static func script(pid: Int32, bundlePath: String, environment: [String: String]) -> String {
-        var open = ["/usr/bin/open", "-g"]
-        if environment[hiddenKey] == "1" { open.append("-j") }
+        var open = ["/usr/bin/open"]
+        if environment[hiddenKey] == "1" { open += ["-g", "-j"] }
         for key in forwardedKeys {
             guard let value = environment[key], !value.isEmpty else { continue }
             open += ["--env", "\(key)=\(value)"]

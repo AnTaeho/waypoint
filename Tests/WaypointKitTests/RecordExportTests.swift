@@ -215,6 +215,6 @@ import Testing
         #expect(!script.contains("HOME"))
         #expect(script.hasSuffix("'/Apps/Way point.app'"))
         let plain = AppRelaunch.script(pid: 1, bundlePath: "/A.app", environment: [:])
-        #expect(plain.hasSuffix("'/usr/bin/open' '-g' '/A.app'"))
+        #expect(plain.hasSuffix("'/usr/bin/open' '/A.app'"))
     }
 }
