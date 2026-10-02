@@ -398,11 +398,51 @@ import Testing
         #expect(unknown.line == 1)
     }
 
+    /// 실행 파일이 없을 때(nil)만 자체 검사로 대신한다.
     @Test func missingCodexFallsBackToBuiltIn() {
-        let outcome = CommandRulesCheck.check("prefix_rule(pattern=[\"ls\"\n", codex: "/nonexistent/codex")
+        let outcome = CommandRulesCheck.check("prefix_rule(pattern=[\"ls\"\n", codex: nil)
         #expect(outcome.method == .builtIn)
         #expect(!outcome.isValid)
         #expect(CommandRulesCheck.check(Self.good, codex: nil) == .init(method: .builtIn))
+    }
+
+    /// 실행 파일이 있는데 실행하지 못하면 맞는 내용이어도 저장하지 않는다.
+    @Test func launchFailureBlocksSave() throws {
+        let dir = try TempDir()
+        // 실행 권한 없는 파일, 없는 경로
+        let notExecutable = try dir.write("codex", "#!/bin/sh\nexit 0\n")
+        for codex in [notExecutable.path, dir.url.appendingPathComponent("none/codex").path] {
+            let outcome = CommandRulesCheck.check(Self.good, codex: codex)
+            #expect(outcome == .unchecked, "\(codex)")
+            #expect(!outcome.isValid)
+        }
+        let file = try dir.write("rules/default.rules", "")
+        #expect(throws: GuidanceFileWrite.Failure.invalidRules(.unchecked)) {
+            try GuidanceFileWrite.apply([.init(path: file.path, before: "", after: Self.good)],
+                                        backups: GuidanceBackupStore(root: dir.url.appendingPathComponent("b")),
+                                        reason: .edit, at: Date(),
+                                        checkRules: { CommandRulesCheck.check($0, codex: notExecutable.path) })
+        }
+        #expect(try dir.read("rules/default.rules") == "")
+    }
+
+    /// 시간 안에 끝나지 않는 가짜 codex는 멈추고 저장하지 않는다.
+    @Test func timeoutBlocksSave() throws {
+        let dir = try TempDir()
+        let slow = try dir.write("codex", "#!/bin/sh\nsleep 5\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: slow.path)
+        let start = Date()
+        let outcome = CommandRulesCheck.check(Self.good, codex: slow.path, timeout: 0.5)
+        #expect(outcome == .unchecked)
+        #expect(Date().timeIntervalSince(start) < 3)
+    }
+
+    /// 가짜 codex가 바로 0으로 끝나면 통과(실행 경로 자체는 쓰인다).
+    @Test func fakeCodexSuccess() throws {
+        let dir = try TempDir()
+        let fake = try dir.write("codex", "#!/bin/sh\nexit 0\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        #expect(CommandRulesCheck.check("아무 글", codex: fake.path) == .init(method: .codex))
     }
     #endif
 }

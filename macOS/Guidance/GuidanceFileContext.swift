@@ -35,6 +35,7 @@ enum GuidanceFileRunner {
         switch error {
         case GuidanceFileWrite.Failure.changed: "바뀜"
         case GuidanceFileWrite.Failure.notWritable: "쓸 수 없는 파일"
+        case GuidanceFileWrite.Failure.invalidRules(let outcome) where outcome.couldNotCheck: "검사 못 함"
         case GuidanceFileWrite.Failure.invalidRules(let outcome): "저장 안 함 · \(outcome.message ?? "규칙 오류")"
         case GuideItemEdit.Failure.staleItem: "항목이 바뀜"
         default: "저장 못 함 · \(error.localizedDescription)"

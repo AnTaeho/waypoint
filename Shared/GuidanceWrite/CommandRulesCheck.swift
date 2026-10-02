@@ -1,7 +1,8 @@
 import Foundation
 
 /// Codex 명령 규칙(`*.rules`) 저장 전 검사. Codex 실행 파일이 있으면 Codex에게 새 내용을 읽혀 보고
-/// (`codex execpolicy check --rules <임시 파일> -- <없는 명령>`), 없거나 시간 안에 끝나지 않으면 자체 검사로 대신한다.
+/// (`codex execpolicy check --rules <임시 파일> -- <없는 명령>`). 실행 파일이 없을 때만 자체 검사로 대신하고,
+/// 있는데 시간 안에 끝나지 않거나 실행하지 못하면 「검사 못 함」으로 저장을 막는다.
 public enum CommandRulesCheck {
 
     public enum Method: String, Sendable, Equatable {
@@ -18,11 +19,18 @@ public enum CommandRulesCheck {
         /// 문제 줄(1부터). 모르면 nil.
         public var line: Int?
 
-        public init(method: Method, problem: String? = nil, line: Int? = nil) {
+        /// Codex가 있는데 시간 안에 끝나지 않았거나 실행하지 못했다(저장하지 않는다)
+        public var couldNotCheck: Bool
+
+        public init(method: Method, problem: String? = nil, line: Int? = nil, couldNotCheck: Bool = false) {
             self.method = method
             self.problem = problem
             self.line = line
+            self.couldNotCheck = couldNotCheck
         }
+
+        /// 검사 못 함
+        public static let unchecked = Outcome(method: .codex, problem: "검사 못 함", couldNotCheck: true)
 
         public var isValid: Bool { problem == nil }
 
@@ -38,10 +46,10 @@ public enum CommandRulesCheck {
     /// Codex 검사 시간 상한(초)
     public static let timeout: TimeInterval = 3
 
-    /// Codex가 있으면 Codex로, 없거나 시간이 넘으면 자체 검사로.
-    public static func check(_ content: String, codex: String?) -> Outcome {
+    /// Codex가 있으면 Codex로(시간이 넘거나 실행하지 못하면 `unchecked`), 없을 때만 자체 검사로.
+    public static func check(_ content: String, codex: String?, timeout: TimeInterval = timeout) -> Outcome {
         #if os(macOS)
-        if let codex, let outcome = run(codex: codex, content: content) { return outcome }
+        if let codex { return run(codex: codex, content: content, timeout: timeout) ?? .unchecked }
         #endif
         return builtIn(content)
     }
