@@ -393,7 +393,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 
 ### project_init
 
-`/tracker init`에서만 부른다. 도구는 사용자의 확인을 기다리지 않는다.
+`/tracker init`에서만 부른다. 도구는 사용자의 확인을 기다리지 않는다. `project_init` 뒤 스킬은 지침 파일이 「절 머리 + 한 줄에 지침 하나」 꼴이 아니면 대상 파일·줄 수와 그 파일에서 뽑은 전/후 예시 하나를 보여 주고 다듬을지 한 번만 묻는다(TRK-65). 큰 저장소에서는 그 자체가 큰 작업이라 묻지 않고 하지 않는다. 동의하면 뜻은 그대로 구조만 다듬고 diff 확인 뒤에만 커밋한다. 앱은 관여하지 않는다(다듬는 것은 에이전트).
 
 - 검사(실패하면 `isError`, 초안을 만들지 않는다): `cwd`가 절대 경로이고 있는 폴더일 것. 이미 등록된 폴더(하위 폴더 포함, `project_resolve`와 같은 매칭)면 `이미 등록된 폴더: <키> (…)`. 같은 폴더를 보관된 프로젝트가 쓰면 `보관된 프로젝트 <키>…`(보관 해제 안내). `name`이 비었으면 오류. `seedCards`는 최대 8개, 항목은 `{title, status: next|idea(기본 next), kind?: task|idea|bug(기본 status가 idea면 idea, 아니면 task), body?}`.
 - `guideFiles`: 상대(cwd 기준)·절대 경로를 받아 cwd 아래 실제 `.md`·`.txt` 파일만 상대 경로로 남긴다(중복 제거, 심볼릭 링크는 풀어서 비교). 나머지는 결과 `missingGuideFiles`.
