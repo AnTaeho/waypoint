@@ -23,6 +23,7 @@ struct DashboardView: View {
         let sections = DashboardSearch.sections(overview.groups, query: query)
         let rows = sections.flatMap(\.rows).filter { provider == nil || $0.session.provider == provider }
         let live = rows.filter { $0.workState == .live }
+        let overlaps = WorkOverlap.byRow(live, now: now)
         let stalled = rows.filter { $0.workState == .stalled }
         let notes = overview.resumeCards.filter { card in
             guard let query else { return true }
@@ -43,13 +44,13 @@ struct DashboardView: View {
                         DashboardStats(overview: overview)
                         if width >= Theme.Dashboard.twoColumnWidth {
                             HStack(alignment: .top, spacing: Theme.Spacing.xl) {
-                                DashboardWorkList(rows: live, now: now, provider: $provider)
+                                DashboardWorkList(rows: live, now: now, provider: $provider, overlaps: overlaps)
                                     .frame(maxWidth: .infinity)
                                 DashboardContinue(rows: stalled, cards: notes, now: now)
                                     .frame(width: Theme.Dashboard.contextWidth)
                             }
                         } else {
-                            DashboardWorkList(rows: live, now: now, provider: $provider)
+                            DashboardWorkList(rows: live, now: now, provider: $provider, overlaps: overlaps)
                             DashboardContinue(rows: stalled, cards: notes, now: now)
                         }
                         SituationBoard(tiles: tiles, width: width, now: now, select: selectProject)

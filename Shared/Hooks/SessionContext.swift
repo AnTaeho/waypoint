@@ -51,9 +51,13 @@ public enum SessionContext {
             .compactMap { row in row.card.map { (card: $0, row: row) } }
         if !others.isEmpty {
             lines.append("다른 세션에서 작업중:")
+            // 그 세션이 최근 바꾼 파일(TRK-17): 새 세션이 같은 파일을 피하게.
+            let touched = WorkOverlap.index(for: project, now: now, stallTimeout: stallTimeout)
             lines += others.map { card, row in
                 let stalled = ", \(SessionActivityRules.activity(row.session, now: now, timeout: stallTimeout).title)"
-                return "- \(card.displayID) \(card.title) (\(SessionFormat.label(for: row.session))\(stalled))"
+                let files = touched.recentFiles(of: row.session, limit: WorkOverlap.blockFileLimit)
+                let recent = files.isEmpty ? "" : " · 최근 파일: \(files.joined(separator: ", "))"
+                return "- \(card.displayID) \(card.title) (\(SessionFormat.label(for: row.session))\(stalled))\(recent)"
             }
         }
 

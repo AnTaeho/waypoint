@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02B55AE39DF404BFFC85B7CF /* Theme+Overlap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6363B58535CA14264D669285 /* Theme+Overlap.swift */; };
 		034256713F4A4B1C5389EB99 /* InitSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF1E559044FBEEDD8FBB180 /* InitSheetView.swift */; platformFilters = (macos, ); };
 		03FAE1DBA5BAA54E5E8B799A /* GuidanceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7674D8B0BD32470880BE4993 /* GuidanceMonitor.swift */; platformFilters = (macos, ); };
 		066348EEF1E9E22B44507986 /* GuideReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5C68F1762AE0ED6284C1FB /* GuideReader.swift */; platformFilters = (macos, ); };
@@ -103,6 +104,7 @@
 		A2A739615BDA68CB8BC0E1BE /* AppServices+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99F74BF0C8A31746501F1C3 /* AppServices+Lifecycle.swift */; platformFilters = (macos, ); };
 		A4E1B4C563B6482F27B3E7AE /* SidebarSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 648F1BD947F2221E3616CC24 /* SidebarSelection.swift */; platformFilters = (macos, ); };
 		A6AFC6300AD9C9F662C6BCE0 /* BoardSessionBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F4EC7A40B6A8FAE8629FA1 /* BoardSessionBox.swift */; platformFilters = (macos, ); };
+		A7A8116FA810558AB7FF07F6 /* OverlapBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263AB36C01B92EECA246D733 /* OverlapBadge.swift */; platformFilters = (macos, ); };
 		A8335FE7E962D5B2039A3BFD /* GuideLaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99E2FFD1390625EEAE60919B /* GuideLaunch.swift */; platformFilters = (macos, ); };
 		AE8010717EC3BCB93185B8C3 /* BoardCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F03EBCDF71261B2E51201D1 /* BoardCardView.swift */; platformFilters = (macos, ); };
 		AE9F35059E715B8E5776DD93 /* NanumSquareRoundEB.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8208066D1C74F68869BF5909 /* NanumSquareRoundEB.ttf */; };
@@ -175,6 +177,7 @@
 		22E9CD0EB19EC76CDDFEFAFD /* IntegrationMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationMonitor.swift; sourceTree = "<group>"; };
 		23BAEA2547A3E866B89BD333 /* RecordsLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLaunch.swift; sourceTree = "<group>"; };
 		24E0447C0C3D3564FA361133 /* GuideVersionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideVersionSheet.swift; sourceTree = "<group>"; };
+		263AB36C01B92EECA246D733 /* OverlapBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlapBadge.swift; sourceTree = "<group>"; };
 		26DAEC051B147B7C415F9607 /* GuidanceDeletedDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceDeletedDetail.swift; sourceTree = "<group>"; };
 		282B0287CBA91E3D25BCE8BE /* OnboardingLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingLaunch.swift; sourceTree = "<group>"; };
 		2AE32072CBF255EF907DBFB5 /* GuidanceItemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceItemsView.swift; sourceTree = "<group>"; };
@@ -206,6 +209,7 @@
 		5CD4CBFC3B2F7C4E86919528 /* GuidanceAppliedList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceAppliedList.swift; sourceTree = "<group>"; };
 		5EFA63C55AFCFD2F3957B6CE /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = OFL.txt; sourceTree = "<group>"; };
 		60588B3D4D8F4FFA5A1DE9AE /* InitFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitFields.swift; sourceTree = "<group>"; };
+		6363B58535CA14264D669285 /* Theme+Overlap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme+Overlap.swift"; sourceTree = "<group>"; };
 		63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitor.swift; sourceTree = "<group>"; };
 		648F1BD947F2221E3616CC24 /* SidebarSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSelection.swift; sourceTree = "<group>"; };
 		680FB5D176DF7F5F917F3C36 /* Theme+Records.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme+Records.swift"; sourceTree = "<group>"; };
@@ -465,6 +469,7 @@
 				0D73CD7F0A23DD2E40382BE8 /* DashboardView.swift */,
 				C312EDE035FF55A404CC5A2A /* DashboardWorkList.swift */,
 				FC72EE0A12FDD82DEBD3EE2E /* DashboardWorkTile.swift */,
+				263AB36C01B92EECA246D733 /* OverlapBadge.swift */,
 				10953BB751280167D0C7C35D /* RecentEventRow.swift */,
 				10B848F2A827633BD98960A5 /* RecentEventsInspector.swift */,
 				4A0EF3A0BB1F79B4EC428187 /* SituationBoard.swift */,
@@ -487,6 +492,7 @@
 				47AB3D0381D1A7DBA5C8D4F2 /* Theme+Guidance.swift */,
 				59B811F1DE3AC3DC226F1C4E /* Theme+Integration.swift */,
 				C3220C86F24AFD0FFAE000EE /* Theme+Onboarding.swift */,
+				6363B58535CA14264D669285 /* Theme+Overlap.swift */,
 				680FB5D176DF7F5F917F3C36 /* Theme+Records.swift */,
 				DFBC70A24D83A2CD05CE0935 /* Theme+Resume.swift */,
 				530C5A418E959337898BF318 /* Theme+Situation.swift */,
@@ -836,6 +842,7 @@
 				127FC9AFECA02E5CF59774C0 /* OnboardingTaskView.swift in Sources */,
 				0B5036BE50E4DE3FBB45B557 /* OnboardingToolsStep.swift in Sources */,
 				28DEC8FCB58357F6F50C26C4 /* OnboardingView.swift in Sources */,
+				A7A8116FA810558AB7FF07F6 /* OverlapBadge.swift in Sources */,
 				23FEADAF39A118FCDD2EF9F0 /* PhoneAppDelegate.swift in Sources */,
 				461BBAAAF30D7438A27BA9D6 /* PhoneCardDetail.swift in Sources */,
 				92AC41A0FED105D8752026F9 /* PhoneHomeView.swift in Sources */,
@@ -870,6 +877,7 @@
 				A2388B04500BC352B5D851DE /* Theme+Guidance.swift in Sources */,
 				60D8AD7C833441AC71F2DBF4 /* Theme+Integration.swift in Sources */,
 				E010A1168C2CB7CCBFAFB301 /* Theme+Onboarding.swift in Sources */,
+				02B55AE39DF404BFFC85B7CF /* Theme+Overlap.swift in Sources */,
 				2798561C398A73D91F32FE75 /* Theme+Records.swift in Sources */,
 				1B3C2B52416D7A03CA3C779F /* Theme+Resume.swift in Sources */,
 				2DD1C23754E17319B462F416 /* Theme+Situation.swift in Sources */,

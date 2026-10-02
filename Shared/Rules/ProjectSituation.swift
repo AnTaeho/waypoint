@@ -14,6 +14,8 @@ public struct ProjectSituation: Identifiable {
         public let workState: CardWorkState
         /// 붙은 세션의 도구(중복 없이, 처음 나온 순서)
         public let providers: [AgentProvider]
+        /// 붙은 세션이 다른 작업과 같이 만지는 파일 수(TRK-17, 합집합). 없으면 0
+        public var overlapFileCount: Int = 0
 
         public var id: UUID { card.id }
     }
@@ -55,17 +57,21 @@ public struct ProjectSituation: Identifiable {
             .filter { provider == nil || $0.session.provider == provider }
 
         var order: [UUID] = []
-        var grouped: [UUID: (card: Card, live: Bool, providers: [AgentProvider])] = [:]
+        var grouped: [UUID: (card: Card, live: Bool, providers: [AgentProvider], overlaps: Set<String>)] = [:]
+        let overlaps = rows.contains { $0.card != nil }
+            ? WorkOverlap.index(for: project, now: now, stallTimeout: stallTimeout) : .empty
         for row in rows {
             guard let card = row.card, keep(card) else { continue }
-            var entry = grouped[card.id] ?? (card, false, [])
+            var entry = grouped[card.id] ?? (card, false, [], [])
             if grouped[card.id] == nil { order.append(card.id) }
             entry.live = entry.live || row.workState == .live
             if !entry.providers.contains(row.session.provider) { entry.providers.append(row.session.provider) }
+            if !overlaps.isEmpty { entry.overlaps.formUnion(overlaps.overlaps(for: row.session).flatMap(\.files)) }
             grouped[card.id] = entry
         }
         let work = order.compactMap { grouped[$0] }.map {
-            WorkItem(card: $0.card, workState: $0.live ? .live : .stalled, providers: $0.providers)
+            WorkItem(card: $0.card, workState: $0.live ? .live : .stalled, providers: $0.providers,
+                     overlapFileCount: $0.overlaps.count)
         }
 
         let columns = BoardQuery.columns(for: project, now: now)

@@ -18,6 +18,8 @@ struct CardInspector: View {
 
     private func content(now: Date) -> some View {
         let sessions = openSessions(now: now)
+        let overlaps = sessions.isEmpty ? .empty
+            : card.project.map { WorkOverlap.index(for: $0, now: now) } ?? .empty
         let files = CardHistoryFormat.changedFiles(for: card)
         let related = relatedCards
         return VStack(alignment: .leading, spacing: Theme.Spacing.xl + 4) {
@@ -25,7 +27,7 @@ struct CardInspector: View {
             if !sessions.isEmpty {
                 InspectorSection("지금 연결된 세션") {
                     ForEach(sessions, id: \.id) { session in
-                        ConnectedSessionBox(session: session, now: now, open: open)
+                        ConnectedSessionBox(session: session, now: now, overlaps: overlaps.overlaps(for: session), open: open)
                     }
                 }
             }

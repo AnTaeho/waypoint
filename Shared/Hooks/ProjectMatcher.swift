@@ -50,6 +50,24 @@ public enum ProjectMatcher {
 
 /// 작업 폴더의 git 브랜치. `.git/HEAD`만 읽는다(git 명령을 부르지 않는다).
 public enum GitInfo {
+    /// 파일이 든 git 작업 트리의 최상위 폴더(절대 경로). 파일의 폴더부터 위로 올라가며 `.git`(폴더든 파일이든)이 있는
+    /// 첫 폴더를 고른다. worktree·하위 모듈은 `.git`이 파일이라 그 폴더가 따로 잡힌다. 없으면(git 밖) nil.
+    /// 지워진 파일도 위 폴더로 찾는다. git 명령을 부르지 않는다.
+    public static func checkoutRoot(for path: String, fileManager: FileManager = .default) -> String? {
+        guard path.hasPrefix("/") else { return nil }
+        var dir = URL(fileURLWithPath: path).standardizedFileURL.deletingLastPathComponent()
+        for _ in 0..<64 {
+            if fileManager.fileExists(atPath: dir.appendingPathComponent(".git").path) {
+                let found = dir.path
+                return found.count > 1 && found.hasSuffix("/") ? String(found.dropLast()) : found
+            }
+            let parent = dir.deletingLastPathComponent()
+            if parent.path == dir.path { return nil }
+            dir = parent
+        }
+        return nil
+    }
+
     /// `cwd`에서 위로 올라가며 `.git`을 찾는다. `.git`이 파일(worktree)이면 `gitdir:`을 따라간다.
     public static func branch(at cwd: String, fileManager: FileManager = .default) -> String? {
         guard !cwd.isEmpty else { return nil }

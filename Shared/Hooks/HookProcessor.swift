@@ -16,6 +16,8 @@ public final class HookProcessor {
     public var home: String
     /// cwd → git 브랜치. 테스트에서 바꾼다.
     public var gitBranch: (String) -> String?
+    /// 바뀐 파일(절대 경로) → 그 파일의 git 작업 트리 최상위(`file.changed`의 `checkout`, TRK-17). 테스트에서 바꾼다.
+    public var checkoutRoot: (String) -> String?
     /// 저장. 테스트에서 실패를 흉내 낸다.
     var saveContext: (ModelContext) throws -> Void = { try $0.save() }
 
@@ -43,6 +45,7 @@ public final class HookProcessor {
         stallTimeout: TimeInterval = SessionRules.defaultStallTimeout,
         home: String = NSHomeDirectory(),
         gitBranch: @escaping (String) -> String? = { GitInfo.branch(at: $0) },
+        checkoutRoot: @escaping (String) -> String? = { GitInfo.checkoutRoot(for: $0) },
         contextAcks: ContextAckInbox = ContextAckInbox()
     ) {
         self.context = context
@@ -50,6 +53,7 @@ public final class HookProcessor {
         self.stallTimeout = stallTimeout
         self.home = home
         self.gitBranch = gitBranch
+        self.checkoutRoot = checkoutRoot
     }
 
     /// 훅 본문(JSON)을 처리하고 저장한다. 대화에 주입할 텍스트가 있으면 그것을, 아니면 nil.

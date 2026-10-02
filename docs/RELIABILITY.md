@@ -157,6 +157,35 @@
 - 사람이 확인할 것: 연동 상태 패널의 「기록을 열지 못해 … 백업으로 되돌림」 줄과 「알림 확인」(③ 상태의 Dev에서). 화면 캡처는 하지 않았다.
 - 하지 않은 것: CloudKit을 켠 상태의 복원(동기화가 이후 변경을 다시 받는지), iPhone 기기 실행(빌드만), 수동 예약 복원의 앱 실측(단위 테스트만, 화면은 TRK-47).
 
+## 동시 작업 겹침 (TRK-17)
+
+규칙은 SPEC 4장 「같은 파일 작업 중」. 2026-10-02 Dev(Debug, 47822, 브랜치 `trk-17-overlap`)·실측 폴더 PRB(`~/workspace/waypoint-probe`, git 저장소)에서 실측 픽스처 형식 훅(`real-SessionStart`·`real-PostToolUse-Edit`·`doc-codex-*`)과 MCP 호출을 직접 보냈다. 실제 `claude -p`는 쓰지 않았다. 앱은 `open -g -j`로 띄우고 결과는 MCP 응답·`card_get` 기록·시작 블록·창 하나 캡처(`screencapture -l`)로 봤다.
+
+| 단계 | 한 일 | 결과 |
+|---|---|---|
+| ① 같은 폴더 두 세션 | Claude 세션 A(PRB-13)가 `notes.txt`·`hello.txt`, Codex 세션 B(PRB-14)가 `apply_patch`로 `notes.txt` | 둘 다 `checkout` = `/Users/antaeho/workspace/waypoint-probe`. A의 `card_note`에 `overlaps [{sessionId: codex:be262243, provider: codex, cards: [PRB-14], files: [notes.txt], fileCount: 1}]`, B의 `card_evidence`에 A 쪽 같은 항목. 대시보드 두 타일에 `같은 파일 1개 · PRB-14`/`· PRB-13`, 상황판 진행 중 줄에 `같은 파일 1`, PRB-13 인스펙터 세션 상자에 같은 표시 |
+| ② worktree | PRB 안에 `git worktree add .claude/worktrees/trk17`, Claude 세션 C(PRB-15)가 worktree의 `notes.txt`·`hello.txt` | C 기록 `path` = `.claude/worktrees/trk17/notes.txt`, `checkout` = worktree 폴더. C·A·B의 MCP 응답에 `overlaps` 없음, C 타일에 표시 없음(A·B는 그대로). 등록 폴더 **밖**에 만든 worktree(스크래치 폴더)의 편집은 세션도 `file.changed`도 남지 않았다(DB 0건) |
+| ③ 한쪽 종료 | B에 `SessionEnd`(앱을 다시 켠 직후라 억제 기억 없음) | 대시보드에서 B 타일과 함께 A의 표시가 사라짐, A `card_note`에 `overlaps` 없음, 상황판 진행 중 줄 표시 없음 |
+| ④ 반복 호출 | 앱을 다시 켠 뒤 A가 `card_note`·`card_note`·`card_handoff`·`card_update`·`card_start`·`card_evidence`·`project_status`, B가 `card_note` 두 번 | A는 첫 `card_note`에만 `overlaps`, 나머지 6번 없음. B도 첫 번째만 |
+| ⑤ 새 파일 | B가 `hello.txt`도 고침 | A 다음 `card_note`에 `files [hello.txt, notes.txt]`(2개)로 다시, 그다음은 없음. B `card_handoff`에도 A 쪽 2개 |
+
+근거: 겹침 표시는 `file.changed`의 `checkout`·`path`가 같고 두 작업 단위가 모두 끝나지 않았을 때만 나온다. MCP 응답 원문은 PR 설명에, 창 캡처는 작업 보고에 경로로 남겼다.
+
+누락 범위(경고하지 않는 쪽으로 빠지는 경우):
+- TRK-17 전 기록과 git 밖 파일(`checkout` 없음). 업데이트 직후 한 시간은 옛 기록과 새 기록이 겹쳐도 알리지 않는다.
+- 등록 폴더 밖 worktree의 파일은 기록 자체가 없다(기존 규칙: 등록 밖 절대 경로는 남기지 않는다). 그 worktree와 본 작업 트리의 겹침은 원래 생기지 않으므로 오탐도 없다.
+- 셸 명령으로 바꾼 파일 중 훅이 파일 이름을 주지 않는 것(`bashEditDiff`에 없는 변경), 앱이 꺼진 동안 outbox로 늦게 온 변경의 시각은 원래 시각이라 60분 안이면 들어간다.
+- 같은 부모의 서브에이전트끼리, 부모와 서브에이전트는 알리지 않는다(같은 작업 단위).
+- 한 카드에 같은 작업 트리의 세션 둘이 붙어 같은 파일을 고치면, 세션을 받지 않는 도구(`card_note` 등)는 두 세션 모두의 눈으로 보아 부른 쪽이 자기 자신을 상대로 받을 수 있다. 같은 카드의 다른 세션은 `card_start`의 `otherSessions`가 이미 알린다.
+- 60분보다 오래 손대지 않은 파일은 지금 같이 만지는 파일로 보지 않는다.
+
+알림 빈도: MCP `overlaps`는 같은 상대·같은 파일 집합이면 한 번, 새 파일이 끼면 한 번 더(④·⑤). 앱을 다시 켜면 기억이 지워져 남은 겹침을 다음 응답에 한 번 더 붙인다. 화면 표시는 겹침이 있는 동안 늘 보인다(알림 소리·배너 없음). 시작 블록은 겹침을 판정하지 않고 다른 세션 줄에 최근 파일을 붙일 뿐이다.
+
+지연(같은 Dev 저장소, 사이드바 「지침」으로 띄워 대시보드 계산을 빼고 잼):
+- 시작 블록 왕복(`SessionStart` 새 세션 → 끝 30회, main과 번갈아 3회씩): main p50 522·866·829 / p95 887·1344·906 ms, 이 변경 p50 622·827·868 / p95 994·1275·1392 ms. 회차마다 수백 ms씩 흔들려 차이는 잡음 안이다. 블록은 다른 세션 두 줄에 파일이 붙어 523 → 631 바이트(18줄 그대로). 표본을 떠 보니 시간 대부분은 사이드바 `DashboardQuery.summary`와 블록의 `DashboardQuery.rows`가 끝난 세션 1,600여 개를 읽는 데 쓰였고 `WorkOverlap`은 잡히지 않았다.
+- `measure-latency.py` 기본(500건): 번갈아 네 번 — main 수신→저장 p50/p95 612/830, 247/373, 258/377 ms, 이 변경 636/1041, 597/765, 274/378 ms. 저장소가 측정마다 커지고 회차 사이 흔들림이 커서, 마지막처럼 조건이 같은 쌍은 같다. p95 2초 목표 모두 통과, 실패 0건.
+- 색인만(저장소 사본, swift test Debug, `WorkOverlapTimingTests`): 실제 저장소 백업 사본(프로젝트 4·세션 115·이벤트 6150) 프로젝트 전부 5 ms, Dev 저장소 사본(세션 1620·이벤트 7369, 최근 1시간에 측정용 변경 수천 건) 20 ms. 대시보드는 다시 그릴 때마다 진행 작업·상황판에서 한 번씩 만든다.
+
 ## 알려진 한계
 
 - 세션이 끝난 뒤 그보다 이른 시각의 기록이 실시간으로 처리되지 않고 outbox로만 오면 버린다. 실시간 서버가 그 훅을 받지 못했는데 뒤의 `SessionEnd`는 받은 경우뿐이라 실제로는 드물다. 끝난 세션에 늦은 사실 기록을 붙이는 것은 명세를 바꾸는 일이라 이번에 하지 않았다.

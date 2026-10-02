@@ -20,6 +20,8 @@ public final class MCPTools {
     let fileManager = FileManager.default
     /// `card_get`에 싣는 최근 기록 수
     public static let recentEventLimit = 20
+    /// 응답 `overlaps`로 이미 알린 파일(`<내 세션 ID>|<상대 단위 메인 세션 ID>` → 파일). 메모리에만 둔다(TRK-17).
+    var reportedOverlaps: [String: Set<String>] = [:]
 
     public init(
         context: ModelContext, home: String = NSHomeDirectory(), drafts: ProjectDraftQueue? = nil,
@@ -39,12 +41,12 @@ public final class MCPTools {
         case "card_list": return try cardList(args)
         case "card_get": return try cardGet(args)
         case "card_create": return try cardCreate(args)
-        case "card_start": return try cardStart(args)
-        case "card_update": return try cardUpdate(args)
-        case "card_note": return try cardNote(args)
-        case "card_handoff": return try cardHandoff(args)
-        case "card_evidence": return try cardEvidence(args)
-        case "project_status": return try projectStatus(args)
+        case "card_start": return withOverlaps(try cardStart(args), sessions: try overlapSessions(name, args))
+        case "card_update": return withOverlaps(try cardUpdate(args), sessions: try overlapSessions(name, args))
+        case "card_note": return withOverlaps(try cardNote(args), sessions: try overlapSessions(name, args))
+        case "card_handoff": return withOverlaps(try cardHandoff(args), sessions: try overlapSessions(name, args))
+        case "card_evidence": return withOverlaps(try cardEvidence(args), sessions: try overlapSessions(name, args))
+        case "project_status": return withOverlaps(try projectStatus(args), sessions: try overlapSessions(name, args))
         case "work_file": return try workFile(args)
         default: throw MCPToolError("알 수 없는 도구: \(name)")
         }

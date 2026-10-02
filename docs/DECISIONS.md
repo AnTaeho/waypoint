@@ -552,3 +552,27 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | Debug 실행 인자 `-WaypointWindowSize`·`-WaypointDashboardScroll`(내 판단) | 화면 조작 없이 Dev 창 캡처(넓은 창·좁은 창)를 하려고. Release에서는 아무것도 하지 않는다 | 창 프레임 defaults 쓰기 | `DashboardLaunch.swift` |
 
 검증: `swift test` 698개 통과, macOS Debug·iOS 빌드. 실제 저장소 사본 측정(`WAYPOINT_REAL_STORE_COPY`, 프로젝트 4·세션 114·이벤트 6118): 상황판 11–25 ms, 그중 정리 안 된 작업 7–12 ms, 지금 상황 1–2 ms(기계 부하 평균 17). Dev 실측(사본, CloudKit 꺼짐): 1440×900 창 3열, 900×760 창 2열 캡처.
+
+## 2026-10-02 — 동시 작업 겹침 (TRK-17)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 같은 프로젝트에서 끝나지 않은 작업 단위 둘 이상이 같은 체크아웃의 같은 파일을 각자 최근 60분 안에 바꿨으면 겹침. 체크아웃 정보가 없으면 경고하지 않는다. 메인 세션 결정 | 덮어쓰기 위험은 같은 작업 트리에서만 생긴다. 모르는 경우 오탐보다 누락이 낫다 | 같은 상대 경로면 겹침, 세션 cwd로 체크아웃 추정 | `WorkOverlap.pairs` |
+| `file.changed` payload에 `checkout`(그 파일의 git 작업 트리 최상위 절대 경로)을 더한다. 모델 필드는 그대로. 메인 세션 결정 | 「같은 체크아웃」을 기록에서 바로 확인한다. `path`는 등록 프로젝트 `rootPath` 기준이라 등록 폴더 안 worktree는 이미 `path`가 다르지만, 기록만 보고 체크아웃을 가를 수 있게 | 경로 앞부분으로 worktree 추정 | `HookProcessor.checkoutPath` 호출 한 줄, `RecordScope` 키 |
+| 체크아웃은 파일 폴더부터 위로 `.git`(폴더·파일)이 있는 첫 폴더. git 명령을 부르지 않는다(내 판단) | 훅 처리 안에서 프로세스를 띄우지 않는다. worktree·하위 모듈은 `.git` 파일이라 따로 잡힌다. 기존 `GitInfo.branch`와 같은 방식 | `git rev-parse --show-toplevel` | `GitInfo.checkoutRoot` |
+| 작업 단위 = 뿌리 메인 세션과 그 서브에이전트 전부. 부모-서브에이전트, 같은 부모의 서브에이전트끼리는 겹침이 아니다(내 판단) | 부모가 나눠 맡긴 일이라 그 세션이 조정한다. 알려도 받을 쪽이 부모 하나라 소음이 된다. 병렬 서브에이전트가 같은 파일을 만지는 경우는 놓친다 | 서브에이전트마다 따로 | `WorkOverlap.root`·`index`의 `unit` |
+| 단위가 살아 있으면 이미 끝난 서브에이전트의 변경도 단위의 변경으로 센다(내 판단) | 서브에이전트가 끝나도 바꾼 파일은 같은 작업 트리에 남아 부모가 이어 쓴다 | 끝난 세션의 변경은 모두 빼기 | `index`의 `isLive`가 뿌리만 본다 |
+| 끝나지 않음 = 뿌리가 `endedAt` 없고 `SessionRules.state`가 ended 아님(내 판단) | 대시보드 작업중 줄과 같은 기준이라 표시와 줄이 함께 생기고 사라진다 | `endedAt`만 | `index`의 `isLive` |
+| 메인 세션 줄은 단위 전체, 서브에이전트 줄은 그 세션이 바꾼 파일만으로 보인다(내 판단) | 서브에이전트 줄에 부모가 바꾼 파일까지 보이면 무엇을 피할지 흐려진다 | 모든 줄에 단위 전체 | `Index.overlaps(for:)` |
+| 화면 문구 `같은 파일 N개 · PRB-3`(여럿이면 `외 N`), 상황판 `같은 파일 N`, 펼친 목록 머리 「같은 파일 작업 중」. 색은 작업중 강조색(`Theme.Overlap`). 시안 없이. 메인 세션 결정(색·아이콘 `doc.on.doc`·12개 제한은 내 판단) | 기존 행에 붙는 작은 표시. 붉은 계열 토큰이 없어 TRK-47처럼 진한 클레이 | 시스템 빨강, 「충돌」 | `OverlapBadge`·`Theme+Overlap` |
+| 상황판 줄의 표시는 아이콘 없이 글만(내 판단) | 실측 캡처에서 아이콘까지 넣으면 카드 제목이 「TRK-17 겹…」으로 잘렸다 | 아이콘 넣기 | `SituationCardRow.flag` |
+| MCP `overlaps`를 `card_start`·`card_update`·`card_note`·`card_handoff`·`card_evidence`·`project_status`에 붙이고 훅 출력은 늘리지 않는다. 메인 세션 결정 | 에이전트가 자주 부르는 응답에 실어야 고치기 전에 본다. 훅 stdout 규칙은 그대로 | 매 프롬프트 훅 주입 | `MCPTools.call`의 `withOverlaps` |
+| `sessionId`가 없는 도구는 카드에 붙은 끝나지 않은 세션의 눈으로 본다. `project_status`는 `sessionId`가 있을 때만. 메인과 그 서브에이전트가 같이 붙어 있으면 메인만(내 판단) | `card_note`·`card_update`·`card_handoff`는 세션을 받지 않는다. 스키마에 매개변수를 더하지 않고 카드로 부른 쪽을 짐작한다 | 세 도구에 `sessionId` 추가 | `overlapSessions` |
+| 같은 겹침 반복 억제는 `<내 세션>|<상대 메인 세션>`마다 알린 파일 집합을 앱 메모리에(`MCPTools.reportedOverlaps`). 지금 파일이 모두 알린 것이면 안 붙이고, 새 파일이 끼면 그 상대의 전체 목록을 다시(내 판단) | 「과도한 알림 빈도」 기준. 저장하면 판·CloudKit에 상관없는 상태가 섞인다. 앱 재시작 뒤 한 번 더 알리는 것은 해가 적다 | 저장, 응답마다 | `WorkOverlap.shouldReport`·`withOverlaps` |
+| `overlaps` 항목은 `{sessionId 짧은 ID, provider, cards?, files 최대 5, fileCount}`(내 판단) | 짧은 ID는 블록·`work_file`과 같은 꼴. 도구는 provider 원시 값 | 전체 세션 객체 | `overlapJSON` |
+| 시작 블록 「다른 세션에서 작업중」 줄 끝에 ` · 최근 파일: a, b, c`(그 세션이 최근 60분 안에 바꾼 것, 최근순 3개, 체크아웃 몰라도). 메인 세션 결정(형식은 내 판단) | 새 세션이 같은 파일을 피하도록. 블록에서는 판정하지 않고 사실만 | 겹침 판정 줄 | `SessionContext.text` |
+| 질의는 이 프로젝트·최근 60분 `file.changed`만, 대시보드는 프로젝트마다 한 번(`byRow`). 상황판은 따로 한 번 더 만든다(내 판단) | TRK-62에서 관계를 따라간 질의가 280 ms였다. 실제 저장소 사본 5 ms라 두 번 만들어도 작다 | 대시보드에서 한 번 만들어 넘기기 | `ProjectSituation.make`의 `overlaps` |
+| Debug 실행 인자 `-WaypointOpenCard PRB-1`(내 판단, 지시서에 없음) | 화면 조작 없이 카드 인스펙터를 캡처하려고. Release에서는 아무것도 하지 않는다 | — | `DashboardLaunch.swift`의 `CardLaunch`, `RootView` 한 줄 |
+| `HookHarness`는 체크아웃 찾기를 끈다(내 판단) | 실측 픽스처의 경로(`~/workspace/waypoint-probe`)가 이 Mac에서는 실제 git 저장소라 기계마다 payload가 달라진다. 체크아웃은 임시 저장소 테스트로 따로 본다 | 그대로 | `HookSupport.swift` |
+
+검증: `swift test` 716개 중 714개 통과(실패 2개는 `RealInstallStateTests` — 저장소 tracker 스킬을 바꿔 이 Mac에 설치된 스킬과 달라졌다, 머지 뒤 동기화하면 통과), macOS Debug·iOS 빌드. Dev 재현 다섯 단계·지연은 docs/RELIABILITY.md 「동시 작업 겹침 (TRK-17)」.
