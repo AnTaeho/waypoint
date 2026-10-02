@@ -1,11 +1,13 @@
 import SwiftUI
 import WaypointKit
 
-/// 고른 출처의 내용(읽기만): 위에 경로와 사실 한 줄, 아래 본문.
-/// Markdown은 지침 문서 읽기 화면, 명령 규칙은 원문, Codex 기억은 항목 목록.
+/// 고른 출처의 내용: 위에 경로·사실·읽기/항목 한 줄, 아래 본문.
+/// 읽기는 Markdown이면 지침 문서 읽기 화면, 명령 규칙은 원문, Codex 기억은 항목 목록.
+/// 항목은 나눈 항목 목록(프로젝트 안 지침 파일만 고치기·지우기).
 struct GuidanceSourceDetail: View {
     let source: GuidanceSource
     @State private var content: Content = .loading
+    @State private var showsItems = GuideLaunch.items
 
     enum Content: Equatable {
         case loading
@@ -40,6 +42,15 @@ struct GuidanceSourceDetail: View {
                     .foregroundStyle(Theme.textMuted)
                     .lineLimit(1)
                     .fixedSize()
+                if GuidanceDocumentFormat(kind: source.kind) != nil {
+                    Picker("보기", selection: $showsItems) {
+                        Text("읽기").tag(false)
+                        Text("항목").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
             }
             .padding(.horizontal, Theme.Spacing.pageH)
             .frame(height: Theme.Size.rowHeight)
@@ -65,7 +76,9 @@ struct GuidanceSourceDetail: View {
         case .codex(.entries(let total, let recent)):
             CodexMemoryEntries(total: total, entries: recent)
         case .text(let text):
-            if source.path.lowercased().hasSuffix(".md") {
+            if showsItems, let format = GuidanceDocumentFormat(kind: source.kind) {
+                GuidanceSourceItems(source: source, text: text, format: format)
+            } else if source.path.lowercased().hasSuffix(".md") {
                 GuidanceMarkdown(content: text)
             } else {
                 GuidanceRawText(text: text)

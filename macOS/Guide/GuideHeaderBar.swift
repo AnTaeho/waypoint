@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 import WaypointKit
 
-/// 문서 줄: 등록된 문서 이름(누르면 전환, 오른쪽 클릭으로 등록 해제), 문서 추가, 상태, 읽기/편집.
+/// 문서 줄: 등록된 문서 이름(누르면 전환, 오른쪽 클릭으로 등록 해제), 문서 추가, 상태, 읽기/항목/편집.
 struct GuideHeaderBar: View {
     let project: Project
     let docs: [GuideDoc]
@@ -30,6 +30,7 @@ struct GuideHeaderBar: View {
             }
             Picker("보기", selection: $mode) {
                 Text("읽기").tag(GuideMode.read)
+                Text("항목").tag(GuideMode.items)
                 Text("편집").tag(GuideMode.edit)
             }
             .pickerStyle(.segmented)

@@ -103,6 +103,7 @@ struct RootView: View {
             services?.openMainWindow = { [openWindow] in openWindow(id: WaypointApp.mainWindowID) }
         }
         .onDisappear { services?.mainWindowCount -= 1 }
+        .guideLaunch(selection: $selection, projectMode: $projectMode)
     }
 
     private var inspectorTitle: String {
