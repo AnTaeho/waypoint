@@ -104,6 +104,14 @@ struct RootView: View {
         }
         .onDisappear { services?.mainWindowCount -= 1 }
         .guideLaunch(selection: $selection, projectMode: $projectMode)
+        .sheet(isPresented: onboardingShown) {
+            if let services { OnboardingView(services: services, model: services.onboarding) }
+        }
+    }
+
+    /// 연결 설정(온보딩) 시트
+    private var onboardingShown: Binding<Bool> {
+        Binding { services?.onboarding.isPresented ?? false } set: { services?.onboarding.isPresented = $0 }
     }
 
     private var inspectorTitle: String {
