@@ -35,6 +35,9 @@ final class AppServices {
     @ObservationIgnored var mainWindowCount = 0
     @ObservationIgnored private var initWindow: InitWindowController?
 
+    /// 떠 있는 동안의 daily 저장소 백업(10초 점검이 판정, 백업은 백그라운드). iOS는 실행 때만.
+    @ObservationIgnored let dailyBackup = (try? WaypointStore.defaultStoreURL())
+        .map { StoreDailyBackup(storeURL: $0, stamp: .current()) }
     @ObservationIgnored let container: ModelContainer
     @ObservationIgnored var processor: HookProcessor?
     @ObservationIgnored private var server: LocalServer?
@@ -223,6 +226,7 @@ final class AppServices {
             try? context.save()
         }
         reliability.saveIfNeeded()
+        dailyBackup?.startIfDue(now: now)
     }
 
     func retryIntegration() {
