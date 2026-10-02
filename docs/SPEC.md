@@ -449,7 +449,7 @@ Claude·Codex 사용량(한도별 사용 비율과 초기화 시각)을 사이�
 
 ## 10. 화면
 
-`docs/DESIGN.md` 참조. 대시보드 / 지침(출처 목록) / 프로젝트 보드 / 카드 상세 / 지침 문서 / 새 프로젝트 등록 창 / iPhone 작업중.
+`docs/DESIGN.md` 참조. 대시보드 / 지침(출처 목록) / 프로젝트 보드 / 카드 상세 / 지침 문서 / 새 프로젝트 등록 창 / 연결 설정(온보딩) / iPhone 작업중.
 
 ## 11. 열린 질문 (구현 중 결정)
 
@@ -475,7 +475,7 @@ macOS 대시보드의 AI 연동 요약과 모든 화면의 툴바 버튼에서 �
 
 ### 앱 안 연동 설치기 (2026-10-02, TRK-43)
 
-Claude·Codex 연동 설치를 앱 코드(`Shared/Integration/Installer/`)로 옮겼다. 화면은 온보딩(TRK-44)이 붙인다. 셸·파이썬 스크립트는 개발용으로 남고, 기준은 앱 설치기다.
+Claude·Codex 연동 설치를 앱 코드(`Shared/Integration/Installer/`)로 옮겼다. 화면은 온보딩(아래 「온보딩」, TRK-44)이다. 셸·파이썬 스크립트는 개발용으로 남고, 기준은 앱 설치기다.
 
 - 자원: 훅 스크립트·상태줄 중계·Codex 브리지·tracker 스킬은 앱 번들 리소스(macOS)다. `project.yml`이 저장소 `integration/`의 파일을 빌드 때 그대로 복사한다(`IntegrationSources.bundle`, 테스트는 `repository`).
 - 두 단계: **계획**(`IntegrationInstaller.plan`)은 읽기만 하고 대상 파일마다 지금 내용과 바꿀 내용을 담는다. 내용·권한이 같으면 넣지 않으므로 이미 설치된 상태에서는 빈 계획이다. **적용**(`apply`)은 ① 계획 이후 파일이 바뀌었으면 아무것도 쓰지 않고 멈춤 ② 대상 파일 전부 백업 ③ 차례로 원자적 쓰기(같은 폴더 임시 파일 → 권한 → `rename`, 심볼릭 링크는 가리키는 파일에 씀) ④ 하나라도 실패하면 이미 쓴 파일을 이전 내용·권한으로 되돌리고 새로 만든 빈 폴더를 지운 뒤 오류. 파일 단계가 끝난 뒤 명령 단계(MCP 등록)를 돈다.
@@ -501,6 +501,20 @@ Codex: `scripts/install-codex.py`를 그대로 옮겼다(`CodexInstallPlanner`).
 - 다른 점: 백업은 위 저장 폴더에 남기고, 바뀔 것이 없으면 아무것도 쓰지 않는다(파이썬은 매번 모든 파일과 `install.json`의 백업 경로를 다시 쓴다).
 - 해제는 파이썬과 같다: `config.toml`은 표시 블록만 빠져 TOML 값은 설치 전과 같지만 끝에 빈 줄 하나가 남는다(설치 때 끝 공백을 지우고 빈 줄 둘을 붙인 몫). 스크립트·`install.json`은 남는다.
 - `config.toml`은 설치기에 필요한 것만 읽는 작은 TOML 해석기(`MiniTOML`)로 본다: 구조 오류, 표시 블록 밖의 `mcp_servers.waypoint`, `features.hooks = false`. 날짜·숫자 꼴 검사는 `tomllib`보다 느슨하다.
+
+### 온보딩 (2026-10-02, TRK-44)
+
+셸 명령 없이 처음 설정부터 첫 기록 확인까지 끝내는 메인 창 시트(「Waypoint 연결」, `macOS/Onboarding/`). 단계 판정은 순수 타입 `OnboardingProgress`(`Shared/Onboarding/`)가 한다.
+
+1. **도구**: Claude Code·Codex(둘 다 기본 선택). 도구마다 지금 연결 상태(`IntegrationInstallation`). 연결돼 있으면 그 자리에서 「다시 설치」「연결 해제」 — 둘 다 계획을 펼쳐 보이고 확인 버튼으로 적용한다.
+2. **연결**: 고른 도구마다 설치 계획(파일 `~` 경로 · 새로 만듦/바꿈/지움, Claude Code 등록, 건너뛴 단계)을 보이고 「연결」로 적용한다. 계획이 비면 「이미 연결됨」. 성공하면 「백업 보기」(Finder)와 도구 쪽 한 줄(Claude Code는 새로 연 세션부터 기록, Codex는 새로 연 Codex의 `/hooks`에서 Waypoint 신뢰). 설치기 오류(`IntegrationInstallError`)는 화면용 원인 문장(예: 「설정 파일을 읽을 수 없음 · ~/.claude/settings.json」, 「다른 Waypoint 등록이 있어 그대로 둠」) + 「다시 시도」. 도구 상태도 `IntegrationInstallation.detail` 대신 「연결 일부 빠짐」「다른 Waypoint에 연결됨」 같은 말로 보인다(`OnboardingText`, 원문은 연동 상태 패널에 그대로), 부분 실패(`isPartial`, 예: `claude` 실행 파일 없음)는 안 된 단계 + 「다시 시도」. 다시 시도는 다시 계획해 바로 적용한다(이미 확인한 일이고, 끝난 도구는 빈 계획이라 건너뛴다). 계획 중 한 도구라도 오류면 적용하지 않는다.
+3. **프로젝트**: 「폴더 고르기…」(NSOpenPanel). 등록된 폴더면 그 프로젝트를 고른 것으로 보고, 아니면 그 폴더로 `ProjectDraft.folder`(이름 = 폴더 이름, 키 = `ProjectKey.suggest`, 지침 문서 = 폴더 바로 아래 `AGENTS.md`·`CLAUDE.md`·`.claude/CLAUDE.md` 중 있는 것, 개요·스택·카드는 비움)를 만들어 기존 등록 창(`InitSheetView`)에 넣는다. 그 옆 「/tracker init 복사」는 명령을 클립보드에 넣는다(그 폴더의 Claude Code·Codex에서 등록할 때). 보관된 프로젝트의 폴더면 막고 까닭을 보인다. 등록된 프로젝트가 이미 있으면 고르지 않아도 넘어간다.
+4. **첫 기록**: 고른 도구마다 기다린다. 온보딩을 연 시각 이후 활동(`IntegrationReceipt.at`)의 기록이고 프로젝트에 연결된 것이 오면 끝 화면(도구 · 프로젝트 키 · 시각)이 된다. 등록 밖 폴더의 기록이면 그 사실을, 서버가 준비되지 않았으면(`serverState != .ready`) 그 까닭과 「다시 시도」(`retryIntegration`)를 보인다. 이 단계와 연결 단계는 2초마다 연결 상태를 다시 읽는다. 끝은 사용자가 「끝」을 눌러야 한다(자동으로 닫지 않는다).
+
+- 앞 단계가 막히면(도구 없음·연결 안 됨·확인 필요·프로젝트 없음) 뒤 단계를 요청해도 그 단계를 보인다. 「다음」은 그 단계가 막히지 않았을 때만.
+- 메인 창이 여럿이면 먼저 뜬 창 하나에만 시트가 뜬다(그 창이 닫히면 다음 창).
+- **진입점**: 첫 실행 자동 표시(등록된 프로젝트가 보관 포함 하나도 없고 「끝」을 누른 적이 없을 때, UserDefaults `onboarding.completed`), 연동 상태 패널의 「연결 설정」, 메뉴 막대 「연결 설정…」. 「닫기」는 끝낸 것으로 기억하지 않는다.
+- **Dev 제한**: Dev 앱(`AppInstance.isDev`)이 실제 홈에 설치·해제하면 평소용 연결이 47822로 바뀌어 평소용 기록이 끊긴다. 그래서 Dev는 연결이 다 된 상태가 아니면 연결 단계에서 막히고(「Waypoint Dev는 평소용 연결을 바꾸지 않음」), 도구 단계의 다시 설치·연결 해제도 비활성이다(`IntegrationHomePolicy.installBlock`, 링크를 푼 경로로 비교). Debug 빌드는 `WAYPOINT_INTEGRATION_HOME`이 있으면 그 폴더를 홈으로 써서(설치기 컨텍스트·`IntegrationMonitor` 둘 다) 설치를 허용한다. Release는 이 변수를 무시한다.
 
 ### 기록 지표와 진단 내보내기 (2026-10-01, TRK-11)
 

@@ -14,7 +14,10 @@ final class AppServices {
     private(set) var serverState: LocalServer.State = .stopped
     /// 서버 포트. 평소용 47821, 개발용 47822(`AppInstance`), 환경 변수 `WAYPOINT_PORT`가 먼저.
     let port = AppInstance.current.port()
-    let integration = IntegrationMonitor(port: AppInstance.current.port())
+    /// 진단은 설치기와 같은 홈을 본다(Debug 확인용 홈 `WAYPOINT_INTEGRATION_HOME`).
+    let integration = IntegrationMonitor(port: AppInstance.current.port(), home: IntegrationEnvironment.home)
+    /// 연결 설정(온보딩) 진행 상태
+    let onboarding = OnboardingModel()
     /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
     let reliability = ReliabilityMonitor()
     /// 지침·기억 출처 목록(메모리에만). 서비스를 시작하면 생긴다.
@@ -46,6 +49,7 @@ final class AppServices {
 
     init(container: ModelContainer) {
         self.container = container
+        onboarding.attach(self)
     }
 
     /// outbox를 먼저 흡수하고 서버를 연다. 두 번 불러도 한 번만 연다.
@@ -138,6 +142,7 @@ final class AppServices {
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
         observeLifecycle()
+        OnboardingLaunch.start(onboarding, container: container)
     }
 
     /// iPhone에서 온 변경(CloudKit 가져오기)을 메인 context에 들인다(`RemoteCardMerge`). 그대로 두면 iPhone에서

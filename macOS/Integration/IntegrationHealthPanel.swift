@@ -5,6 +5,7 @@ import WaypointKit
 struct IntegrationHealthPanel: View {
     let services: AppServices
     @Query(filter: #Predicate<Session> { $0.endedAt == nil && $0.kindRaw == "main" }) private var sessions: [Session]
+    @Environment(\.dismiss) private var dismiss
     var body: some View {
         LiveDataTimeline { now in
             ScrollView {
@@ -19,7 +20,14 @@ struct IntegrationHealthPanel: View {
                         Text(AppVersion.environment).font(Theme.bodyMedium)
                         Text(AppVersion.display).font(Theme.monoCaption)
                     }.foregroundStyle(Theme.textMuted).textSelection(.enabled)
-                    IntegrationDiagnosticButton(services: services)
+                    HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.m) {
+                        Button("연결 설정", systemImage: "link") {
+                            dismiss()
+                            services.showOnboarding()
+                        }
+                        .font(Theme.captionLarge)
+                        IntegrationDiagnosticButton(services: services)
+                    }
                     ForEach(AgentProvider.allCases, id: \.self) { provider in
                         IntegrationProviderStatus(provider: provider, services: services, now: now,
                             connectedProjects: Array(Set(sessions.filter { $0.provider == provider && $0.project?.archivedAt == nil }

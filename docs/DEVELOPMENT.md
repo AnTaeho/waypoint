@@ -94,11 +94,31 @@ xcrun devicectl device process launch --console --terminate-existing \
 
 ## 연동 설치
 
-사용자 범위 연동(Claude 훅·상태줄 중계·MCP·tracker 스킬, Codex 훅·MCP·스킬)은 앱 안 설치기가 기준이다(`Shared/Integration/Installer/`, `docs/SPEC.md` 「앱 안 연동 설치기」). 설치 화면은 온보딩(TRK-44)에서 붙는다.
+사용자 범위 연동(Claude 훅·상태줄 중계·MCP·tracker 스킬, Codex 훅·MCP·스킬)은 앱 안 설치기가 기준이다(`Shared/Integration/Installer/`, `docs/SPEC.md` 「앱 안 연동 설치기」). 화면은 온보딩(「연결 설정」, `docs/SPEC.md` 「온보딩」)이다.
 
 - 앱 번들에 `integration/`의 훅 스크립트·상태줄 중계·Codex 브리지·tracker 스킬이 리소스로 들어간다(`project.yml`). 저장소 파일이 원본이므로 그 파일을 고치면 앱을 다시 빌드한다.
 - 백업: 저장 폴더의 `integration-backups/<시각>-<8자>/`(`paths.json`에 원래 경로). 평소용은 `~/Library/Application Support/Waypoint/`, Dev는 `Waypoint-Dev/`.
-- Dev로 설치하면 사용자 범위 항목이 47822를 가리키게 바뀐다(평소용 항목을 바꿔 끼움). 평소용이 늘 켜져 있는 이 Mac에서는 Dev를 사용자 범위에 설치하지 않고 아래 실측 폴더를 쓴다.
+- Dev 앱은 실제 홈에 설치·해제하지 않는다(온보딩 연결 단계가 「Waypoint Dev는 평소용 연결을 바꾸지 않음」으로 막힌다). 설치기로 Dev 47822에 잇는 일은 아래 확인용 홈에서만 한다. 평소 Dev 실측은 아래 실측 폴더를 쓴다.
+
+### 확인용 홈과 온보딩 강제 표시 (Debug만)
+
+`WAYPOINT_INTEGRATION_HOME=<폴더>`를 주면 Debug 빌드는 그 폴더를 홈으로 보고(설치기·연동 상태 진단 모두) 설치를 허용한다. Release는 무시한다. 확인용 저장 폴더(`WAYPOINT_SUPPORT_DIR`)와 함께 쓰면 프로젝트가 없어 온보딩이 저절로 뜬다.
+
+```sh
+P=/tmp/onboarding-probe; mkdir -p $P/home $P/support $P/app
+APP=.build/xcode/Build/Products/Debug/Waypoint.app
+open -g -j --env WAYPOINT_INTEGRATION_HOME=$P/home --env WAYPOINT_SUPPORT_DIR=$P/support $APP \
+  --args -WaypointOnboarding apply            # tools | install | apply | project | receive
+open -g -j --env WAYPOINT_INTEGRATION_HOME=$P/home --env WAYPOINT_SUPPORT_DIR=$P/support $APP \
+  --args -WaypointOnboarding receive -WaypointOnboardingFolder $P/app
+osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
+```
+
+- `-WaypointOnboarding <단계>`: 그 단계로 연다. 앞 단계가 막혀 있으면 그 단계가 보인다. `apply`는 연결 계획을 바로 적용하며 `WAYPOINT_INTEGRATION_HOME`이 없으면 적용하지 않는다.
+- `-WaypointOnboardingFolder <경로>`: 프로젝트 단계에서 그 폴더를 고른 것으로 본다. 등록 안 된 폴더면 확인 창 없이 등록한다(확인용 저장 폴더에서만 쓴다).
+- 첫 기록 확인: 임시 홈 `.claude/settings.json`의 `SessionStart` 명령을 `HOME=$P/home`으로, `Tests/Fixtures/hooks/doc-SessionStart.json`의 `cwd`를 등록한 폴더로 바꿔 stdin에 넣어 돌린다.
+- 화면은 `screencapture -x -o -l <창 번호>`로 시트 창 하나만 찍는다(창 번호는 `CGWindowListCopyWindowInfo`로, 폭 640인 창). `-j`로 숨긴 채 띄워도 찍힌다.
+- 끝 화면의 「끝」을 누르면 Dev의 UserDefaults에 `onboarding.completed`가 남는다. 다시 보려면 `defaults delete dev.antaeho.waypoint.dev onboarding.completed`.
 - `scripts/install-codex.py`·`dev-probe-setup.sh`는 개발용으로 남는다. Codex 쪽은 앱 설치기와 같은 파일을 쓴다(`CodexInstallerTests`).
 - 이 Mac의 실제 설치를 그대로 인식하는지는 `RealInstallStateTests`가 실제 설정을 임시 홈에 복사(읽기만)해 빈 계획인지 본다.
 

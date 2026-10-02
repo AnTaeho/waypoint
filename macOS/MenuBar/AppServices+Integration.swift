@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftData
 import WaypointKit
@@ -34,5 +35,12 @@ extension AppServices {
             "pending": .number(Double(integration.queue.count)),
             "queueUnreadable": .bool(integration.queue.unreadable)
         ]).serializedString)
+    }
+
+    /// 연결 설정을 연다(메뉴 막대·연동 상태 패널). 메인 창이 없으면 연다.
+    func showOnboarding() {
+        onboarding.present()
+        if mainWindowCount == 0 { openMainWindow?() }
+        NSApplication.shared.activate()
     }
 }

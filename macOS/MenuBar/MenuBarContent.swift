@@ -39,6 +39,9 @@ struct MenuBarContent: View {
             Text("새 기록을 받지 못하는 중 (포트 \(String(services.port)) 사용 중)")
         }
         Divider()
+        if let services {
+            Button("연결 설정…") { services.showOnboarding() }
+        }
         Button(AppInstance.current.isDev ? "Waypoint Dev 열기" : "Waypoint 열기") {
             openWindow(id: WaypointApp.mainWindowID)
             NSApplication.shared.activate()

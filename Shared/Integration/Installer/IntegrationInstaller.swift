@@ -67,11 +67,13 @@ public struct IntegrationInstallContext: Sendable {
     public static let backupFolderName = "integration-backups"
 
     /// 지금 사용자·이 앱 인스턴스·번들 리소스. 리소스가 없으면 nil.
-    public static func current(instance: AppInstance = .current, bundle: Bundle = .main) throws -> IntegrationInstallContext? {
+    /// - Parameter home: 설정 파일이 있는 홈. nil이면 실제 홈(`IntegrationHomePolicy.home`이 Debug 확인용 홈을 준다).
+    public static func current(instance: AppInstance = .current, bundle: Bundle = .main,
+                               home: URL? = nil) throws -> IntegrationInstallContext? {
         guard let sources = IntegrationSources.bundle(bundle) else { return nil }
         let support = try WaypointStore.supportDirectory()
         return IntegrationInstallContext(
-            home: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true), instance: instance, sources: sources,
+            home: home ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true), instance: instance, sources: sources,
             backupRoot: support.appendingPathComponent(backupFolderName, isDirectory: true))
     }
 
