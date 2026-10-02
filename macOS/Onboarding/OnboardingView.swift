@@ -28,6 +28,7 @@ struct OnboardingView: View {
         .onChange(of: progress.step, initial: true) { _, step in
             if step == .install, IntegrationEnvironment.installBlock == nil { model.prepareInstall() }
         }
+        .onChange(of: progress, initial: true) { _, progress in model.observe(progress) }
     }
 
     @ViewBuilder

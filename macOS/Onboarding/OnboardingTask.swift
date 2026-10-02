@@ -7,6 +7,13 @@ import WaypointKit
 final class OnboardingTask {
     enum Phase: Equatable { case ready, applying, finished }
 
+    /// 첫 연결 지표로 넘길 일(`OnboardingModel`이 받는다). 까닭은 종류만 넘긴다
+    enum Report {
+        case applied(AgentProvider)
+        case failed(AgentProvider, OnboardingMetrics.Reason)
+        case retried
+    }
+
     /// 도구 하나의 상태
     struct Item {
         var plan: IntegrationPlan?
@@ -26,11 +33,14 @@ final class OnboardingTask {
     private(set) var phase: Phase = .ready
     @ObservationIgnored private let home: URL
     @ObservationIgnored private let refreshed: () -> Void
+    @ObservationIgnored private let report: (Report) -> Void
 
-    init(providers: [AgentProvider], action: IntegrationPlan.Action, home: URL, refreshed: @escaping () -> Void) {
+    init(providers: [AgentProvider], action: IntegrationPlan.Action, home: URL,
+         report: @escaping (Report) -> Void = { _ in }, refreshed: @escaping () -> Void) {
         self.providers = providers
         self.action = action
         self.home = home
+        self.report = report
         self.refreshed = refreshed
         prepare()
     }
@@ -42,12 +52,18 @@ final class OnboardingTask {
         let context: IntegrationInstallContext
         do {
             guard let made = try IntegrationEnvironment.context() else {
-                for provider in providers { items[provider] = Item(error: "앱 안의 연결 파일을 찾지 못함") }
+                for provider in providers {
+                    items[provider] = Item(error: "앱 안의 연결 파일을 찾지 못함")
+                    report(.failed(provider, .missingResource))
+                }
                 return
             }
             context = made
         } catch {
-            for provider in providers { items[provider] = Item(error: OnboardingText.error(error, home: home.path)) }
+            for provider in providers {
+                items[provider] = Item(error: OnboardingText.error(error, home: home.path))
+                report(.failed(provider, .init(error: error)))
+            }
             return
         }
         for provider in providers {
@@ -55,6 +71,7 @@ final class OnboardingTask {
                 items[provider] = Item(plan: try IntegrationInstaller.plan(provider, action, context: context))
             } catch {
                 items[provider] = Item(error: OnboardingText.error(error, home: home.path))
+                report(.failed(provider, .init(error: error)))
             }
         }
     }
@@ -79,8 +96,12 @@ final class OnboardingTask {
             do {
                 let result = try await Task.detached { try IntegrationInstaller.apply(plan, context: context) }.value
                 items[provider]?.result = result
+                let partial = result.commandOutcomes.compactMap(OnboardingMetrics.Reason.init)
+                partial.forEach { report(.failed(provider, $0)) }
+                if partial.isEmpty { report(.applied(provider)) }
             } catch {
                 items[provider]?.error = OnboardingText.error(error, home: home.path)
+                report(.failed(provider, .init(error: error)))
             }
         }
         phase = .finished
@@ -89,6 +110,7 @@ final class OnboardingTask {
 
     /// 다시 계획하고 바로 적용한다(이미 확인한 일이다). 끝난 도구는 빈 계획이라 건너뛴다.
     func retry() async {
+        report(.retried)
         prepare()
         if canApply { await apply() } else { phase = .finished; refreshed() }
     }

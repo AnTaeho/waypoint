@@ -8,7 +8,8 @@ struct ReliabilityMetricsSection: View {
     var body: some View {
         let display = ReliabilityMetrics.summary(metrics.displayMs)
         let resume = ReliabilityMetrics.summary(metrics.resumeSeconds)
-        if display != nil || resume != nil || metrics.failures.total > 0 || !metrics.recovery.isEmpty {
+        let onboarding = metrics.onboarding.panelLines()
+        if display != nil || resume != nil || metrics.failures.total > 0 || !metrics.recovery.isEmpty || !onboarding.isEmpty {
             VStack(alignment: .leading, spacing: Theme.Spacing.s) {
                 Text("기록 지표").font(Theme.bodyMedium)
                 if let display {
@@ -17,6 +18,7 @@ struct ReliabilityMetricsSection: View {
                 if let resume {
                     Text("재개 · 중앙값 \(ReliabilityMetrics.duration(resume.p50)) · \(resume.count)회")
                 }
+                ForEach(onboarding, id: \.self) { Text($0) }
                 if metrics.failures.total > 0 {
                     Text("연동 실패 · 서버 \(metrics.failures.server) · 형식 \(metrics.failures.invalidInput) · 저장 \(metrics.failures.saveFailed)")
                         .foregroundStyle(Theme.liveText)

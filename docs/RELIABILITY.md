@@ -90,6 +90,55 @@
 - 진단 정보 복사(사용자가 누를 때만): 위 숫자를 더한다. 프로젝트명·경로·세션 ID·대화·오류 원문은 넣지 않는다(`IntegrationDiagnosticTests`, `ReliabilityMetricsTests`가 고정).
 - `/integration/status`(루프백 전용)가 같은 숫자를 `metrics`로 돌려준다. 측정 스크립트가 쓴다.
 
+### 첫 연결 지표 (TRK-45)
+
+`ReliabilityMetrics.onboarding`(`OnboardingMetrics`, `Shared/Onboarding/OnboardingMetrics.swift`). 온보딩을 한 번 연 것(열기 → 「끝」 또는 닫기)이 한 시도다. 최근 20회만 남긴다. 같은 `metrics.json`에 들어가므로 숫자·시각·정수 값만 있다(`OnboardingMetricsTests`가 문자열 값이 없음과 키 이름을 고정한다). 시각은 Foundation 기본 인코딩(2001-01-01부터 초).
+
+| 필드 | 뜻 |
+|---|---|
+| `attempts[].startedAt` | 온보딩을 연 시각. 시도를 가리는 키 |
+| `lastStage` / `furthestStage` | 마지막으로 보인 단계 / 가장 멀리 간 단계. 0 도구 · 1 연결 · 2 프로젝트 · 3 첫 기록 · 4 끝 |
+| `installed.claude` / `installed.codex` | 연결 적용 성공 시각(이미 연결돼 있던 것을 화면이 확인한 시각 포함). 처음 한 번 |
+| `projectAt` | 프로젝트를 고르고 등록까지 된 시각(이미 등록된 프로젝트로 넘어간 시각 포함) |
+| `firstRecord.claude` / `firstRecord.codex` | 시작 이후 활동이고 프로젝트에 연결된 첫 기록을 받은 시각(`receivedAt`) |
+| `finishedAt` / `closedAt` | 「끝」 / 닫기(Esc·창 닫힘 포함). 둘 다 없으면 앱이 꺼진 것 |
+| `retries` | 연결 「다시 시도」와 첫 기록 단계의 서버 「다시 시도」 횟수 |
+| `failures[]` | `{stage, reason, tool?, at, count}`. 같은 (단계, 까닭, 도구)는 한 줄에 횟수로 모은다. 화면 막힘은 바로 앞 판정과 다를 때만 센다. 계획 단계 오류(설정 겹침 등)는 연결 단계에 들어올 때마다 다시 센다 |
+
+`reason` 값: 0 기타 · 1 설정 읽기 실패 · 2 설정 겹침 · 3 앱 연결 파일 없음 · 4 확인 중 파일 바뀜 · 5 백업 실패 · 6 쓰기 실패 · 7 등록 명령 실패(부분 실패) · 8 claude 실행 파일 없음(부분 실패) · 9 설치 준비 실패 · 10 Dev 차단 · 11 확인 필요(다른 포트·꺼짐) · 12 보관된 프로젝트 · 13 서버 안 뜸 · 14 등록 밖 폴더. `tool`: 0 Claude · 1 Codex. 모르는 값은 0(기타)·0(도구 단계)으로 읽고, `onboarding`을 못 읽으면 그것만 버리고 나머지 지표는 살린다.
+
+- 파일은 10초 점검 때만 쓴다. 「끝」 뒤 10초 안에 앱을 끄면 `finishedAt`을 잃는다(종료 때 쓰기는 아직 없음).
+- 요약: 마지막 시도의 시작→첫 기록(도구별), 「끝」낸 시도들의 시작→첫 기록(어느 도구든 먼저) 중앙값, 미완 시도가 가장 많이 멈춘 단계(`lastStage`, 같으면 앞 단계. 마지막 시도가 열려 있으면 진행 중으로 보고 뺀다).
+- 연동 상태 패널: 「첫 기록까지 · 최근 1분 5초 · 중앙값 1분 20초 (3회)」, 「자주 멈춘 단계 · 연결 (2회)」(시도가 있을 때만).
+- 진단 정보 복사: 「첫 연결: 시도 N회 · 끝냄 M회」부터 마지막 시도의 단계별 시간·실패 종류까지 7줄.
+
+## 깨끗한 환경 첫 설정 (TRK-45)
+
+2026-10-02, Claude Code 2.1.287, codex-cli 0.159.2, Waypoint Dev Debug(브랜치 `trk-45-first-setup`). 설정이 하나도 없는 임시 홈(`WAYPOINT_INTEGRATION_HOME`)과 임시 저장 폴더로 Dev를 `open -g -j`로 띄우고 `-WaypointOnboarding apply -WaypointOnboardingFolder <임시 프로젝트>`로 연결 적용·프로젝트 등록까지 한 번에 했다. 도구는 `env -i HOME=<임시 홈>`으로 한 번씩만 돌렸다. 인증 정보는 임시 홈에 옮기지 않았다. 절차는 `docs/DEVELOPMENT.md` 「깨끗한 환경 첫 설정」.
+
+| 시각(UTC) | 시작부터 | 일 |
+|---|---|---|
+| 03:10:09.65 | 0 | 온보딩 시작(`startedAt`) |
+| 03:10:10.31 | 0.66초 | 프로젝트 등록(`projectAt`) |
+| 03:10:11.58 | 1.93초 | Claude 연결 적용 성공. 임시 홈에 `settings.json` 훅(47822)·상태줄 중계·`.claude.json` MCP(47822)·`/tracker` 스킬 |
+| 03:10:11.59 | 1.94초 | Codex 연결 적용 성공. `config.toml` MCP·`hooks.json`·스킬 |
+| 03:10:42 | | `claude -p "ok" --model haiku` 실행(임시 프로젝트 폴더) |
+| 03:10:44.78 | 35.1초 | Claude 첫 기록(`firstRecord.claude`). 실행부터 2.8초. 앞의 30초는 사람 대신 확인하느라 쉰 시간 |
+| 03:11:15 | | `codex exec --skip-git-repo-check "ok"` 실행(`CODEX_HOME=<임시 홈>/.codex`) |
+
+결과:
+
+- **Claude: 설정·수신 성공, 모델 호출은 인증에서 멈춤.** 임시 홈 설정의 `SessionStart`·`SessionEnd` 훅이 Dev(47822)로 갔고 Dev DB에 세션이 임시 프로젝트로 생겼다(시작·끝 시각 모두). `SessionStart` 응답으로 Dev의 블록(「Waypoint: <키> (<이름>)」)이 들어갔고 MCP도 47822에 연결됐다(`lastMCPAt`). 온보딩은 첫 기록을 받아 끝 단계(`lastStage` 4)로 넘어갔다. 그 뒤 모델 호출은 「Not logged in · Please run /login」으로 끝났다(종료 코드 1, 3초). 임시 홈에는 로그인 정보가 없다.
+- **Codex: 설정 성공, 수신 없음.** 실행은 인증 없이 `401 Unauthorized`로 끝났다(종료 코드 1, 17초, 재연결 10회). 훅은 한 번도 오지 않았다. 새 홈의 Codex 훅은 `/hooks`에서 신뢰해야 도는데 그 승인은 대화형뿐이라, 인증이 있었어도 이 실행에서 받았을지는 확인하지 못했다.
+- 지표: `metrics.json`(0600)에 위 시각이 그대로 남았다. 실패 0, 다시 시도 0. 「끝」 단추는 화면 자동 조작 금지라 누르지 않았다(`finishedAt`·「끝」 경로는 단위 테스트만). 앱을 끄면 시도는 열린 채 남는다(다음 시도부터 앱이 꺼진 미완으로 센다).
+- 실제 홈(`~/.claude/settings.json`·스킬·`~/.codex/config.toml`·`hooks.json`·`~/.agents`)은 수정 시각·해시가 그대로였고 `~/.claude.json`의 `mcpServers`도 같았다.
+
+사람이 해야 할 일:
+
+1. 깨끗한 계정에서 Claude 실제 대화까지: 임시 홈에서 `HOME=<임시 홈> claude`로 `/login`을 한 번 하고 같은 실측을 다시 한다(모델 응답 뒤 `UserPromptSubmit`·`Stop` 수신과 MCP `card_start`까지).
+2. Codex: `HOME=<임시 홈> CODEX_HOME=<임시 홈>/.codex codex login` 뒤, 대화형 `codex`에서 `/hooks`를 열어 Waypoint 훅을 신뢰하고 한 번 대화한다. 첫 기록이 오면 `firstRecord.codex`가 남는다.
+3. 「끝」을 눌러 `finishedAt`과 중앙값이 생기는지 화면으로 본다.
+
 ## 알려진 한계
 
 - 세션이 끝난 뒤 그보다 이른 시각의 기록이 실시간으로 처리되지 않고 outbox로만 오면 버린다. 실시간 서버가 그 훅을 받지 못했는데 뒤의 `SessionEnd`는 받은 경우뿐이라 실제로는 드물다. 끝난 세션에 늦은 사실 기록을 붙이는 것은 명세를 바꾸는 일이라 이번에 하지 않았다.

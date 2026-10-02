@@ -23,6 +23,9 @@ private struct OnboardingSheet: ViewModifier {
     }
 
     private var shown: Binding<Bool> {
-        Binding { services?.onboarding.shows(in: windowID) ?? false } set: { services?.onboarding.isPresented = $0 }
+        Binding { services?.onboarding.shows(in: windowID) ?? false } set: { shown in
+            // 시트 밖에서 닫혀도(Esc 등) 닫기로 센다
+            if !shown { services?.onboarding.close() }
+        }
     }
 }
