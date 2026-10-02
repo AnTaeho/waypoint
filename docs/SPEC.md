@@ -54,7 +54,7 @@ Claude Code 세션들 ──훅(command)──▶ waypoint-hook.sh ──HTTP─
 - SwiftData `ModelConfiguration(cloudKitDatabase: .private(<컨테이너>))`. 개인 DB 하나, 공유 없음.
 - 컨테이너는 인스턴스마다 따로: 평소용 `iCloud.dev.antaeho.waypoint`, 개발용 `iCloud.dev.antaeho.waypoint.dev`(`AppInstance.cloudKitContainerIdentifier`). 엔타이틀먼트(`Config/Waypoint-{macOS,iOS}.entitlements`)는 build setting `WAYPOINT_CONTAINER`로 같은 값을 받는다.
 - 환경: 둘 다 CloudKit **Development**. 개발 서명(Apple Development) 빌드는 기본이 Development라 엔타이틀먼트에 환경을 적지 않는다. 개인 앱이라 Production 스키마 배포는 하지 않는다. Development 스키마는 앱이 처음 올린 레코드로 자동으로 생긴다.
-- 끄기: 환경 변수 `WAYPOINT_CLOUDKIT=0`, 또는 `WAYPOINT_SUPPORT_DIR`로 저장 폴더를 옮긴 실행(확인용 임시 저장소가 실제 컨테이너와 섞이지 않게). 샘플 모드(메모리 저장소)와 테스트(`makeContainer` 기본값)는 늘 로컬.
+- 끄기(`AppInstance.cloudKitContainer`가 nil): 빌드 스위치 Info.plist `WaypointICloud`가 `NO`(macOS, build setting `WAYPOINT_ICLOUD`, `Config/Waypoint-macOS-Info.plist`. 기본 `YES`, 외부 베타 배포 `scripts/release-mac.sh`만 기본 `NO`. 키가 없으면 켬 — iOS), 환경 변수 `WAYPOINT_CLOUDKIT=0`, 또는 `WAYPOINT_SUPPORT_DIR`로 저장 폴더를 옮긴 실행(확인용 임시 저장소가 실제 컨테이너와 섞이지 않게). 빌드 스위치가 `NO`면 환경 변수로 켤 수 없다. 꺼지면 설정 「기록」 탭이 「이 Mac · iCloud 꺼짐」으로 보인다. 샘플 모드(메모리 저장소)와 테스트(`makeContainer` 기본값)는 늘 로컬.
 - 서명: 팀 `2FCXA77MC5` 자동 서명. App ID·컨테이너·프로파일은 `xcodebuild -allowProvisioningUpdates`가 만든다. 푸시: iOS `aps-environment`, macOS `com.apple.developer.aps-environment`(development), iOS 백그라운드 모드 `remote-notification`.
 - iOS는 앱이 원격 알림을 직접 등록한다(`PhoneAppDelegate`). 등록하지 않으면 Mac 변경이 앱을 다시 열 때까지 오지 않았다(2026-09-28 실측). macOS는 미러링이 알림 수신을 스스로 연다.
 - iOS 화면은 CloudKit 가져오기가 끝날 때마다 새 `ModelContext`로 다시 읽는다. 메인 context는 새로 생긴 객체만 보이고 이미 읽은 객체(세션 `endedAt` 등)를 옛 값으로 둬, 끝난 세션이 작업중에 남았다(iOS 26 실측).
