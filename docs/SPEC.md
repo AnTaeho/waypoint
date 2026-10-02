@@ -594,7 +594,7 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 지침 문서를 항목(TRK-38) 단위로 보고, 등록 프로젝트 폴더 안의 지침 파일은 항목마다 고치고 지운다. 쓰기는 모두 8장 저장 경로(`GuideLibrary.save`: 디스크 해시 확인 → 원자적 쓰기 → `GuideVersion(app)`·`guide.synced`(app), 다르면 충돌)를 지난다. 로직은 `GuideItemEdit`·`GuideItemTarget`(`Shared/Guide/`).
 
 - **들어가는 곳**: 프로젝트 지침 문서 화면의 「읽기 | 항목 | 편집」, 지침 화면(사이드바)의 출처 내용 「읽기 | 항목」(Codex 기억 DB 제외).
-- **쓰는 대상**(`GuideItemTarget.resolve`): 등록 문서면 그 문서. 등록 프로젝트 묶음의 프로젝트 `CLAUDE.md`·`.claude/CLAUDE.md`·`AGENTS.md`(·`AGENTS.override.md`)·`CLAUDE.local.md`이고 프로젝트 폴더 아래(`GuidePaths.relativePath`, 심볼릭 링크를 푼 경로)면 처음 고치거나 지울 때 지침 문서로 등록(8장 등록: `GuideVersion(local)`, `guide.synced`(local))한 뒤 저장한다. 그 밖(전역·상위 폴더·기억·색인·Codex 파일·`.claude/rules`)은 보기만 한다(TRK-41).
+- **쓰는 대상**(`GuideItemTarget.resolve`): 등록 문서면 그 문서. 등록 프로젝트 묶음의 프로젝트 `CLAUDE.md`·`.claude/CLAUDE.md`·`AGENTS.md`(·`AGENTS.override.md`)·`CLAUDE.local.md`이고 프로젝트 폴더 아래(`GuidePaths.relativePath`, 심볼릭 링크를 푼 경로)면 처음 고치거나 지울 때 지침 문서로 등록(8장 등록: `GuideVersion(local)`, `guide.synced`(local))한 뒤 저장한다. 그 밖(전역·상위 폴더·기억·색인·Codex 파일·`.claude/rules`)은 아래 TRK-41 경로로 파일에 바로 쓴다.
 - **바탕 원문**: 등록 문서는 앱 기록(`content`). 등록 전 파일은 UTF-8 그대로 전부 읽은 원문(`GuideFile.read`. 보기용 읽기는 2MB 앞부분이라 쓰지 않는다). 못 읽으면 보기만.
 - **고치기**: 항목 줄 자리에 원문 편집 상자(하위 항목 줄 포함). 상자를 열 때의 문서를 기억하고, 글이 바뀌는 동안 「그 문서에서 이 항목만 바꾼 문서 전체」를 `draft`로 둔다(같으면 nil). 그래서 상자가 열린 사이 로컬 파일이 바뀌면 8장 규칙대로 충돌 → 비교 화면. 저장(⌘↩)은 상자를 연 문서를 다시 나눠 같은 번호·종류·글의 항목을 찾아 바꾼 뒤 저장 경로로, 취소(Esc)는 `draft`를 비운다.
 - **지우기**: 누르면 바로 지금 문서에서 그 항목(하위 포함)을 지워 저장한다(TRK-38 지우기 규칙). 저장되면 화면 아래 알림 「지움 · <앞부분 24자>」(하위가 있으면 「· 하위 N개 포함」)과 「되돌리기」, 6초.
@@ -605,3 +605,21 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 - 지침 화면에서 고른 등록 문서가 충돌이면 그 자리에 8장 비교 화면을 보인다.
 
 검증: `GuideItemEditTests`(고치기·하위 포함 지우기·되돌리기가 임시 파일과 버전에 반영, 애매 문서 지우기 거절, 낡은 항목 거절, 상자 연 사이 로컬 변경 → 충돌, `draft`가 있으면 감시가 충돌로 판정, 감시 전 디스크 변경 → 충돌, 지운 뒤 로컬 변경 → 되돌리기 충돌), `GuideItemTargetTests`(등록 전 프로젝트 파일은 처음 고칠 때 등록되고 버전 `[app, local]`, 전역·상위 폴더·기억·폴더 밖 경로·rules는 쓰기 대상 아님).
+
+## 프로젝트 밖 지침 쓰기 (2026-10-02, TRK-41)
+
+전역·상위 폴더·기억·`.claude/rules`·Codex 규칙 파일도 항목 화면(TRK-40)에서 고치고 지운다. 지침 문서(`GuideDoc`)로 등록하지 않고 파일만 다룬다. 로직은 `Shared/GuidanceWrite/`.
+
+- **쓰는 대상**(`GuidanceFileWrite.isWritable`, `GuideItemTarget.file`): 종류가 전역·상위 폴더·rules(전역·프로젝트)·기억·기억 색인·명령 규칙이고 `.md`(규칙은 `.rules`)인 파일. `~/.claude/CLAUDE.md`(`CLAUDE_CONFIG_DIR`), `~/.codex/AGENTS.md`·`AGENTS.override.md`(있을 때만 — 수집기가 있는 파일만 찾으므로 새로 만들지 않는다), `~/.codex/rules/*.rules`(`CODEX_HOME`), 상위 폴더 지침, `~/.claude/projects/*/memory/*.md`. 프로젝트 `CLAUDE.md` 등은 지금처럼 지침 문서로. 이미 지침 문서로 등록된 파일은 그 문서로.
+- **쓰지 않는 것**: Codex 기억 DB(`memories_1.sqlite`, `-wal` 포함, `.sqlite` 전부)와 관리 정책 파일(`/Library/…`). 종류와 경로 둘 다로 거절하고, 쓰기 함수(`apply`·`restore`)도 경로로 다시 거절한다. DB에 쓰는 코드는 없다.
+- **쓰기 순서**(`GuidanceFileWrite.apply`): ① 바뀔 파일 모두를 다시 읽어 화면이 나눈 원문과 바이트까지 같은지 확인(하나라도 다르거나 사라졌으면 아무것도 쓰지 않고 「바뀜」) → ② `.rules`면 새 내용 전체를 검사(아래) → ③ 파일마다 지금 내용을 백업 → ④ 원자적 쓰기(`GuideFile.writeAtomically`: 같은 폴더 임시 파일 → `rename`, 원래 권한 유지) 또는 지우기.
+- **바탕 원문**: 출처 파일을 UTF-8 그대로 전부 읽은 것. 쓴 뒤와 「다시 읽기」에서 다시 읽는다. 못 읽으면 보기만.
+- **백업**(`GuidanceBackupStore`, 이 Mac에만): `<저장 폴더>/guidance-backups/<원본 경로 SHA-256 앞 32자>/<UTC 시각 yyyyMMddTHHmmss.SSSZ>-<까닭>.<원래 확장자>`와 같은 폴더의 `source-path`(원본 절대 경로). 까닭: `edit`(고치기 전)·`delete`(지우기 전)·`restore`(복원 전)·`undo`(되돌리기 전). 폴더 0700, 파일 0600. 원본 하나에 최근 50개(이름순 = 시각순, 같은 밀리초면 1 ms 뒤로). 저장 폴더는 `WAYPOINT_SUPPORT_DIR`를 따른다. SwiftData·CloudKit에 넣지 않는다.
+- **기억 지우기**: 기억 파일 항목(파일 하나 = 한 항목)을 지우면 그 파일과, 같은 폴더 `MEMORY.md`에서 그 파일을 가리키는 색인 줄 모두(`MemoryIndexPairing.fileName` 기준, TRK-38 지우기 규칙)를 한 번에 지운다. 색인이 없거나 가리키는 줄이 없거나 색인이 애매한 문서면 파일만. `MEMORY.md`의 색인 줄만 지울 수도 있고(파일이 없는 줄도), 기억 파일 내용(머리·본문)도 고칠 수 있다.
+- **되돌리기**: 지운 뒤 화면 아래 알림(6초) 「지움 · 앞부분」(+「· 하위 N개 포함」·「· 색인 줄 포함」) + 「되돌리기」. 바뀜을 거꾸로 적용한다 — 모든 파일이 지운 직후와 같을 때만, 아니면 쓰지 않고 「되돌리지 못함 · 바뀜」. 알림은 지침 화면이 들고 있어 지운 기억 파일이 목록에서 빠져도 남는다.
+- **백업에서 복원**: 출처 위 한 줄의 「백업 N」 → 사본 목록(시각 · 까닭)과 원문 → 「이 판으로 되돌리기」. 지금 파일이 있으면 먼저 백업(`restore`)하고 사본 내용으로 원자적 쓰기, 없으면 다시 만든다. 지운 파일은 출처 목록 맨 아래 「지운 파일」(사본은 있고 파일은 없는 경로)에서 같은 화면으로.
+- **Codex 규칙 검사**(`CommandRulesCheck`): `codex`를 재개 열기(TRK-12 `ToolLaunch`)와 같은 폴더들에서 찾고, 있으면 새 내용을 0700 임시 폴더에 쓰고 `codex execpolicy check --rules <임시 파일> -- waypoint-check-<무작위>`를 `CODEX_HOME=<임시 폴더>`로 실행한다(사용자 Codex 홈에 아무것도 남기지 않는다). 끝 코드 0이고 오류 출력에 `failed to parse policy`가 없으면 통과. 아니면 마지막 `error:` 문장과, 그 줄 원문이 함께 찍힌 경우에만 줄 번호(구문 오류는 `1:1`로 찍히고 원문이 비어 있어 믿지 않는다)를 「저장 안 함 · 줄 2 · invalid decision: maybe」로 보이고 저장하지 않는다. 3초 안에 끝나지 않거나 실행하지 못하면, 또는 `codex`가 없으면 자체 검사: 괄호 짝(TRK-38 규칙 나누기), 한 줄 문자열이 그 줄에서 닫힘, 규칙마다 `prefix_rule`·`host_executable`·`network_rule` 중 하나의 호출이고 닫는 괄호 뒤에는 공백·주석만. `codex`가 없으면 위 한 줄에 「codex 없음 · 간단 검사」. 빈 파일·주석만 있는 파일은 통과. 되돌리기·복원은 있던 내용으로 돌리는 것이라 검사하지 않는다. 확인한 판: codex-cli 0.159.2(`execpolicy check --rules <PATH> <COMMAND>...`).
+- **열린 세션**: 이 경로로 쓰는 파일을 고를 때 위 한 줄에 그 파일을 읽는 도구의 끝나지 않은 메인 세션 수 「열린 Claude 세션 3」(`liveText`, 없으면 안 보임). 전역이면 그 도구의 모든 세션, 아니면 걸리는 프로젝트의 세션.
+- 쓴 뒤에는 지침 목록을 다시 모은다(홈 바로 아래 파일은 감시하지 않으므로).
+
+검증: `GuidanceFileWriteTests`(쓰기·백업 내용·권한 0700/0600·원래 권한 유지·50개 정리·같은 밀리초 순서·복원 전 백업·지운 파일 복원·디스크 변경과 사라진 파일 거절·여러 파일 중 하나만 바뀌어도 아무것도 안 씀·기억 지우기와 되돌리기(바이트까지)·색인 바뀐 뒤 되돌리기 거절·색인 없는 파일·`MEMORY.md` 없는 폴더·파일 없는 색인 줄·한 파일을 가리키는 색인 줄 여럿·애매한 색인·기억 내용 고치기·Codex DB 쓰기 거절·잘못된 규칙 저장 거절), `CommandRulesCheckTests`(자체 검사 통과·거절과 줄 번호, Codex 오류 출력 읽기, `codex`가 있을 때만 실제 CLI로 맞는 파일·빈 파일·검사 명령을 막는 규칙·잘못된 결정값(줄 2)·닫히지 않은 괄호·모르는 이름), `GuidanceOpenSessionsTests`, `GuideItemTargetTests`(파일 대상 6종, 보기만 4종). 모든 테스트는 임시 폴더만 쓴다.
