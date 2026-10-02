@@ -483,3 +483,23 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | CloudKit: Developer ID 앱은 Production 환경(export 엔타이틀먼트로 확인). Production 스키마 배포는 사람이 Console에서 한다. 메인 세션 결정 | 외부 사용자는 Production만 쓴다. 스키마 배포는 되돌릴 수 없는 외부 변경 | `cktool`로 자동화 | — |
 
 검증: `scripts/release-mac.sh --skip-notarize` 성공(archive·export·서명 검증, `spctl`은 공증 전이라 거부), `python3 scripts/test_build_failure_report.py` 통과. 공증은 `waypoint-notary` 프로필이 없어 못 함. 결과 원문은 docs/RELEASE.md 「이번 실제 결과」.
+
+## 2026-10-02 — 기록 탭 (TRK-47)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 설정 창을 탭 둘(사용량·기록)로, 기록 탭은 grouped Form 한 장에 남기는 것 · 어디에 · 백업 · 내보내기·지우기. 사용자 선택(시안 1) | — | 시안 2·3 | `SettingsView`를 사용량 Form 하나로 |
+| 화면 문장은 저장 범위 표(`RecordScope`)에서만 만들고, 표는 테스트가 스키마 속성·실제 생성 지점 payload 키와 맞춘다. 메인 세션 결정 | 시안 문구(「파일 내용은 남기지 않음」)가 지침 문서 내용·판을 저장하는 사실과 달랐다. 속성을 더하면 화면이 저절로 틀리지 않게 | 화면에 문장을 직접 적기 | `RecordScopeTests` 지우기 |
+| payload 키 확인은 실제 생성 지점을 돌려 모은 키 + `Shared/`의 `Event.record(` 호출 수 목록(내 판단) | 소스 문자열에서 키를 읽는 것은 깨지기 쉽다. 돌려 보는 쪽이 정확하고, 호출 수 목록이 새 생성 지점을 놓치지 않게 한다 | 소스 정규식으로 키 추출 | `eventRecordCallSitesAreKnown` |
+| 남기지 않는 것 줄: 「AI 답변 · 대화 전체 · 명령 출력 · 지침 문서가 아닌 파일의 내용」(내 판단) | 코드 확인: 훅 처리는 출력에서 끝 코드·커밋 줄만 뽑고, 편집 원문은 outbox에서 크기로 줄인다. 에이전트가 도구로 남긴 메모·카드 본문은 「메모」「카드」에 든다 | 「파일 내용」 | `RecordScope.notKept` |
+| 「세션」에 요청 시각을, 「요청 문장」(30일)에 문장만 둔다(내 판단) | `PromptRetention`은 문장만 비우고 이벤트·시각·`promptId`는 남긴다 | 요청 전체를 30일로 | `RecordScope.payloadKeys` |
+| 지우기 전 백업은 새 까닭 `beforeDelete`(내 판단) | 목록에서 「지우기 전」으로 바로 알아본다. 이 값을 모르는 옛 앱은 이 폴더를 목록·정리에서 건너뛸 뿐(이름 해석 실패) 열기는 막지 않는다 | `manual` | `StoreBackup.Reason.beforeDelete`를 `manual`로 |
+| 「지금 백업」·지우기 전 백업은 `StoreDailyBackup.runNow`로 daily와 같은 진행 중 표시를 쓴다(내 판단) | 온라인 백업 둘과 7개 정리가 겹치지 않게. 직접 뜬 백업도 daily의 「마지막 백업」이 된다 | 따로 `backupOpenStore` | `RecordsModel`이 `backup.backupOpenStore`를 바로 부르게 |
+| 지우기는 한 행씩 `delete` 후 저장, 일괄 삭제(`delete(model:)`)를 쓰지 않는다(내 판단) | 일괄 삭제는 보통 저장 경로를 건너뛰어 iCloud 미러링이 지운 것을 iPhone에 보내는지 보장되지 않는다. 4,700행은 한 번에 지워도 짧다 | `delete(model:)` | `RecordWipe.deleteAll` |
+| 복원 예약·지우기 뒤 앱을 다시 시작한다: 작은 셸이 지금 PID가 끝나기를 기다렸다가 `open -g <같은 번들>`, 앱은 `NSApp.terminate`(내 판단) | 복원은 다음 실행에서만 적용된다. 지운 뒤에는 열린 화면·처리기가 지운 행을 들고 있지 않게. 같은 번들 경로라 평소용·Dev가 자기만 다시 띄우고, `open`이 셸 환경을 넘기지 않아 저장 폴더 등은 `--env`로 넘긴다(안 넘기면 확인용 폴더로 띄운 Dev가 기본 폴더로 떠 예약이 사라진다). `-g`로 다른 앱의 초점을 뺏지 않는다 | 사용자에게 다시 열라고 하기, `NSWorkspace.openApplication` | `RecordsModel.relaunch`에서 `terminate`만 |
+| 지운 뒤 UserDefaults(`onboarding.completed` 등)와 저장소 밖 파일은 그대로(내 판단) | 연결 설정은 그대로라 온보딩을 다시 할 일이 아니다. 끝낸 적이 없으면 프로젝트 0개라 온보딩이 다시 뜬다(Dev 실측) | 온보딩 기록도 지우기 | `RecordWipe` 뒤에 `defaults` 지우기 |
+| 내보내기는 작동 상태 값(PID·블록 확인·상태 캐시·대기 중인 도구·해시)을 넣지 않고, 카드는 표시 ID·세션은 세션 ID로 서로 가리킨다. 날짜는 밀리초까지(내 판단) | 사람이 읽고 다른 도구로 옮길 기록만. 기본 `.iso8601`은 초 아래를 버려 같은 초 이벤트 순서가 흐려진다 | 모델 그대로 전부 | `RecordExport` 레코드 필드 |
+| 기록 탭 너비 520(`Theme.Records`), 높이 760에서 스크롤. 「모든 기록 지우기…」 색은 `liveText`(내 판단) | 백업 줄 「시각 · 까닭 · 크기 · 복원…」이 한 줄에 들어가게. 붉은 계열 토큰이 따로 없어 실패 표시와 같은 진한 클레이 | 시스템 빨강 | `Theme+Records.swift` |
+| Debug 실행 인자로 대화상자 없이 같은 동작을 탄다(`-WaypointSettingsTab`·`-WaypointExport`·`-WaypointBackupNow`·`-WaypointRestore`·`-WaypointWipe`·`-WaypointSettingsScroll`)(내 판단) | 화면 조작 없이 Dev 실측을 하려고. Release에서는 설정 창 탭 선택 말고는 무시한다 | — | `RecordsLaunch` |
+
+검증: `swift test` 672개 통과, macOS Debug·iOS 빌드. Dev 실측(실제 저장소 백업 사본, CloudKit 꺼짐): 기록 탭 창 캡처, 전체·프로젝트 하나 내보내기, 지금 백업, 복원 예약 → 다시 시작 → 복원 확인, 모든 기록 지우기 → 비고 `beforeDelete` 백업 남음.

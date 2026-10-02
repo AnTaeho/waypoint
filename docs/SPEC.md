@@ -710,3 +710,67 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 - 그래서 지금 말할 수 있는 것: 깨진 로컬 파일을 되살리는 데에는 쓸 수 있다. 동기화를 켠 채 「예전 데이터로 되돌리기」로 쓰면 서버의 이후 변경을 다시 받아 되돌림이 일부 풀릴 수 있다(확인 못 함). 기기 실측은 남은 일.
 
 검증: `StoreDailyBackupTests`(24시간 경계·백업 없으면 바로·진행 중 중복 거절·실패 뒤 다음 점검에서 다시·백그라운드 한 번), `StoreBackupTests`(판 기록 없는 저장소 = upgrade·빌드 바뀜 → 열기 전 upgrade·같은 판은 없음·daily 24시간·7개 유지와 끝나지 않은 백업 정리·같은 밀리초 순서·0700/0600과 저장 폴더 권한 그대로·첨부 캐시 제외·깨진 저장소 → 보존 폴더 + 앞의 정상 백업 복원 + 열림·백업이 못 쓰면 실패 그대로 + 파일 제자리·저장소 없으면 복구 안 함·검사는 통과하지만 열리지 않는 백업 건너뛰기·온라인 백업으로 복구(남은 -wal 없이)·열린 저장소 온라인 백업의 일관성과 열림·예약 복원·정리에도 남는 예약 대상·없는 예약 백업), `StoreSchemaTests`. Dev 실측은 docs/RELIABILITY.md 「저장소 백업·복구(TRK-46)」.
+
+## 기록 탭 (2026-10-02, TRK-47)
+
+설정 창(⌘,)은 탭 둘: 「사용량」(전과 같음), 「기록」. 기록 탭은 grouped Form 한 장에 위에서부터 남기는 것 · 어디에 · 백업 · 내보내기·지우기. 화면 `macOS/Settings/Records*`, 로직 `Shared/Store/RecordScope`·`RecordExport`·`RecordWipe`, `Shared/Instance/AppRelaunch`, 문구 `Shared/Format/RecordFormat`.
+
+### 저장 범위 표 (`RecordScope`)
+
+저장소의 저장 속성 전부(`WaypointStore.schema`, 관계 제외)와 이벤트 payload 키를 화면 항목으로 나눈다. 화면 문장은 이 표에서만 만든다. `RecordScopeTests`가 스키마 속성 목록과 표를 양쪽으로 맞추고(빠진 속성·없는 속성 모두 실패), 실제 생성 지점(훅 픽스처 전부·MCP 도구·`CardLifecycle`·`CardEditing`·`GuideLibrary`·샘플)이 만든 payload 키가 모두 표에 있는지, `Shared/`의 `Event.record(` 호출 수가 아는 목록과 같은지 본다.
+
+| 항목 | 남기는 것(코드에서 확인) | 보관 |
+|---|---|---|
+| 프로젝트 | 이름·키·폴더 경로·개요·스택·다음 카드 번호·만든/보관 시각 | 계속 |
+| 카드 | 제목·본문·종류·상태·완료 조건(글·체크)·만든 쪽·부모·시각, 세션 연결(붙은/떨어진 시각), 이벤트 `card.*`, 조건 체크 메모(`kind: criterion`) | 계속 |
+| 세션 | 도구·종류·에이전트 이름·작업 폴더·브랜치·시작/마지막/끝 시각·끝난 까닭·요청 시각(`lastPromptAt`, 요청 이벤트의 시각·`promptId`), `session.*`, 프로젝트 옮김(`kind: project.bound`) | 계속 |
+| 요청 문장 | `Session.lastPrompt`와 요청 이벤트의 `text`, 앞 300자 | 30일(`PromptRetention`) |
+| 바뀐 파일 | `file.changed`: 프로젝트 기준 경로·늘고 준 줄 수 | 계속 |
+| 커밋 | `commit`: 해시·메시지 첫 줄(커밋 출력의 `[branch hash] 메시지` 줄) | 계속 |
+| 검증 기록 | `check`: 명령(값 가림, 300자)·결과·출처·조건 번호와 글·짧은 설명(200자)·끝 코드 | 계속 |
+| 메모 | 카드 메모(`card_note`)·다음 세션 메모(`nextSessionNote`, `kind: handoff`). 에이전트가 도구로 남긴 글도 여기 든다 | 계속 |
+| 지침 문서 | 등록한 문서의 **내용 전체**·저장 안 한 편집·충돌 때 읽은 로컬 내용·이전 판(`GuideVersion`) | 계속 |
+
+- 남기지 않는 것: AI 답변, 대화 전체, 명령 출력(끝 코드·커밋 줄만 뽑고 버린다), 지침 문서가 아닌 파일의 내용(편집 원문·읽은 파일은 저장하지 않는다. outbox에는 앱이 켜질 때까지 요청 600자와 편집 크기만 잠시 머문다).
+- 내보내기에 넣지 않는 작동 상태 값(표의 `exported: false`): `Project.lastEventAt`, `Card.statusBeforeActive`, `Session`의 PID·블록 확인(`context*`)·상태 캐시·활동 상태·대기 중인 도구, `GuideDoc.contentHash`.
+- 어디에: 저장소 전부 = iCloud · 이 Mac과 iPhone(iCloud를 끈 실행은 「이 Mac」). 이 Mac에만: 기록 백업(`store-backups`), 지침 파일 백업(`guidance-backups`), 연결 설정 백업(`integration-backups`), 앱이 꺼진 동안 온 기록(`outbox.jsonl`), 연결 상태와 지표(`integration-health.json`·`metrics.json`), 사용량(`usage.json`).
+
+### 백업·복원
+
+- 「지금 백업」: 열린 저장소를 `manual`로 SQLite 온라인 백업(백그라운드). `StoreDailyBackup.runNow`로 daily와 같은 진행 중 표시를 써 겹치지 않는다.
+- 목록: `StoreBackup.list()` 최신순 한 줄 「시각 · 까닭 · 크기」. 까닭 `upgrade` 업데이트 전 · `daily` 매일 · `manual` 직접 · `beforeRestore` 복원 전 · `beforeDelete` 지우기 전. 「Finder에서 보기」.
+- 「복원…」 → 확인(다시 시작하며 되돌림, 지금 기록도 먼저 백업, iCloud가 그 뒤 바뀐 내용을 다시 받아 올 수 있음) → `scheduleRestore` → 다시 시작. 적용은 다음 실행의 열기 1단계(「저장소 백업·복구」).
+- 다시 시작(`AppRelaunch`): `/bin/sh -c`로 지금 PID가 끝나기를 0.2초 간격 최대 20초 기다린 뒤 `open -g <지금 번들 경로>`, 그다음 `NSApp.terminate`. 같은 번들 경로라 평소용·Dev가 저마다 자기만 다시 띄운다. `open`은 셸 환경을 넘기지 않아 `WAYPOINT_SUPPORT_DIR`·`WAYPOINT_PORT`·`WAYPOINT_CLOUDKIT`·`WAYPOINT_INTEGRATION_HOME`·`WAYPOINT_RELAUNCH_HIDDEN`을 `--env`로 넘긴다. 실행 인자는 넘기지 않는다. `WAYPOINT_RELAUNCH_HIDDEN=1`이면 `-j`.
+
+### 내보내기 형식 (`RecordExport`, formatVersion 1)
+
+UTF-8 JSON, 들여쓰고 키 정렬, 날짜는 ISO 8601 UTC 밀리초(`2026-10-02T04:31:31.224Z`). NSSavePanel, 이름 제안 `Waypoint-<키|전체>-<yyyy-MM-dd>.json`.
+
+```
+{ formatVersion: 1, exportedAt, app: { version, build, schemaVersion }, scope: "all" | "project",
+  projects: [ { id, key, name, summary, rootPath, stack, nextCardNumber, createdAt, archivedAt?,
+                cards: [ { id, displayID, number, title, body, kind, status, origin, originSessionId?, parent?(표시 ID),
+                           criteria: [{ text, isDone }], nextSessionNote?, createdAt, updatedAt, doneAt?,
+                           sessions: [{ sessionId?, attachedAt, detachedAt? }] } ],
+                sessions: [ { id, provider, kind, parent?, agentName?, cwd, gitBranch?, startedAt, lastSeenAt,
+                              endedAt?, endReason?, lastPrompt?, lastPromptAt? } ],
+                events: [ { id, at, type, card?(표시 ID), session?(세션 ID), payload?: { 키: 문자열|정수|참거짓 } } ],
+                guideDocs: [ { id, relPath, content, draft?, conflictContent?, isMissing, lastSyncedAt,
+                               versions: [{ at, source, content }] } ] } ],
+  unassigned?: { cards, sessions, events, guideDocs } }   // 전체만: 프로젝트에 붙지 않은 행
+```
+
+- 프로젝트 하나: 그 프로젝트의 카드·세션·이벤트·지침 문서만. 이벤트는 바뀌지 않는 `Event.project`로 가른다. `unassigned` 없음.
+- 형식의 이름·뜻을 바꾸면 `formatVersion`을 올린다. 필드 더하기는 그대로.
+
+### 모든 기록 지우기 (`RecordWipe`)
+
+- 확인 두 번: ① 「모든 기록을 지울까요?」 + 무엇이 지워지는지·백업은 남음·(iCloud가 켜져 있으면) iPhone에서도 지워짐 → 「계속」 ② 「프로젝트 N개 · 카드 M개를 지울까요?」 + 지우기 전 백업·다시 시작 → 「지우기」.
+- 순서: 저장 → `beforeDelete` 온라인 백업(`runNow`, 다른 백업이 도는 중이거나 실패하면 지우지 않음) → 7종 모델을 잎부터 한 행씩 `delete` 후 저장(일괄 삭제를 쓰지 않아 iCloud 미러링이 지운 것을 보낸다) → 다시 시작.
+- 건드리지 않는 것: 저장소 밖 파일(백업·지표·연결 설정)과 UserDefaults. 그래서 온보딩은 「끝」을 누른 적이 없을 때만 다시 뜬다(프로젝트 0개, 「온보딩」 진입 조건 그대로).
+
+### Debug 실행 인자
+
+`-WaypointSettingsTab records`(설정 창을 기록 탭으로 연다), `-WaypointSettingsScroll bottom`, `-WaypointExport <경로>`(+`-WaypointExportProject <키>`), `-WaypointBackupNow 1`, `-WaypointRestore <백업 폴더 이름|latest>`, `-WaypointWipe 1`. 버튼과 같은 `RecordsModel` 길을 대화상자 없이 탄다. 절차는 docs/DEVELOPMENT.md 「기록 탭 실측」.
+
+검증: `RecordScopeTests`(스키마 속성 ↔ 표 양방향, 생성 지점 payload 키, `Event.record(` 호출 목록, 30일 항목은 요청 문장뿐, 지침 문서 내용·판), `RecordExportTests`(전체 왕복 디코드·재인코드 바이트 같음, 프로젝트 하나에 다른 프로젝트 것 없음, 작동 상태 값 제외, 임시 저장소 지우기 → 7종 0개 + `beforeDelete` 백업이 먼저 생기고 지우기 전 내용을 담음, 백업 실패·진행 중이면 안 지움, 지금 백업과 daily의 겹침, 문구, 다시 시작 명령의 환경 변수 전달과 따옴표).
