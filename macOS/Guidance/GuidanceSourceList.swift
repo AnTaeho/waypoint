@@ -1,10 +1,12 @@
 import SwiftUI
 import WaypointKit
 
-/// 출처 목록. 기억 폴더는 접혀 있다.
+/// 출처 목록. 기억 폴더는 접혀 있다. 맨 아래 「지운 파일」은 사본만 남은 경로.
 struct GuidanceSourceList: View {
     let snapshot: GuidanceSnapshot
     let projects: [Project]
+    /// 사본은 있고 파일은 없는 경로(이름순)
+    var deleted: [String] = []
     @Binding var selection: String?
 
     var body: some View {
@@ -35,6 +37,22 @@ struct GuidanceSourceList: View {
                             Text(subtitle).font(Theme.monoSmall).foregroundStyle(Theme.textMuted)
                         }
                     }
+                }
+            }
+            if !deleted.isEmpty {
+                Section {
+                    ForEach(deleted, id: \.self) { path in
+                        Text(GuideFormat.displayPath(path))
+                            .font(Theme.Guidance.rowTitle)
+                            .foregroundStyle(Theme.textMuted)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .padding(.vertical, Theme.Spacing.xxs)
+                            .help(GuideFormat.displayPath(path))
+                            .tag(path)
+                    }
+                } header: {
+                    Text("지운 파일").font(Theme.tableHeader)
                 }
             }
         }

@@ -1,13 +1,18 @@
+import SwiftData
 import SwiftUI
 import WaypointKit
 
 /// 고른 출처의 내용: 위에 경로·사실·읽기/항목 한 줄, 아래 본문.
 /// 읽기는 Markdown이면 지침 문서 읽기 화면, 명령 규칙은 원문, Codex 기억은 항목 목록.
-/// 항목은 나눈 항목 목록(프로젝트 안 지침 파일만 고치기·지우기).
+/// 항목은 나눈 항목 목록(프로젝트 안 지침 파일은 지침 문서로, 프로젝트 밖 파일은 파일 그대로 고치기·지우기).
 struct GuidanceSourceDetail: View {
     let source: GuidanceSource
+    @Environment(\.guidanceFiles) private var files
+    @Query(filter: #Predicate<Session> { $0.endedAt == nil }) private var openSessions: [Session]
     @State private var content: Content = .loading
     @State private var showsItems = GuideLaunch.items
+    @State private var backups: [GuidanceBackupStore.Backup] = []
+    @State private var showsBackups = false
 
     enum Content: Equatable {
         case loading
@@ -18,50 +23,31 @@ struct GuidanceSourceDetail: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            GuidanceSourceHeader(
+                source: source, showsItems: $showsItems, notes: notes, backupCount: backups.count,
+                openBackups: { showsBackups = true }
+            )
             Divider().overlay(Theme.divider)
             bodyView
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         // 크기·수정 시각이 바뀌면(파일 변경) 다시 읽는다.
         .task(id: source) { await load() }
-    }
-
-    private var header: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { timeline in
-            HStack(spacing: Theme.Spacing.m) {
-                Text(GuideFormat.displayPath(source.path))
-                    .font(Theme.mono)
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                Spacer(minLength: Theme.Spacing.m)
-                Text(facts(now: timeline.date))
-                    .font(Theme.caption)
-                    .foregroundStyle(Theme.textMuted)
-                    .lineLimit(1)
-                    .fixedSize()
-                if GuidanceDocumentFormat(kind: source.kind) != nil {
-                    Picker("보기", selection: $showsItems) {
-                        Text("읽기").tag(false)
-                        Text("항목").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.pageH)
-            .frame(height: Theme.Size.rowHeight)
-            .background(Theme.bgPanel)
+        .sheet(isPresented: $showsBackups) {
+            GuidanceBackupSheet(path: source.path, backups: backups)
         }
     }
 
-    private func facts(now: Date) -> String {
-        let base = GuidanceFormat.facts(source)
-        guard let modified = source.modifiedAt else { return base }
-        return "\(base) · \(TimeFormat.relative(modified, now: now))"
+    /// 경로 오른쪽 사실 앞에 붙일 짧은 사실: 이 파일을 읽는 열린 세션 수, 규칙 검사를 Codex 없이 하는지.
+    private var notes: [String] {
+        guard GuidanceFileWrite.isWritable(kind: source.kind, path: source.path) else { return [] }
+        var notes: [String] = []
+        if let sessions = GuidanceOpenSessions.label(
+            for: source, count: GuidanceOpenSessions.count(for: source, sessions: openSessions)) {
+            notes.append(sessions)
+        }
+        if source.kind == .commandRules && files.codex == nil { notes.append("codex 없음 · 간단 검사") }
+        return notes
     }
 
     @ViewBuilder private var bodyView: some View {
@@ -88,11 +74,14 @@ struct GuidanceSourceDetail: View {
 
     private func load() async {
         let source = source
-        let loaded: Content = await Task.detached(priority: .userInitiated) {
-            if source.kind == .codexMemory { return .codex(CodexMemoryStore.read(path: source.path)) }
-            return GuidanceText.load(source.path).map(Content.text) ?? .unreadable
+        let store = GuidanceFileWrite.isWritable(kind: source.kind, path: source.path) ? files.backups : nil
+        let loaded: (Content, [GuidanceBackupStore.Backup]) = await Task.detached(priority: .userInitiated) {
+            let list = store?.backups(of: source.path) ?? []
+            if source.kind == .codexMemory { return (.codex(CodexMemoryStore.read(path: source.path)), list) }
+            return (GuidanceText.load(source.path).map(Content.text) ?? .unreadable, list)
         }.value
-        content = loaded
+        content = loaded.0
+        backups = loaded.1
     }
 }
 

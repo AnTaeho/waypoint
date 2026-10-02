@@ -14,6 +14,8 @@ extension Theme {
         static let entrySpacing: CGFloat = 12
         /// 인스펙터 「이 프로젝트에 걸린 지침」 줄 높이
         static let appliedRowHeight: CGFloat = 26
+        /// 「백업 N」 사본 목록 폭(TRK-41)
+        static let backupListWidth: CGFloat = 220
     }
     /// 지침 문서 항목 보기(TRK-40)
     enum GuideItems {
