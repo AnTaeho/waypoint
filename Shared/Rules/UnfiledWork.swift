@@ -23,14 +23,16 @@ public enum UnfiledWork {
 
     /// 이 프로젝트의 정리 안 된 작업, 최근 것부터. `SessionStart` 응답 안에서 불리므로(훅 타임아웃 1초) 질의를 이 프로젝트·
     /// 최근 14일로 묶고, 세션은 ID만 먼저 가져온 뒤 카드 없는 파일 변경이 있는 세션만 읽는다. 파일 목록(payload)은 `limit`개만 채운다.
-    public static func items(for project: Project, now: Date, limit: Int = .max) -> [Item] {
+    /// `excluding`: 지금 블록을 받는 세션(재개로 다시 열린 세션이 자기 자신을 보지 않게).
+    public static func items(for project: Project, now: Date, limit: Int = .max, excluding current: Session? = nil) -> [Item] {
         guard let context = project.modelContext else { return [] }
         let cutoff = now.addingTimeInterval(-window)
         let main = SessionKind.main.rawValue
         let projectID = project.id
-        let ended = Set((try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: #Predicate<Session> {
+        var ended = Set((try? context.fetchIdentifiers(FetchDescriptor<Session>(predicate: #Predicate<Session> {
             $0.kindRaw == main && $0.lastSeenAt >= cutoff && $0.endedAt != nil && $0.project?.id == projectID
         }))) ?? [])
+        if let current { ended.remove(current.persistentModelID) }
         guard !ended.isEmpty else { return [] }
         let raw = EventType.fileChanged.rawValue
         let events = (try? context.fetch(FetchDescriptor<Event>(predicate: #Predicate<Event> {
@@ -55,7 +57,8 @@ public enum UnfiledWork {
         guard !grouped.isEmpty else { return [] }
         let filed = filedSessionIDs(for: project)
         let found = grouped.compactMap { id, events -> (Session, [Event])? in
-            guard let session = context.model(for: id) as? Session, !filed.contains(session.id), !everAttached(session)
+            guard let session = context.model(for: id) as? Session, session.endedAt != nil,
+                  !filed.contains(session.id), !everAttached(session)
             else { return nil }
             return (session, events)
         }.sorted { $0.0.lastSeenAt > $1.0.lastSeenAt }

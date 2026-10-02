@@ -27,11 +27,16 @@ extension MCPTools {
         let session = try findEndedSession(try requiredString(args, "sessionId"))
         guard let project = session.project else { throw MCPToolError("프로젝트가 없는 세션") }
         guard !UnfiledWork.everAttached(session) else { throw MCPToolError("카드에 연결된 적 있는 세션: 정리할 것 없음") }
-        guard !UnfiledWork.filedSessionIDs(for: project).contains(session.id) else {
+        // 넘긴 세션은 나중에 카드에 이을 수 있다. 이은 세션은 다시 처리하지 않는다.
+        let outcomes = ProjectStatus.fetch(.sessionFiled, in: context)
+            .filter { $0.payloadValues["sessionId"]?.stringValue == session.id }
+            .compactMap { $0.payloadValues["outcome"]?.stringValue }
+        let cardID = optionalString(args, "cardId")
+        guard !outcomes.contains("filed"), outcomes.isEmpty || cardID != nil else {
             throw MCPToolError("이미 정리한 세션: \(UnfiledWork.shortID(session))")
         }
         let date = now()
-        guard let cardID = optionalString(args, "cardId") else {
+        guard let cardID else {
             Event.record(.sessionFiled, in: context, project: project, session: session, at: date,
                          payload: ["sessionId": .string(session.id), "outcome": .string("dismissed")])
             return ["sessionId": .string(session.id), "outcome": "dismissed"]

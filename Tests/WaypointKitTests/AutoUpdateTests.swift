@@ -93,6 +93,18 @@ private func send(_ h: HookHarness, _ name: String, session: String, at date: Da
         #expect(card.status == .next)
     }
 
+    /// 끝난 세션이 재개로 다시 열리면 그 세션의 블록에 자기 자신을 넣지 않는다.
+    @Test func resumedSessionDoesNotListItself() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-PostToolUse-Edit", at: t0 + 10)
+        try h.send("doc-SessionEnd", at: t0 + 20)
+        try h.context.save()
+        let resumed = try #require(try h.send("doc-SessionStart", at: t0 + 600))
+        #expect(!resumed.contains("정리 안 된 작업"))
+        #expect(try h.session()?.endedAt == nil)
+    }
+
     @Test func noSectionWithoutUnfiledWork() throws {
         let h = try HookHarness()
         let text = try #require(try h.send("doc-SessionStart", at: t0))
@@ -194,6 +206,13 @@ private func send(_ h: HookHarness, _ name: String, session: String, at date: Da
         #expect((s.events ?? []).filter { $0.type == .fileChanged }.allSatisfy { $0.card == nil })
         #expect(UnfiledWork.items(for: p, now: t0 + 60).isEmpty)
         #expect(throws: MCPToolError.self) { try tools(ctx, at: t0 + 70).call("work_file", ["sessionId": "abcdef12-0000"]) }
+        // 넘긴 세션도 나중에 카드에 이을 수 있고, 이은 뒤에는 다시 처리하지 않는다
+        p.makeCard(in: ctx, title: "카드", at: t0)
+        let filed = try tools(ctx, at: t0 + 80).call("work_file", ["sessionId": "abcdef12-0000", "cardId": "LDG-1"])
+        #expect(filed["outcome"] == "filed")
+        #expect(throws: MCPToolError.self) {
+            try tools(ctx, at: t0 + 90).call("work_file", ["sessionId": "abcdef12-0000", "cardId": "LDG-1"])
+        }
     }
 
     @Test func fileMovesFilesCommitsChecksOnly() throws {

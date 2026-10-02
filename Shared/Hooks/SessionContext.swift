@@ -62,7 +62,7 @@ public enum SessionContext {
             lines += note.split(separator: "\n", omittingEmptySubsequences: true).map { "  \($0)" }
         }
 
-        let unfiled = UnfiledWork.items(for: project, now: now, limit: UnfiledWork.blockLimit)
+        let unfiled = UnfiledWork.items(for: project, now: now, limit: UnfiledWork.blockLimit, excluding: session)
         if !unfiled.isEmpty {
             lines.append("정리 안 된 작업:")
             lines += unfiled.prefix(UnfiledWork.blockLimit).map { UnfiledWork.line($0, now: now) }
