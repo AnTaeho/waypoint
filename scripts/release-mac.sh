@@ -79,6 +79,7 @@ fi
 icloud_setting() { [ "$1" = 1 ] && echo YES || echo NO; }
 icloud_label() { [ "$1" = YES ] && echo 켬 || echo 끔; }
 ICLOUD_SETTING="$(icloud_setting "$icloud")"
+ICLOUD_EXPECTED="$ICLOUD_SETTING"   # 서명 검증이 앱 Info.plist에서 기대하는 원래 값(이어 하기는 아카이브 값, 비어 있을 수 있음)
 
 # ── 점검 항목. 각각 0(됨)/1(안 됨)을 돌려주고, 안 될 때 사람이 할 일을 FIX에 남긴다 ─────────────
 FIX=""
@@ -234,7 +235,7 @@ verify_signature() {
   local icloud_value
   icloud_value="$(/usr/libexec/PlistBuddy -c 'Print :WaypointICloud' "$app/Contents/Info.plist" 2>/dev/null)"
   echo "  Info.plist WaypointICloud: ${icloud_value:-(없음)}"
-  [ "$icloud_value" = "$ICLOUD_SETTING" ] || fail "Info.plist WaypointICloud가 ${icloud_value:-(없음)}(예상 $ICLOUD_SETTING, $app)"
+  [ "$icloud_value" = "$ICLOUD_EXPECTED" ] || fail "Info.plist WaypointICloud가 ${icloud_value:-(없음)}(예상 ${ICLOUD_EXPECTED:-(없음)}, $app)"
   codesign --verify --deep --strict --verbose=2 "$app" > "$WORK/codesign-verify.txt" 2>&1 \
     || fail "codesign --verify 실패($app): $(tail -3 "$WORK/codesign-verify.txt" | tr '\n' ' ')"
   codesign -dv --verbose=4 "$app" > "$WORK/codesign-info.txt" 2>&1
@@ -310,8 +311,9 @@ if [ "$resume" = 1 ]; then
   BUILD="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' "$props" 2>/dev/null)"
   [ -n "$VERSION" ] && [ -n "$BUILD" ] || usage_error "--resume-notarize: 아카이브 Info.plist에서 버전·빌드를 읽지 못함: $props"
   # iCloud 스위치는 아카이브 안 앱의 Info.plist에서. 키가 없으면(이 스위치 전 아카이브) 앱이 켬으로 돈다.
-  ICLOUD_SETTING="$(/usr/libexec/PlistBuddy -c 'Print :WaypointICloud' "$ARCHIVE/Products/Applications/Waypoint.app/Contents/Info.plist" 2>/dev/null)"
-  [ "$ICLOUD_SETTING" = NO ] || ICLOUD_SETTING=YES
+  ICLOUD_EXPECTED="$(/usr/libexec/PlistBuddy -c 'Print :WaypointICloud' "$ARCHIVE/Products/Applications/Waypoint.app/Contents/Info.plist" 2>/dev/null)"
+  ICLOUD_SETTING=YES
+  [ "$ICLOUD_EXPECTED" = NO ] && ICLOUD_SETTING=NO
   idx="$(last_upload_index "$ARCHIVE")" || usage_error "--resume-notarize: 이 아카이브에 공증 제출(upload) 기록이 없음: $ARCHIVE"
   submitted_iso="$(/usr/libexec/PlistBuddy -c "Print :Distributions:$idx:uploadEvent:date" "$props" 2>/dev/null)"
   SUBMIT_EPOCH="$(iso_epoch "$submitted_iso")"
