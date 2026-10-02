@@ -13,6 +13,7 @@ PORT=47821
 CONTAINER="iCloud.dev.antaeho.waypoint"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/build-failure-report.sh"
+source "$ROOT/scripts/build-version.sh"
 DERIVED="$ROOT/.build/release"
 BUILT="$DERIVED/Build/Products/Release/Waypoint.app"
 DEST_DIR="${WAYPOINT_INSTALL_DIR:-/Applications}"
@@ -31,12 +32,14 @@ listen_pid() { lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1; }
 
 # 1. 빌드. CloudKit·푸시 엔타이틀먼트는 프로파일이 있어야 해서 팀 서명(project.yml)으로 빌드한다.
 #    `-allowProvisioningUpdates`: 프로파일이 없거나 만료됐으면 Xcode 계정으로 새로 받는다.
+#    빌드 번호는 커밋 수(build-version.sh). 번호가 바뀌어야 새 앱이 첫 실행 때 저장소를 백업한다.
 if [ "${WAYPOINT_SKIP_BUILD:-0}" != "1" ]; then
-  step "Release 빌드"
+  build_number="$(waypoint_build_number "$ROOT")" || fail "빌드 번호를 정하지 못함"
+  step "Release 빌드(빌드 번호 $build_number)"
   log="$DERIVED/install-build.log"
   mkdir -p "$DERIVED"
   if ! xcodebuild -project "$ROOT/Waypoint.xcodeproj" -scheme Waypoint -configuration Release \
-      -destination 'platform=macOS' -derivedDataPath "$DERIVED" -allowProvisioningUpdates build > "$log" 2>&1; then
+      -destination 'platform=macOS' -derivedDataPath "$DERIVED" -allowProvisioningUpdates CURRENT_PROJECT_VERSION="$build_number" build > "$log" 2>&1; then
     report_build_failure "$log"
     fail "빌드 실패(전체 로그: $log)"
   fi
@@ -106,4 +109,5 @@ else
 fi
 
 version="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$DEST/Contents/Info.plist" 2>/dev/null)"
-echo "Waypoint $version 설치됨: $DEST · PID $pid · 127.0.0.1:$PORT LISTEN · 로그인 항목 $login"
+build="$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$DEST/Contents/Info.plist" 2>/dev/null)"
+echo "Waypoint $version ($build) 설치됨: $DEST · PID $pid · 127.0.0.1:$PORT LISTEN · 로그인 항목 $login"

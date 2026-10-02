@@ -5,3 +5,4 @@ DerivedData/
 .DS_Store
 *.xcuserstate
 __pycache__/
+dist/
