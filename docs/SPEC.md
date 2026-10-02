@@ -138,6 +138,22 @@ CloudKit(M6) 호환을 위해 처음부터 다음을 지킨다: `@Attribute(.uni
 - 도구 필터(진행 작업의 전체/Claude/Codex): 진행 중 줄과 작업중 점을 그 도구 세션으로만 본다. 프로젝트는 숨기지 않는다.
 - 다시 계산: 대시보드와 함께(`LiveDataTimeline`, 저장·훅 직후와 5초마다). 지금 상황은 `project.status` 이벤트를 한 번만 읽는다(`ProjectStatus.latestEntries`). 실제 저장소 사본(프로젝트 4·세션 114·이벤트 6118)에서 상황판 전체 11–25 ms(기계 부하 평균 17에서 잼).
 
+### 같은 파일 작업 중 (`WorkOverlap`, TRK-17)
+
+같은 프로젝트에서 동시에 도는 작업(메인·서브에이전트, Claude·Codex)이 같은 파일을 만지고 있음을 사람과 에이전트에게 알려 덮어쓰기를 미리 막는다. 실제 git 충돌을 뜻하지 않으므로 화면은 「충돌」이라 쓰지 않는다. 모델 필드는 늘리지 않는다.
+
+- `file.changed` payload `checkout`(TRK-17부터): 바뀐 파일의 git 작업 트리 최상위 절대 경로. 파일 폴더부터 위로 올라가며 `.git`(폴더·파일 모두)이 있는 첫 폴더(`GitInfo.checkoutRoot`, git 명령을 부르지 않는다). worktree·하위 모듈은 `.git`이 파일이라 따로 잡힌다. git 밖이면 키가 없다.
+- `path`는 그 파일이 속한 가장 가까운 등록 프로젝트의 `rootPath` 기준 상대 경로다(세션 `cwd`·git 최상위는 쓰지 않는다). 등록 폴더 안의 worktree(`.claude/worktrees/x/…`)는 `path`부터 다르고, 등록 폴더 밖 worktree의 파일은 기록되지 않는다(아래 누락).
+- 작업 단위: 메인 세션과 그 서브에이전트(뿌리 메인 세션). 같은 단위끼리는 겹침이 아니다.
+- 겹침: 같은 프로젝트에서 끝나지 않은(뿌리 메인 세션이 `endedAt` 없고 `SessionRules.state`가 ended 아님 — 대시보드 작업중 줄과 같은 기준) 단위 둘 이상이 같은 `checkout`의 같은 `path`를 각자 최근 60분(`WorkOverlap.window`, 경계 포함) 안에 바꿨다. 단위가 살아 있으면 끝난 서브에이전트의 변경도 단위 것으로 센다. 카드마다 한 건씩 남은 같은 변경은 하나로 센다.
+- 누락(경고하지 않는 쪽): `checkout`이 없는 기록(TRK-17 전 기록, git 밖 파일)은 판정에서 뺀다. 한쪽만 있어도 겹침이 아니다.
+- 메인 세션 줄은 단위 전체의 변경으로, 서브에이전트 줄은 그 세션의 변경으로 본다. 상대 이름은 상대 단위가 붙은 첫 카드 ID, 카드가 없으면 세션 표시(`sess·1a2b`, Codex는 `Codex · sess·…`).
+- 질의: 이 프로젝트·최근 60분의 `file.changed`만(`WorkOverlap.index`). 대시보드는 프로젝트마다 한 번 만든다(`byRow`). 실제 저장소 사본(프로젝트 4·세션 115·이벤트 6150) 5 ms, Dev 저장소 사본(세션 1620·최근 1시간 변경 수천 건) 20 ms.
+
+화면(문구에 「충돌」·만든 쪽 용어를 쓰지 않는다, 색은 `Theme.Overlap` — 작업중 강조색):
+- 대시보드 진행 작업 타일, 카드 인스펙터 「지금 연결된 세션」 상자: `같은 파일 N개 · PRB-3`(상대가 여럿이면 `… · PRB-3 외 1`, N은 합집합). 누르면 상대마다 `카드 제목 · 도구 세션`과 파일(상대마다 12개, 넘으면 `외 N개`). 마우스를 올리면 파일 목록.
+- 상황판 진행 중 줄: 도구 앞에 `같은 파일 N`(그 카드에 붙은 세션들의 겹친 파일 합집합).
+
 ### 완료 조건 근거 상태 (`CardEvidence`, 순수 함수)
 
 - 조건마다 통과·실패·건너뜀·미검증 + 출처·시각·명령. 근거가 없으면 미검증. 완료 조건이 없는 카드는 표시하지 않는다(기존 카드 그대로 동작).
@@ -218,7 +234,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 다음 할 일:
 - PRB-1 실측용 카드
 다른 세션에서 작업중:
-- PRB-4 파서 (sess·a1b2)
+- PRB-4 파서 (sess·a1b2, 응답 진행 중) · 최근 파일: Parser.swift, Lexer.swift
 직전 세션 메모 (PRB-1 실측용 카드):
   note.txt에 hello 추가함. 볼 파일: note.txt
 정리 안 된 작업:
@@ -229,7 +245,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - 1줄: `Waypoint: <키> (<이름>)`, 2줄: `sessionId: <Claude Code session_id>`. 마지막 줄은 스킬 안내(고정 문구).
 - 지금 상황: 최신 `project.status`가 있으면 `지금 상황 (<상대 시각>, <도구 이름>[, 오래됨]):`과 두 칸 들여쓴 글 줄. 상대 시각은 `TimeFormat.relative`, 7일보다 오래되면 `오래됨`. 없으면 제목째 뺀다.
 - 다음 할 일: status next, 번호순 상위 5개. 없으면 제목째 뺀다.
-- 다른 세션에서 작업중: 대시보드 작업중 줄 중 이 세션·이 세션의 서브에이전트가 아닌 카드 줄(카드 없는 세션 줄은 뺀다). 멈춘 세션은 `, 멈춤`.
+- 다른 세션에서 작업중: 대시보드 작업중 줄 중 이 세션·이 세션의 서브에이전트가 아닌 카드 줄(카드 없는 세션 줄은 뺀다). 괄호 안은 세션 표시와 활동 상태. 그 세션(메인이면 서브에이전트 포함)이 최근 60분 안에 바꾼 파일이 있으면 ` · 최근 파일: <최근 것부터 최대 3개>`(TRK-17, 체크아웃을 몰라도 붙인다 — 새 세션이 같은 파일을 피하게).
 - 직전 세션 메모: 다음 세션 메모가 있고 done·archived가 아닌 카드 중 **가장 최근에 `card_handoff`한 카드 하나**(handoff 기록 시각, 없으면 `updatedAt`). 메모 줄은 두 칸 들여쓴다.
 - 정리 안 된 작업(4장): 블록을 받는 세션 자신은 뺀다(재개). 최대 3개, 줄마다 `- <마지막 활동 시각> · <도구 이름> · 파일 <N>개: <많이 바뀐 파일 최대 3개>[ 외 M] · <짧은 세션 ID>`. 짧은 ID는 원본 ID 앞 8자(Codex는 `codex:` + 8자), `work_file`이 앞부분 일치로 받는다. 3개를 넘으면 `- 외 K개`. 없으면 제목째 뺀다.
 - 속도: `SessionStart` 응답 안에서 만든다(훅 타임아웃 1초). 상황은 `project.status` 이벤트만, 정리 안 된 작업은 이 프로젝트·최근 14일의 끝난 메인 세션 ID(객체를 읽지 않는 `fetchIdentifiers`)와 카드 없는 `file.changed`만 질의하고, 파일 목록은 보일 3개만 읽는다. 측정은 9장 뒤 「자동 갱신 지표」.
@@ -405,6 +421,11 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `card_evidence` | **`id`**, `criterion`, **`command`**, **`outcome`**, `detail`, `sessionId` | 에이전트 보고 근거 `check`(`source: agent`). `criterion`은 **1부터**(card_get `criteria` 순서, 저장은 0부터 + 조건 글), 빼면 카드 수준. 범위 밖·조건 없는 카드에 번호·정수 아님은 오류. `outcome`은 `pass`·`fail`·`skipped`(일부러 건너뛴 경우만). `detail` 200자. 결과 `{id, outcome, source, criterion?, state?, confirmed?}`(`confirmed`: 훅 기록과 짝지어져 「확인됨」인지) |
 
 `criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
+
+**`overlaps`(TRK-17)**: `card_start`·`card_update`·`card_note`·`card_handoff`·`card_evidence`·`project_status` 결과가 객체이고 알릴 같은 파일 작업 중(4장)이 있으면 붙는다. 훅 출력은 늘리지 않는다.
+- 누구의 눈으로: `sessionId`를 주면 그 세션, 아니면 카드에 붙은 끝나지 않은 세션(`project_status`는 `sessionId`가 있을 때만). 메인과 그 서브에이전트가 같이 있으면 메인만.
+- 항목 `{sessionId: 상대 메인 세션 짧은 ID(앞 8자, Codex는 codex:), provider, cards?: 상대가 붙은 카드 ID, files: 최근 것부터 최대 5, fileCount}`.
+- 빈도: `<내 세션>|<상대 메인 세션>`마다 이미 알린 파일을 앱 메모리에 둔다. 지금 겹친 파일이 모두 알린 것이면 붙이지 않고, 새 파일이 끼면 그 상대의 전체 목록을 다시 붙인다. 앱을 다시 켜면 처음부터 센다. 없으면 키째 없다.
 
 `sessionId`는 `SessionStart` 훅이 주입한 블록의 `sessionId:` 줄에서 Claude가 읽어 전달한다.
 
@@ -770,7 +791,7 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 | 카드 | 제목·본문·종류·상태·완료 조건(글·체크)·만든 쪽·부모·시각, 세션 연결(붙은/떨어진 시각), 이벤트 `card.*`, 조건 체크 메모(`kind: criterion`), 정리 안 된 작업 처리(`session.filed`: 세션 ID·결과·카드 ID·파일·옮긴 수) | 계속 |
 | 세션 | 도구·종류·에이전트 이름·작업 폴더·브랜치·시작/마지막/끝 시각·끝난 까닭·요청 시각(`lastPromptAt`, 요청 이벤트의 시각·`promptId`), `session.*`, 프로젝트 옮김(`kind: project.bound`) | 계속 |
 | 요청 문장 | `Session.lastPrompt`와 요청 이벤트의 `text`, 앞 300자 | 30일(`PromptRetention`) |
-| 바뀐 파일 | `file.changed`: 프로젝트 기준 경로·늘고 준 줄 수 | 계속 |
+| 바뀐 파일 | `file.changed`: 프로젝트 기준 경로·저장소 폴더(`checkout`)·늘고 준 줄 수 | 계속 |
 | 커밋 | `commit`: 해시·메시지 첫 줄(커밋 출력의 `[branch hash] 메시지` 줄) | 계속 |
 | 검증 기록 | `check`: 명령(값 가림, 300자)·결과·출처·조건 번호와 글·짧은 설명(200자)·끝 코드 | 계속 |
 | 메모 | 카드 메모(`card_note`)·다음 세션 메모(`nextSessionNote`, `kind: handoff`)·프로젝트 지금 상황(`project.status`: 글·도구·세션 ID). 에이전트가 도구로 남긴 글도 여기 든다 | 계속 |
