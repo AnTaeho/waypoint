@@ -38,6 +38,17 @@ public enum ProjectStatus {
         events(for: project).max { $0.at < $1.at }.flatMap(entry)
     }
 
+    /// 프로젝트별 최신 상황. `project.status` 이벤트를 한 번만 가져온다(상황판처럼 여러 프로젝트를 한꺼번에 볼 때).
+    public static func latestEntries(in context: ModelContext) -> [UUID: Entry] {
+        var newest: [UUID: Event] = [:]
+        for event in fetch(.projectStatus, in: context) {
+            guard let id = event.project?.id else { continue }
+            if let old = newest[id], old.at >= event.at { continue }
+            newest[id] = event
+        }
+        return newest.compactMapValues(entry)
+    }
+
     /// 프로젝트별 최신 상황 시각(지표용).
     public static func latestDates(in context: ModelContext) -> [UUID: Date] {
         var result: [UUID: Date] = [:]

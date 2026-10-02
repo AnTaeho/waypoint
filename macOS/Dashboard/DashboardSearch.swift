@@ -39,7 +39,16 @@ enum DashboardSearch {
         }
     }
 
-    /// 프로젝트 표: 이름·키가 맞거나, 맞는 카드(보관 제외)가 하나라도 있는 프로젝트.
+    /// 상황판 타일의 카드 거르기: 프로젝트 이름·키가 맞으면 거르지 않고(nil), 아니면 맞는 카드만 남긴다.
+    /// 작업중 줄의 검색(`sections`)과 같은 규칙이다.
+    static func cardFilter(_ query: String?) -> (Project) -> ((Card) -> Bool)? {
+        { project in
+            guard let query, !matches(project, query) else { return nil }
+            return { matches($0, query) }
+        }
+    }
+
+    /// 상황판 타일: 이름·키가 맞거나, 맞는 카드(보관 제외)가 하나라도 있는 프로젝트.
     static func filter(_ projects: [Project], query: String?) -> [Project] {
         guard let query else { return projects }
         return projects.filter { project in

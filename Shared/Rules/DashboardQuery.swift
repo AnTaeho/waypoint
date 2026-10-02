@@ -85,7 +85,8 @@ public enum DashboardQuery {
         }
 
         var pending: [Pending] = []
-        for session in project.sessions ?? [] {
+        // 끝난 세션은 줄이 되지 않는다. 상태 판정(끝난 까닭을 이벤트에서 찾을 수 있다)을 건너뛴다.
+        for session in project.sessions ?? [] where session.endedAt == nil {
             let state = SessionRules.state(of: session, now: now, stallTimeout: stallTimeout)
             let work: CardWorkState
             switch state {
@@ -167,16 +168,21 @@ public enum DashboardQuery {
             case .ended: break
             }
         }
-        // 이벤트는 훅마다 쌓이므로 전체를 읽지 않고 `lastEventAt` 캐시를 쓴다.
-        let times: [Date] = [project.lastEventAt].compactMap { $0 }
-            + (project.sessions ?? []).map(\.lastSeenAt)
-            + cards.map(\.updatedAt)
         return ProjectSummary(
             liveCount: live,
             stalledCount: stalled,
             nextCount: next,
             ideaCount: idea,
-            lastActivityAt: times.max()
+            lastActivityAt: lastActivityAt(of: project)
         )
+    }
+
+    /// 이벤트·세션 활동·카드 수정 중 가장 늦은 시각. 아무것도 없으면 nil.
+    /// 이벤트는 훅마다 쌓이므로 전체를 읽지 않고 `lastEventAt` 캐시를 쓴다.
+    public static func lastActivityAt(of project: Project) -> Date? {
+        let times: [Date] = [project.lastEventAt].compactMap { $0 }
+            + (project.sessions ?? []).map(\.lastSeenAt)
+            + (project.cards ?? []).map(\.updatedAt)
+        return times.max()
     }
 }
