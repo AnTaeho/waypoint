@@ -32,7 +32,9 @@ Waypoint로 다른 저장소의 세션을 늘 추적하면서 Waypoint 자체도
 scripts/install-local.sh
 ```
 
-Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 뒤에서 실행(`open -g`, 쓰던 창의 초점을 뺏지 않는다) → 47821을 설치한 앱이 여는지 확인 → 로그인 항목이 없으면 System Events로 추가. 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
+Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`, 빌드 번호 = 커밋 수) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 뒤에서 실행(`open -g`, 쓰던 창의 초점을 뺏지 않는다) → 47821을 설치한 앱이 여는지 확인 → 로그인 항목이 없으면 System Events로 추가. 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
+
+외부 베타용 배포 빌드(Developer ID·공증)는 [`docs/RELEASE.md`](RELEASE.md), `scripts/release-mac.sh`.
 
 앱이 꺼져 있는 동안 온 훅은 `outbox.jsonl`에 쌓였다가 새 앱이 켜질 때 흡수된다.
 
