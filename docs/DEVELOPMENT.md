@@ -114,13 +114,37 @@ open -g -j --env WAYPOINT_INTEGRATION_HOME=$P/home --env WAYPOINT_SUPPORT_DIR=$P
 osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 ```
 
-- `-WaypointOnboarding <단계>`: 그 단계로 연다. 앞 단계가 막혀 있으면 그 단계가 보인다. `apply`는 연결 계획을 바로 적용하며 `WAYPOINT_INTEGRATION_HOME`이 없으면 적용하지 않는다.
+- `-WaypointOnboarding <단계>`: 그 단계로 연다. 앞 단계가 막혀 있으면 그 단계가 보인다. `apply`는 연결 계획을 바로 적용하며 `WAYPOINT_INTEGRATION_HOME`이 없으면 적용하지 않는다. `-WaypointOnboardingFolder`와 함께 주면 적용 뒤 첫 기록 단계로 넘어간다.
 - `-WaypointOnboardingFolder <경로>`: 프로젝트 단계에서 그 폴더를 고른 것으로 본다. 등록 안 된 폴더면 확인 창 없이 등록한다(확인용 저장 폴더에서만 쓴다).
 - 첫 기록 확인: 임시 홈 `.claude/settings.json`의 `SessionStart` 명령을 `HOME=$P/home`으로, `Tests/Fixtures/hooks/doc-SessionStart.json`의 `cwd`를 등록한 폴더로 바꿔 stdin에 넣어 돌린다.
 - 화면은 `screencapture -x -o -l <창 번호>`로 시트 창 하나만 찍는다(창 번호는 `CGWindowListCopyWindowInfo`로, 폭 640인 창). `-j`로 숨긴 채 띄워도 찍힌다.
 - 끝 화면의 「끝」을 누르면 Dev의 UserDefaults에 `onboarding.completed`가 남는다. 다시 보려면 `defaults delete dev.antaeho.waypoint.dev onboarding.completed`.
+- 첫 연결 지표(`metrics.json`의 `onboarding`)는 `curl -s 127.0.0.1:47822/integration/status | jq .metrics.onboarding`으로 본다(파일은 10초 점검 때 쓴다).
 - `scripts/install-codex.py`·`dev-probe-setup.sh`는 개발용으로 남는다. Codex 쪽은 앱 설치기와 같은 파일을 쓴다(`CodexInstallerTests`).
 - 이 Mac의 실제 설치를 그대로 인식하는지는 `RealInstallStateTests`가 실제 설정을 임시 홈에 복사(읽기만)해 빈 계획인지 본다.
+
+### 깨끗한 환경 첫 설정 (TRK-45)
+
+설정이 하나도 없는 홈에서 첫 설정과 실제 수신을 잰다. 결과는 `docs/RELIABILITY.md` 같은 이름 절.
+
+```sh
+P=<스크래치>/clean; mkdir -p $P/home $P/support $P/app
+open -g -j --env WAYPOINT_INTEGRATION_HOME=$P/home --env WAYPOINT_SUPPORT_DIR=$P/support $APP \
+  --args -WaypointOnboarding apply -WaypointOnboardingFolder $P/app
+curl -s 127.0.0.1:47822/integration/status | jq .metrics.onboarding   # installed·projectAt 확인
+cd $P/app
+env -i HOME=$P/home PATH=$HOME/.local/bin:/usr/bin:/bin:/opt/homebrew/bin TERM=xterm \
+  claude -p "ok" --model haiku --debug                               # 한 번만
+env -i HOME=$P/home CODEX_HOME=$P/home/.codex PATH=/opt/homebrew/bin:/usr/bin:/bin TERM=xterm \
+  codex exec --skip-git-repo-check "ok" < /dev/null                  # 한 번만
+curl -s 127.0.0.1:47822/integration/status | jq '.history.hooks, .metrics.onboarding'
+osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
+```
+
+- `env -i`로 띄운다. Claude Code 안에서 돌리면 `CLAUDECODE`·메시징 소켓 변수가 따라가 지금 세션으로 섞인다.
+- 임시 홈에는 로그인 정보가 없어 Claude는 훅·MCP까지만 돌고 모델 호출에서 「Not logged in」, Codex는 `401`로 끝난다. 실제 대화까지 보려면 사람이 임시 홈에서 로그인하고, Codex는 대화형 `/hooks`에서 신뢰한다. 실제 홈의 인증 파일을 복사하지 않는다.
+- 끝나면 실제 홈 설정(`~/.claude/settings.json`·`~/.codex/config.toml`·`hooks.json`·`~/.agents`)의 수정 시각·해시와 `~/.claude.json`의 `mcpServers`가 그대로인지 본다(`~/.claude.json` 전체는 돌고 있는 Claude Code가 늘 고쳐 쓴다).
+- macOS에는 `timeout`이 없다. 시간 제한은 `perl -e 'alarm 150; exec @ARGV' …`.
 
 ## 실측 폴더
 
