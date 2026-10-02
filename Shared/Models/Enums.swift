@@ -47,6 +47,11 @@ public enum EventType: String, Codable, Sendable, CaseIterable {
     case guideSynced = "guide.synced"
     /// 검증 근거(명령·결과·출처). payload는 `CheckRecord`.
     case check = "check"
+    /// 프로젝트 지금 상황(TRK-63, `project_status`). payload `summary`·`provider`·`sessionId`. 최신 것이 현재 상황.
+    /// 옛 앱은 모르는 종류를 `note`로 읽으므로 `text` 키를 두지 않는다(옛 앱에 메모로 보이지 않게).
+    case projectStatus = "project.status"
+    /// 정리 안 된 작업 처리(TRK-62, `work_file`). payload `sessionId`·`outcome`(filed·dismissed)·`cardId`·`moved`.
+    case sessionFiled = "session.filed"
 }
 
 public enum GuideSource: String, Codable, Sendable, CaseIterable {

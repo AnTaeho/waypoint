@@ -6,6 +6,7 @@ struct IntegrationHealthPanel: View {
     let services: AppServices
     @Query(filter: #Predicate<Session> { $0.endedAt == nil && $0.kindRaw == "main" }) private var sessions: [Session]
     @Environment(\.dismiss) private var dismiss
+    @State private var coverage: [String] = []
     var body: some View {
         LiveDataTimeline { now in
             ScrollView {
@@ -33,7 +34,7 @@ struct IntegrationHealthPanel: View {
                             connectedProjects: Array(Set(sessions.filter { $0.provider == provider && $0.project?.archivedAt == nil }
                                 .compactMap { $0.project.map { "\($0.name) (\($0.key))" } })).sorted())
                     }
-                    ReliabilityMetricsSection(metrics: services.reliability.metrics)
+                    ReliabilityMetricsSection(metrics: services.reliability.metrics, coverage: coverage)
                     VStack(alignment: .leading, spacing: Theme.Spacing.s) {
                         Text("미처리 기록 · \(services.integration.queue.count)건").font(Theme.bodyMedium)
                         if services.integration.queue.unreadable { Text("기록 폴더 읽기 실패") }
@@ -61,6 +62,7 @@ struct IntegrationHealthPanel: View {
             }
             .frame(width: Theme.Integration.panelWidth, height: Theme.Integration.panelMaxHeight)
             .background(Theme.bg)
+            .task { coverage = services.trackingCoverage().panelLines() }
         }
     }
 

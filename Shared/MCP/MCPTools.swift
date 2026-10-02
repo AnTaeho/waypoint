@@ -44,6 +44,8 @@ public final class MCPTools {
         case "card_note": return try cardNote(args)
         case "card_handoff": return try cardHandoff(args)
         case "card_evidence": return try cardEvidence(args)
+        case "project_status": return try projectStatus(args)
+        case "work_file": return try workFile(args)
         default: throw MCPToolError("알 수 없는 도구: \(name)")
         }
     }
@@ -169,8 +171,10 @@ public final class MCPTools {
             card.updatedAt = date
         }
         if args["criteria"] != nil {
+            let old = card.criteria
             card.criteria = try criteria(args)
             card.updatedAt = date
+            CardEditing.recordCriteriaChanges(card, from: old, at: date, in: context)
         }
         if let status = try optionalStatus(args, "status") {
             guard status != .active else { throw MCPToolError("active는 card_start로만") }

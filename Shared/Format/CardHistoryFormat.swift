@@ -82,7 +82,10 @@ public enum CardHistoryFormat {
         case .check:
             guard let record = CheckRecord(event: event) else { return nil }
             return make(.neutral, EvidenceFormat.historyText(record), code: EvidenceFormat.shortCommand(record.command))
-        case .sessionStart, .sessionEnd, .guideSynced:
+        case .sessionFiled:
+            let files = p["files"]?.intValue ?? 0
+            return make(.neutral, files > 0 ? "이전 세션 작업 연결 · 파일 \(files)개" : "이전 세션 작업 연결")
+        case .sessionStart, .sessionEnd, .guideSynced, .projectStatus:
             return nil
         }
     }

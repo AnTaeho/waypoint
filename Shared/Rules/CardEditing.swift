@@ -26,6 +26,20 @@ public enum CardEditing {
         ])
         return true
     }
+    /// `card_update`로 완료 조건을 통째로 바꿨을 때: 체크가 바뀐 조건(같은 글의 체크 변경, 체크된 채 새로 생긴 조건)마다
+    /// `setCriterion`과 같은 `note` 이벤트를 남긴다. 기록과 메모 갱신률(`TrackingCoverage`)에 보이게 한다.
+    public static func recordCriteriaChanges(_ card: Card, from old: [Criterion], at date: Date, in context: ModelContext) {
+        var before: [String: Bool] = [:]
+        for criterion in old where before[criterion.text] == nil { before[criterion.text] = criterion.isDone }
+        for criterion in card.criteria {
+            let previous = before[criterion.text]
+            guard previous != criterion.isDone, previous != nil || criterion.isDone else { continue }
+            Event.record(.note, in: context, card: card, at: date, payload: [
+                "kind": .string(criterionNoteKind), "text": .string(criterion.text), "isDone": .bool(criterion.isDone),
+            ])
+        }
+    }
+
     /// 카드 상세의 완료 버튼: 완료로 옮기고 저장한다. 저장했으면 true.
     /// 옮기기·저장이 실패하면 rollback 뒤 저장소 값으로 다시 읽는다.
     @discardableResult

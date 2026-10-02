@@ -40,6 +40,8 @@ struct ActivityEventRow: View {
         case .note: return "note.text"
         case .sessionStart, .sessionEnd: return "clock"
         case .check: return "checkmark.seal"
+        case .projectStatus: return "flag"
+        case .sessionFiled: return "tray.and.arrow.down"
         default: return "circle"
         }
     }

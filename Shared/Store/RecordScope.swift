@@ -53,7 +53,7 @@ public enum RecordScope {
             case .files: "경로 · 늘고 준 줄 수"
             case .commits: "해시 · 메시지 첫 줄"
             case .checks: "명령 · 결과 · 짧은 설명"
-            case .notes: "카드 메모 · 다음 세션 메모"
+            case .notes: "카드 메모 · 다음 세션 메모 · 프로젝트 지금 상황"
             case .guides: "등록한 문서의 내용과 이전 판"
             }
         }
@@ -129,7 +129,7 @@ public enum RecordScope {
         names.map { PayloadKey(type: type, kind: kind, key: $0, item: item) }
     }
 
-    /// 이벤트 종류별 payload 키. 생성 지점은 `HookProcessor`·`MCPTools`·`CardLifecycle`·`CardEditing`·
+    /// 이벤트 종류별 payload 키. 생성 지점은 `HookProcessor`·`MCPTools`(`+Status` 포함)·`CardLifecycle`·`CardEditing`·
     /// `CardEvidence`·`SessionProjectBinding`·`GuideLibrary`·`ProjectRegistry`.
     public static let payloadKeys: [PayloadKey] =
         keys(.sessionStart, .sessions, ["source", "agentName"])
@@ -143,6 +143,8 @@ public enum RecordScope {
         + keys(.check, .checks, ["command", "outcome", "source", "criterion", "criterionText", "detail", "exitCode",
                                  "provider", "toolUseId"])
         + keys(.guideSynced, .guides, ["relPath", "source"])
+        + keys(.projectStatus, .notes, ["summary", "provider", "sessionId"])
+        + keys(.sessionFiled, .cards, ["sessionId", "outcome", "cardId", "files", "moved"])
         + keys(.note, .notes, ["text"])
         + keys(.note, kind: MCPTools.handoffNoteKind, .notes, ["kind", "text"])
         + keys(.note, kind: CardEditing.criterionNoteKind, .cards, ["kind", "text", "isDone"])

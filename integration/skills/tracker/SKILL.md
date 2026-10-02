@@ -1,6 +1,6 @@
 ---
 name: tracker
-description: Waypoint 카드 보드에 프로젝트 작업을 기록한다. 코드 작업을 시작·전환·마무리할 때 사용한다. 시작 폴더가 작업 대상 프로젝트와 다르거나 Waypoint 주입 블록이 없어도 실제 대상 폴더를 확인해 연결한다. 나중에 할 일 기록, 서브에이전트 위임, 세션 메모와 /tracker init에도 사용한다. MCP가 없으면 기록하지 않는다.
+description: Waypoint 카드 보드에 프로젝트 작업을 기록한다. 코드 작업을 시작·전환할 때, 의미 있는 단위가 끝날 때마다 사용한다. 시작 폴더가 작업 대상 프로젝트와 다르거나 Waypoint 주입 블록이 없어도 실제 대상 폴더를 확인해 연결한다. 나중에 할 일 기록, 서브에이전트 위임, 세션 메모·프로젝트 상황, 정리 안 된 작업과 /tracker init에도 사용한다. MCP가 없으면 기록하지 않는다.
 ---
 
 # tracker
@@ -14,18 +14,24 @@ Waypoint는 사용자의 개인 프로젝트 보드다. 너는 카드를 최신 
 ```
 Waypoint: PRB (waypoint-probe)
 sessionId: 5e1f0c2a-…
+지금 상황 (3시간 전, Claude Code):
+  파서 리팩터 진행 중. 다음: 오류 메시지 정리
 다음 할 일:
 - PRB-1 실측용 카드
 다른 세션에서 작업중:
 - PRB-4 파서 (sess·a1b2)
 직전 세션 메모 (PRB-1 실측용 카드):
   파서까지 함. 남은 것: 테스트
-작업을 시작·전환·마무리하거나 나중에 할 일을 들으면 tracker 스킬을 따른다.
+정리 안 된 작업:
+- 어제 14:32 · Claude Code · 파일 2개: Parser.swift, note.txt · 9c3e71d2
+작업을 시작·전환하거나 한 단위를 끝낼 때마다, 나중에 할 일을 들으면 tracker 스킬을 따른다.
 ```
 
 - 프로젝트 키(`PRB`)는 도구의 `project`에, `sessionId`는 `card_start`·`card_create`의 `sessionId`에 그대로 넣는다.
 - 시작 폴더와 실제 작업 대상 폴더를 구분한다. `Waypoint: 이 폴더는 Waypoint에 없음`이어도 작업 대상 프로젝트가 등록되어 있으면 연결하고 기록한다. 시작 폴더를 대신 등록하거나 프로젝트 이름만 보고 폴더를 추측하지 않는다.
 - 직전 세션 메모가 있으면 그 카드부터 이어갈지 사용자 요청과 맞춰 본다.
+- 지금 상황은 프로젝트 전체의 흐름이다. 요청을 이해하는 데 쓰고, `오래됨`이면 이번 작업 뒤 새로 쓴다.
+- 정리 안 된 작업은 카드 없이 파일을 바꾸고 끝난 지난 세션이다. 사용자 요청을 먼저 하고, 짧게 정리한다: 바뀐 파일로 맞는 카드를 알 수 있으면 `work_file(sessionId, cardId)`, 기록할 것 없는 작업이면 `cardId` 없이 넘긴다. 맞는 카드를 모르면 사용자에게 묻지 말고 넘기거나 그대로 둔다. 정리했다는 알림은 한 줄.
 
 ## 도구
 
@@ -47,6 +53,8 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 | `card_note(id, text)` | 결정·막힌 점 한 줄 |
 | `card_handoff(id, nextSessionNote)` | 다음 세션 메모 |
 | `card_evidence(id, criterion?, command, outcome, detail?, sessionId?)` | 완료 조건을 확인하려고 실행한 명령과 결과. criterion은 1부터, outcome은 pass·fail·skipped |
+| `project_status(project, text?, sessionId?)` | 프로젝트 지금 상황 갱신(600자·8줄 이내, 전체를 새로 쓴다). text를 빼면 읽기 |
+| `work_file(sessionId, cardId?)` | 정리 안 된 작업 정리. 블록의 짧은 ID 그대로. cardId를 빼면 넘김 |
 | `project_resolve(cwd)` | 폴더 → 프로젝트(주입 블록이 없을 때 확인용) |
 | `project_init(cwd, name, key?, summary?, stack?, guideFiles?, seedCards?)` | `/tracker init`에서만. 앱에 등록 확인 창을 띄운다 |
 
@@ -65,9 +73,7 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 
 - 주제가 바뀌면 새 카드로 `card_start`한다. 이 세션에 붙어 있던 이전 카드는 서버가 연결을 풀고 원래 상태(next·idea 등)로 돌린다. 이전 카드를 done으로 만들지 않는다.
 - 사용자가 "나중에", "언젠가", "다음엔", "이것도 있으면 좋겠다"처럼 **지금 하지 않을 일**을 말하면 `card_create(kind: idea, status: idea, sessionId)`로 남기고 한 줄로 알린다: `PRB-5 아이디어로 남겼어요.` 지금 하던 작업은 계속한다. 당장 할 게 확실한 후속 작업은 `status: next`.
-- 의미 있는 결정이나 막힌 점은 `card_note`로 짧게.
 - 완료 조건을 확인하려고 명령(테스트·빌드 등)을 실행했으면 `card_evidence(id, criterion, command, outcome, sessionId)`로 조건 번호(1부터, `card_get`의 criteria 순서)와 결과를 남긴다. `command`는 실행한 명령 그대로, 실패면 `fail`. 실행하지 않은 조건은 남기지 않는다. `skipped`는 일부러 건너뛴 조건에만 쓴다. 특정 조건이 아닌 검증은 `criterion`을 뺀다. 앱은 실행을 직접 본 기록과 맞춰 보고, 근거 뒤에 파일이 바뀌면 다시 미검증으로 보인다.
-- 완료 조건을 달성하면 `card_update`로 criteria 전체를 체크 상태로 다시 보낸다.
 - `status: active`는 `card_update`로 줄 수 없다. 작업중은 `card_start`로만.
 
 ## 서브에이전트를 쓸 때
@@ -75,11 +81,14 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 1. 맡길 일을 하위 카드로 만든다: `card_create(project, title, parentId: 지금 카드, sessionId)`.
 2. 서브에이전트 프롬프트 **첫 줄**을 대괄호 카드 ID로 시작한다: `[PRB-6] 파서 단위 테스트 작성`. 훅이 이 줄을 보고 서브에이전트를 그 카드에 붙여 작업중으로 표시한다. 서브에이전트에게 `card_start`를 시키지 않는다.
 
-## 마무리할 때
+## 단위가 끝날 때마다
 
-- 작업이 끝났다고 판단되면 사용자에게 완료 처리할지 묻고, 동의하면 `card_update(status: done)`. 묻지 않고 done으로 만들지 않는다.
-- 세션을 끝내거나 사용자가 자리를 뜨는 흐름이면(또는 사용자가 마무리하자고 하면) 작업한 카드마다 `card_handoff`로 다음 세션 메모를 남긴다: 어디까지 했는지, 남은 것, 다음에 먼저 볼 파일. 3줄 이내.
-- 세션이 끝나면 카드 연결은 서버가 푼다. 따로 할 일은 없다.
+세션은 예고 없이 끝난다. 세션 끝까지 미루지 말고, 의미 있는 단위(기능 하나, 버그 하나, 검증 한 번)가 끝나 응답을 마치기 전에 갱신한다.
+
+- 달성한 완료 조건은 `card_update`로 criteria 전체를 체크 상태로 다시 보낸다. 결정·막힌 점이 있었으면 `card_note`로 짧게.
+- 남은 일이 있으면 `card_handoff`로 다음 세션 메모를 새로 쓴다: 어디까지 했는지, 남은 것, 다음에 먼저 볼 파일. 3줄 이내.
+- 프로젝트 흐름이 바뀌었으면(큰 작업이 끝남, 다음 우선순위가 바뀜, 막힘) `project_status`로 지금 상황을 새로 쓴다: 진행 중인 것, 다음 할 것, 막힌 것. 카드 하나의 세부는 넣지 않는다.
+- 작업이 끝났다고 판단되면 사용자에게 완료 처리할지 묻고, 동의하면 `card_update(status: done)`. 묻지 않고 done으로 만들지 않는다. 카드 연결은 세션이 끝나면 서버가 푼다.
 
 ## /tracker init
 

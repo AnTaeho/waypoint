@@ -4,12 +4,14 @@ import WaypointKit
 /// 연동 상태 패널의 기록 지표(TRK-11). 숫자가 없으면 줄을 감춘다.
 struct ReliabilityMetricsSection: View {
     let metrics: ReliabilityMetrics
+    var coverage: [String] = []
 
     var body: some View {
         let display = ReliabilityMetrics.summary(metrics.displayMs)
         let resume = ReliabilityMetrics.summary(metrics.resumeSeconds)
         let onboarding = metrics.onboarding.panelLines()
-        if display != nil || resume != nil || metrics.failures.total > 0 || !metrics.recovery.isEmpty || !onboarding.isEmpty {
+        if display != nil || resume != nil || metrics.failures.total > 0 || !metrics.recovery.isEmpty || !onboarding.isEmpty
+            || !coverage.isEmpty {
             VStack(alignment: .leading, spacing: Theme.Spacing.s) {
                 Text("기록 지표").font(Theme.bodyMedium)
                 if let display {
@@ -19,6 +21,7 @@ struct ReliabilityMetricsSection: View {
                     Text("재개 · 중앙값 \(ReliabilityMetrics.duration(resume.p50)) · \(resume.count)회")
                 }
                 ForEach(onboarding, id: \.self) { Text($0) }
+                ForEach(coverage, id: \.self) { Text($0) }
                 if metrics.failures.total > 0 {
                     Text("연동 실패 · 서버 \(metrics.failures.server) · 형식 \(metrics.failures.invalidInput) · 저장 \(metrics.failures.saveFailed)")
                         .foregroundStyle(Theme.liveText)
