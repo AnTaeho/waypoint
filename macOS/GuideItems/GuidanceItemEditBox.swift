@@ -5,6 +5,10 @@ import WaypointKit
 struct GuidanceItemEditBox: View {
     @Binding var text: String
     let error: String?
+    /// 쓰는 중이면 저장을 막는다
+    var busy = false
+    /// 디스크가 바뀌어 저장하지 않았을 때 「다시 읽기」
+    var reload: (() -> Void)?
     let cancel: () -> Void
     let save: () -> Void
 
@@ -33,12 +37,15 @@ struct GuidanceItemEditBox: View {
                         .foregroundStyle(Theme.liveText)
                         .lineLimit(2)
                 }
+                if let reload { Button("다시 읽기", action: reload) }
                 Spacer()
+                if busy { ProgressView().controlSize(.small) }
                 Button("취소", action: cancel)
                     .keyboardShortcut(.cancelAction)
                 Button("저장", action: save)
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
+                    .disabled(busy)
             }
             .font(Theme.body)
         }
@@ -47,10 +54,10 @@ struct GuidanceItemEditBox: View {
     }
 }
 
-/// 화면 아래 가운데 어두운 알림: 「지움 · 앞부분」 + 「되돌리기」.
+/// 화면 아래 가운데 어두운 알림: 「지움 · 앞부분」 + 「되돌리기」(없으면 알림만).
 struct GuidanceUndoToast: View {
     let message: String
-    let undo: () -> Void
+    let undo: (() -> Void)?
 
     var body: some View {
         HStack(spacing: Theme.Spacing.l) {
@@ -58,10 +65,12 @@ struct GuidanceUndoToast: View {
                 .font(Theme.body)
                 .foregroundStyle(Theme.GuideItems.toastText)
                 .lineLimit(1)
-            Button("되돌리기", action: undo)
-                .buttonStyle(.plain)
-                .font(Theme.bodyStrong)
-                .foregroundStyle(Theme.GuideItems.toastAction)
+            if let undo {
+                Button("되돌리기", action: undo)
+                    .buttonStyle(.plain)
+                    .font(Theme.bodyStrong)
+                    .foregroundStyle(Theme.GuideItems.toastAction)
+            }
         }
         .padding(.horizontal, Theme.Spacing.l)
         .padding(.vertical, Theme.Spacing.m)

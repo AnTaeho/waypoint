@@ -386,3 +386,24 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 애매한 문서 고치기는 지침 문서 화면에서는 「편집」 보기로, 지침 화면에서는 그 자리 상자(문서 전체)로 | 지침 화면에는 전체 편집 보기가 없다. 문서 전체 항목 바꾸기는 TRK-38 편집기로 바이트 그대로 된다 | 지침 화면에서는 고치기 숨김 | `GuidanceItemWriter.openFullEditor` |
 | 지움 알림은 6초, 앞부분 24자 | 되돌리기를 누를 시간은 주되 화면을 오래 가리지 않는다 | 알림을 닫을 때까지 | `Theme.GuideItems.toastSeconds`, `GuideItemEdit.previewLength` |
 | Debug 실행 인자 `-WaypointGuideMode items`·`-WaypointGuideItemsEdit N` | 손 없이 창 하나만 캡처해 항목 보기·상자를 확인하려고. Release에는 없다 | — | `GuideLaunch` |
+
+## 2026-10-02 — 프로젝트 밖 지침 쓰기와 안전장치 (TRK-41)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 전역·상위 폴더·기억·Codex 파일은 지침 문서(`GuideDoc`)로 등록하지 않고 파일 그대로 쓰며, 버전은 파일 사본으로 이 Mac에만 남긴다 | 개인 지침·기억은 iCloud로 다른 기기에 올리지 않는다. `GuideDoc`은 프로젝트에 매이고 CloudKit으로 동기화된다 | `GuideDoc`에 프로젝트 없는 문서를 더하기 | `GuidanceBackupStore` |
+| 쓰기 직전 디스크 내용이 화면이 읽은 원문과 바이트까지 다르면 쓰지 않고 「바뀜 · 다시 읽기」. 비교 화면은 두지 않았다 | 이 파일들엔 앱 기록(`content`)이 없어 M4 비교 화면(`GuideConflictView`)이 `GuideDoc`에 매여 있다. 다시 읽고 다시 고치면 된다 | 간단한 비교 창 새로 만들기 | `GuidanceFileWrite.apply`·`GuidanceItemsView.reload` |
+| 프로젝트 `.claude/rules/*.md`와 전역 `~/.claude/rules/*.md`도 이번에 쓰기를 열었다(같은 안전장치) | 같은 Markdown 지침이고 안전장치가 그대로 맞는다 | 보기만 | `GuidanceFileWrite.writableKinds` |
+| 관리 정책 `CLAUDE.md`(`/Library/…`)는 보기만 | 조직이 배포하는 파일이고 보통 관리자 권한이다 | — | `isWritablePath` |
+| 바뀜은 파일 여럿을 한 묶음으로 확인한 뒤 쓴다(기억 지우기 = 파일 + 색인). 되돌리기는 묶음을 거꾸로 | 기억 지우기·색인 줄만 지우기·파일만 지우기·되돌리기가 한 코드 경로가 된다. 둘 중 하나만 바뀌었을 때 반쪽만 쓰지 않는다 | 파일마다 따로 | `GuidanceFileWrite.ChangeSet` |
+| 기억 파일은 문서가 애매해도(머리가 닫히지 않음) 지울 수 있다. 색인이 애매하면 파일만 지운다 | 파일 하나가 한 항목이라 「지우기」는 파일 지우기다. 애매한 색인을 지우기 규칙으로 고치면 문서가 비거나 깨진다 | 애매하면 막기 | `GuidanceFileEdit.canDelete`·`removingIndexLines` |
+| 규칙 검사는 Codex CLI를 임시 `CODEX_HOME`으로 돌리고, 없는 명령(`waypoint-check-…`)으로 검사한다. 끝 코드와 `failed to parse policy`를 같이 본다 | Codex가 `CODEX_HOME/tmp`를 만든다(실측). 규칙이 검사 명령을 막아도 끝 코드는 0이지만, 없는 명령이면 결과가 규칙에 흔들리지 않는다 | `-- true`로 검사, 실제 `~/.codex` | `CommandRulesCheck.run` |
+| `codex`가 있는데 검사가 3초를 넘거나 실행하지 못하면 저장하지 않고 「검사 못 함」. 자체 검사는 `codex`가 없을 때만 | 자체 검사를 지나도 Codex가 읽지 못하는 줄이 저장될 수 있다(완료 조건 2). 메인 세션 결정 | 자체 검사로 대신하고 저장 | `CommandRulesCheck.check`·`Outcome.unchecked` |
+| 되돌리기·백업 복원은 규칙 검사를 하지 않는다 | 있던 내용으로 돌리는 것이고, 원래 파일이 Codex 판에 맞지 않았더라도 되돌릴 수 있어야 한다 | 검사 | `apply(checkRules: nil)`·`restore` |
+| 지움 알림은 지침 화면이 들고 있다 | 기억 파일을 지우면 출처가 목록에서 빠져 항목 화면이 사라진다 | 항목 화면 안 | `GuidanceView.toast` |
+| 지운 파일은 출처 목록 맨 아래 「지운 파일」에서 사본으로 되살린다. 기억 파일을 지우면 고른 자리가 그 줄로 옮겨 간다 | 사라진 파일엔 출처 줄이 없어 「백업 N」에 갈 길이 없다 | 백업 전체 목록 창 | `GuidanceDeletedDetail` |
+| 사본 이름은 UTC 밀리초 + 까닭, 원본 경로 해시 폴더에 원본 경로 파일 | 이름순이 시각순이고, 원본이 사라져도 어디 것인지 안다 | 사본 목록 JSON | `GuidanceBackupStore.fileName` |
+| 열린 세션 수는 위 한 줄에 「열린 Claude 세션 N」 사실만 | 고친 지침이 이미 떠 있는 세션에 바로 반영되지 않을 수 있다. 설명 문구는 넣지 않는다 | 저장 전 확인 창 | `GuidanceOpenSessions` |
+| Debug 실행 인자 `-WaypointGuidanceSource <경로 끝>` | 손 없이 지침 화면의 출처(지운 파일 포함)를 골라 창 하나만 캡처하려고. Release에는 없다 | — | `GuideLaunch.guidanceSource` |
+
+검증: 임시 `CLAUDE_CONFIG_DIR`·`CODEX_HOME`·`WAYPOINT_SUPPORT_DIR`로 Dev를 띄워 전역 지침 항목 상자, 기억 파일 한 줄(이름·설명), 「지운 파일」 사본 화면을 창 하나만 캡처했다. 실제 사용자 지침·기억·Codex 파일에는 쓰지 않았다.

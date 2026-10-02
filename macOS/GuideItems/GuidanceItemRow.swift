@@ -76,6 +76,21 @@ struct GuidanceItemText: View {
                 .font(Theme.Guide.code)
                 .foregroundStyle(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+        case .memory where item.memory?.name != nil || item.memory?.description != nil:
+            // 기억 파일 하나 = 한 줄: 이름 아래 설명
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                if let name = item.memory?.name {
+                    Text(name)
+                        .font(Theme.bodyStrong)
+                        .foregroundStyle(Theme.text)
+                }
+                if let description = item.memory?.description {
+                    Text(description)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         case .code, .tableHeader, .tableRow, .frontmatter, .rule:
             Text(sourceLines)
                 .font(Theme.Guide.code)

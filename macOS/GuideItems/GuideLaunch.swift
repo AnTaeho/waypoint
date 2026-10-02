@@ -6,14 +6,17 @@ import WaypointKit
 /// - `-WaypointGuideMode items`: 지침 문서를 항목 보기로 연다. 지침 화면(`-WaypointSidebar guidance`)도 항목으로,
 ///   그 밖이면 지침 문서가 있는 첫 프로젝트의 지침 문서 화면을 고른다.
 /// - `-WaypointGuideItemsEdit 2`: 항목 보기를 열 때 그 순번(0부터, 하위 포함) 항목의 편집 상자를 연다.
+/// - `-WaypointGuidanceSource memory/a.md`: 지침 화면에서 경로가 이 글로 끝나는 출처(또는 지운 파일)를 고른다.
 enum GuideLaunch {
     #if DEBUG
+    static var guidanceSource: String? { UserDefaults.standard.string(forKey: "WaypointGuidanceSource") }
     static var items: Bool { UserDefaults.standard.string(forKey: "WaypointGuideMode") == "items" }
     static var editIndex: Int? {
         UserDefaults.standard.object(forKey: "WaypointGuideItemsEdit") == nil
             ? nil : UserDefaults.standard.integer(forKey: "WaypointGuideItemsEdit")
     }
     #else
+    static let guidanceSource: String? = nil
     static let items = false
     static let editIndex: Int? = nil
     #endif
