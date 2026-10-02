@@ -407,3 +407,24 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | Debug 실행 인자 `-WaypointGuidanceSource <경로 끝>` | 손 없이 지침 화면의 출처(지운 파일 포함)를 골라 창 하나만 캡처하려고. Release에는 없다 | — | `GuideLaunch.guidanceSource` |
 
 검증: 임시 `CLAUDE_CONFIG_DIR`·`CODEX_HOME`·`WAYPOINT_SUPPORT_DIR`로 Dev를 띄워 전역 지침 항목 상자, 기억 파일 한 줄(이름·설명), 「지운 파일」 사본 화면을 창 하나만 캡처했다. 실제 사용자 지침·기억·Codex 파일에는 쓰지 않았다.
+
+## 2026-10-02 — 앱 안 연동 설치기 (TRK-43)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 설치기는 「계획 → 적용」. 계획은 읽기만 하고 내용·권한이 같은 파일은 넣지 않는다. 적용은 계획 이후 바뀐 파일이 있으면 멈추고, 전부 백업한 뒤 차례로 원자적으로 쓰고, 실패하면 쓴 파일을 이전 내용·권한으로 되돌린다 | 이미 설치된 Mac에서 다시 설치해도 아무것도 쓰지 않아야 한다(완료 조건 3). 확인 화면(TRK-44)이 계획을 그대로 보여 줄 수 있다. 메인 세션 결정 | 매번 다시 쓰기(파이썬 스크립트 방식) | `IntegrationInstaller`·`IntegrationApplier` |
+| 백업은 `<저장 폴더>/integration-backups/<UTC 시각>-<8자>/`(0700) + 사본(0600) + `paths.json` | 지침 쓰기(TRK-41)처럼 이 Mac에만, Waypoint 폴더에 모은다. 같은 밀리초에 두 번 돌아도 겹치지 않게 8자를 붙였다 | `~/.codex/waypoint/backups/`(파이썬과 같은 자리) | `IntegrationApplier.backupFolder` |
+| JSON은 키 순서·숫자 원문을 지키는 자체 해석기(`OrderedJSON`)로 쓴다. 들여쓰기·끝 줄바꿈은 원문을 따르고, 이스케이프는 표준 꼴로 바뀔 수 있다 | `JSONSerialization`은 키 순서를 잃고 `settings.json`을 통째로 섞는다. Codex는 파이썬 `json.dumps`와 같은 바이트가 필요하다 | 외부 JSON 라이브러리 | `OrderedJSON` |
+| Claude 훅은 이벤트마다 「Waypoint 훅이 하나, 명령·`timeout`이 같고 matcher가 같은 뜻(없음·`""`·`"*"`)」이면 손대지 않는다. 새로 넣는 묶음은 `settings.example.json`처럼 `matcher: "*"` | 지금 깔린 PreToolUse·PostToolUse 훅엔 matcher가 없다. Claude Code는 없는 matcher를 모든 도구로 본다(`IntegrationInstallation`도 같은 판정) | 예시와 다르면 고쳐 쓰기(완료 조건 3 깨짐) | `ClaudeInstallPlanner.satisfied` |
+| 상태줄이 없으면 중계만 넣는다(출력 없음) | 사용량 게이지가 이 입력을 쓴다. 해제하면 `statusLine`을 지워 원래대로 | 상태줄이 없으면 건너뛰기 | `ClaudeInstallPlanner.planStatusLine` |
+| 원래 상태줄 명령은 따로 적어 두지 않고 감싼 꼴에서 되찾는다. 셸 특수 문자가 있으면 `bash -c '<원래 명령>'`로 감싼다 | 지금 Mac엔 설치 기록 파일이 없다(새 파일을 만들면 완료 조건 3이 깨진다). 낱말로 나눠도 같은 명령만 그대로 붙인다 | 설치 기록 파일 | `StatusLineWrap` |
+| Claude tracker 스킬은 머리말 `name: tracker`이고 Waypoint를 말하면 Waypoint 것으로 보고 덮어쓰기·지우기(백업 있음). 아니면 그 단계만 건너뜀 | Claude 쪽엔 Codex의 `skillHash` 같은 기록이 없어 옛 판과 사용자가 고친 판을 가를 수 없다 | Codex처럼 기록 파일을 두고 해시 비교 | `ClaudeInstallPlanner.isWaypointTrackerSkill` |
+| 해제해도 `~/.claude/waypoint/`·`~/.codex/waypoint/`의 스크립트는 남긴다 | 열린 세션이 이전 설정으로 스크립트를 부른다(파이썬 설치기와 같은 까닭) | 지우기 | 계획의 `remove` 분기 |
+| MCP는 `claude mcp add/remove` CLI로, `~/.claude.json`은 읽기만. CLI가 없거나 실패하면 그 단계만 결과에 남기고 파일은 둔다 | `~/.claude.json`은 Claude Code가 자주 쓰는 큰 파일이다. 파일과 MCP는 서로 독립이라 MCP 실패로 훅까지 되돌릴 까닭이 없다. 메인 세션 결정 | 직접 편집, 실패하면 전부 되돌리기 | `ClaudeCommandRunner`·`Result.isPartial` |
+| 다른 포트의 Waypoint 주소(`http://127.0.0.1:<포트>/mcp`)로 등록돼 있으면 지우고 다시 등록, 다른 주소면 건너뜀 | 평소용↔Dev 전환을 설치기 하나로. 남의 서버는 건드리지 않는다 | 다른 주소도 멈춤 | `ClaudeInstallPlanner.planMCP` |
+| Dev 설치도 사용자 범위에 한다(평소용 항목을 바꿔 끼움) | 카드 지시(`AppInstance` 기준 포트 선택). 이 Mac처럼 평소용이 늘 켜져 있으면 Dev는 실측 폴더(`dev-probe-setup.sh`)가 맞다 — TRK-44에서 Dev 설치를 막을지 정한다 | Dev는 프로젝트 범위 | `IntegrationInstallContext.instance` |
+| Codex는 `install-codex.py`를 그대로 옮기고 같은 입력에서 결과 파일을 바이트 비교한다(`install.json`의 `backup`만 다름). 바뀔 것이 없으면 쓰지 않는 것만 다르다 | Codex는 훅을 해시로 신뢰한다. 같은 `hooks.json`이어야 다시 설치해도 신뢰가 풀리지 않는다 | 새로 설계 | `CodexInstallPlanner` |
+| TOML은 필요한 것만 읽는 작은 해석기(`MiniTOML`) | 외부 의존성 없이 구조 오류·`mcp_servers.waypoint`·`features.hooks`만 알면 된다. `tomllib`보다 날짜·숫자 검사가 느슨하다 | 외부 TOML 라이브러리 | `MiniTOML` |
+| 이번 카드엔 디버그 진입점을 두지 않았다 | 테스트(임시 홈·가짜 CLI)로 모든 경로를 돌렸고, 실제 홈에 쓰는 진입점은 위험만 늘린다 | Debug 메뉴 | — |
+
+검증: 임시 홈에서 처음 설치·재설치(빈 계획)·해제(사용자 설정 바이트 복원)·Dev 전환·두 번째 쓰기 실패 되돌림·백업 권한·가짜 `claude` CLI. Codex는 Homebrew python3로 파이썬 설치기와 결과 비교. 이 Mac의 실제 설정을 임시 홈에 복사(읽기만)해 Claude·Codex 모두 빈 계획임을 확인했다. 실제 `~/.claude`·`~/.claude.json`·`~/.codex`·`~/.agents`에는 쓰지 않았고 `claude mcp`도 실제 홈으로 돌리지 않았다.

@@ -50,6 +50,8 @@ xcrun devicectl device install app --device <기기 UDID> .build/ios/Build/Produ
 
 ## 설치 (MCP·스킬)
 
+연동(훅·상태줄 중계·MCP·tracker 스킬, Codex 포함)은 앱 안 설치기가 기준이다(`Shared/Integration/Installer/`, 동작은 `docs/SPEC.md` 「앱 안 연동 설치기」). 쓰기 전 `~/Library/Application Support/Waypoint/integration-backups/`에 백업을 남기고, 기존 설정을 보존하며, 중간에 실패하면 되돌린다. 설치 화면은 온보딩(TRK-44)에서 붙는다. 아래 수작업·스크립트 절차는 개발용이다.
+
 평소용 앱이 켜져 있으면 `http://127.0.0.1:47821/mcp`에 MCP 서버가 열린다. 한 번만 등록한다.
 
 ```sh
@@ -75,7 +77,7 @@ MCP 도구: `project_resolve`, `project_init`, `session_bind`, `card_list`, `car
 
 ## Codex 연결
 
-로컬 Codex CLI의 훅·MCP·tracker 스킬을 연결한다. Python 3.11+가 필요하며 외부 Python 패키지는 쓰지 않는다. 개발 중에는 `--dev`로 Waypoint Dev에 연결하고, 평소용 앱을 갱신한 뒤 기본 설치로 전환한다.
+로컬 Codex CLI의 훅·MCP·tracker 스킬을 연결한다. 앱 안 설치기가 이 스크립트와 같은 결과 파일을 쓴다(테스트가 바이트 단위로 비교한다). 스크립트는 개발용으로 남긴다. Python 3.11+가 필요하며 외부 Python 패키지는 쓰지 않는다. 개발 중에는 `--dev`로 Waypoint Dev에 연결하고, 평소용 앱을 갱신한 뒤 기본 설치로 전환한다.
 
 ```sh
 python3 scripts/install-codex.py --dev  # 개발용(47822)

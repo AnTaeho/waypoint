@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Codex의 Waypoint 훅·MCP·스킬을 설치/해제한다. 신뢰 상태는 바꾸지 않는다."""
+"""Codex의 Waypoint 훅·MCP·스킬을 설치/해제한다. 신뢰 상태는 바꾸지 않는다.
+
+개발용. 기준은 앱 안 설치기(Shared/Integration/Installer/CodexInstallPlanner.swift)이고,
+CodexInstallerTests가 같은 입력에서 두 구현의 결과 파일이 같은지 비교한다. 한쪽을 고치면 다른 쪽도 고친다.
+"""
 import argparse
 import hashlib
 import json

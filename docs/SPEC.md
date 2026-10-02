@@ -429,7 +429,7 @@ Claude·Codex 사용량(한도별 사용 비율과 초기화 시각)을 사이�
 
 - 출처: Claude Code가 상태줄 명령 stdin에 넘기는 JSON의 `rate_limits.five_hour` / `rate_limits.seven_day`(`used_percentage` 0–100, `resets_at` 유닉스 초). 사용자의 상태줄 명령 앞에 중계 스크립트 `integration/statusline/waypoint-statusline-tap.sh`를 끼운다. 스크립트는 입력에 `rate_limits` 객체가 있으면 저장 폴더에 `usage.json`을 원자적으로 쓰고(임시 파일 → `mv`, jq 필요), 같은 입력을 원래 명령에 넘겨 출력을 그대로 내보낸다. jq가 없거나 쓰기에 실패해도 상태줄 출력은 그대로 나온다. 추가 시간은 약 8 ms.
 - 파일: `~/Library/Application Support/Waypoint/usage.json`(`WAYPOINT_SUPPORT_DIR`로 바꿀 수 있음), 한 줄 `{"capturedAt":<unix 초>,"rateLimits":<rate_limits 원본>}`.
-- 설치: 스크립트를 `~/.claude/waypoint/`에 복사하고 `chmod +x`, `~/.claude/settings.json`의 `statusLine.command`를 `bash ~/.claude/waypoint/waypoint-statusline-tap.sh <원래 명령>`으로 바꾼다(예: `bash ~/.claude/waypoint/waypoint-statusline-tap.sh bash ~/.claude/awesome-statusline.sh`). 원래 명령은 인자 대신 환경 변수 `WAYPOINT_STATUSLINE_NEXT`(셸 명령 문자열)로 줘도 된다. 되돌리려면 `statusLine.command`를 원래 명령으로 돌린다.
+- 설치: 앱 안 연동 설치기가 한다(아래 「앱 안 연동 설치기」 절). 손으로 할 때는 스크립트를 `~/.claude/waypoint/`에 복사하고 `chmod +x`, `~/.claude/settings.json`의 `statusLine.command`를 `bash ~/.claude/waypoint/waypoint-statusline-tap.sh <원래 명령>`으로 바꾼다(예: `bash ~/.claude/waypoint/waypoint-statusline-tap.sh bash ~/.claude/awesome-statusline.sh`). 원래 명령은 인자 대신 환경 변수 `WAYPOINT_STATUSLINE_NEXT`(셸 명령 문자열)로 줘도 된다. 되돌리려면 `statusLine.command`를 원래 명령으로 돌린다.
 - 앱(macOS): 30초마다 파일 수정 시각을 보고 바뀌었을 때만 다시 읽는다(`UsageMonitor`). 파서는 숫자·숫자 문자열, 초·밀리초·ISO 8601 시각, 한쪽 창만 있는 경우를 받는다.
 
 ### Codex
@@ -472,6 +472,35 @@ macOS 대시보드의 AI 연동 요약과 모든 화면의 툴바 버튼에서 �
 패널에는 마지막 훅 활동·실제 수신 시각·수신 당시 프로젝트, 현재 연결된 프로젝트, MCP 마지막 요청, 미처리 outbox 수와 읽기·처리 오류, 원인에 맞는 복구 안내를 표시한다. 미등록 폴더 수신은 프로젝트 미연결로 표시한다. 10초 점검·활성화·잠자기 복귀·다시 점검 때 설정과 대기 기록을 갱신한다. 「다시 점검」은 실패한 로컬 서버의 시작도 재시도한다.
 
 수신 이력은 이 기기의 저장 폴더 `integration-health.json`에만 남고 CloudKit 모델을 변경하지 않는다. 사용자 대화·파일 경로·세션 ID·설정 원문은 저장하지 않는다. 지연 재수신은 원래 활동 시각으로 비교해 더 최신 상태를 덮어쓰지 않는다. 누락 기록은 활동과 실제 재수신 시각을 따로 표시한다. `/integration/status`는 루프백 서버의 읽기 전용 진단 정보다.
+
+### 앱 안 연동 설치기 (2026-10-02, TRK-43)
+
+Claude·Codex 연동 설치를 앱 코드(`Shared/Integration/Installer/`)로 옮겼다. 화면은 온보딩(TRK-44)이 붙인다. 셸·파이썬 스크립트는 개발용으로 남고, 기준은 앱 설치기다.
+
+- 자원: 훅 스크립트·상태줄 중계·Codex 브리지·tracker 스킬은 앱 번들 리소스(macOS)다. `project.yml`이 저장소 `integration/`의 파일을 빌드 때 그대로 복사한다(`IntegrationSources.bundle`, 테스트는 `repository`).
+- 두 단계: **계획**(`IntegrationInstaller.plan`)은 읽기만 하고 대상 파일마다 지금 내용과 바꿀 내용을 담는다. 내용·권한이 같으면 넣지 않으므로 이미 설치된 상태에서는 빈 계획이다. **적용**(`apply`)은 ① 계획 이후 파일이 바뀌었으면 아무것도 쓰지 않고 멈춤 ② 대상 파일 전부 백업 ③ 차례로 원자적 쓰기(같은 폴더 임시 파일 → 권한 → `rename`, 심볼릭 링크는 가리키는 파일에 씀) ④ 하나라도 실패하면 이미 쓴 파일을 이전 내용·권한으로 되돌리고 새로 만든 빈 폴더를 지운 뒤 오류. 파일 단계가 끝난 뒤 명령 단계(MCP 등록)를 돈다.
+- 백업: `<저장 폴더>/integration-backups/<UTC 시각>-<8자>/`(0700)에 사본(0600, `01-settings.json` 꼴)과 `paths.json`(사본 이름·원래 경로·권한, 없던 파일은 `file: null`). 계획마다 하나.
+- 대상 인스턴스: `AppInstance`. 평소용은 47821·`Waypoint`, Dev는 47822·`Waypoint-Dev`. 한 번에 하나만 사용자 범위에 잇는다(Dev로 설치하면 평소용 항목을 바꿔 끼운다).
+- 멈춤·건너뜀: 설정 파일을 읽을 수 없으면(JSON·TOML 아님, `hooks`가 객체 아님) 아무것도 쓰지 않고 멈춘다. Claude 쪽에서 사용자 것과 겹치는 단계(같은 이름의 다른 tracker 스킬, 다른 주소의 `waypoint` MCP, 명령이 아닌 상태줄, 손으로 고친 중계 명령)는 그 단계만 건너뛰고 `notes`에 남긴다. Codex 쪽은 파이썬 설치기와 같이 멈춘다.
+
+Claude Code:
+
+| 대상 | 설치·재설치 | 해제 |
+|---|---|---|
+| `~/.claude/settings.json` `hooks` | 10개 이벤트(`settings.example.json`과 같은 차례·matcher)에 Waypoint 훅. 명령에 `/.claude/waypoint/waypoint-hook.sh`가 든 것만 Waypoint 것으로 본다. 이벤트에 Waypoint 훅이 정확히 하나이고 명령·`timeout: 2`가 같고 matcher가 같은 뜻(없음·`""`·`"*"`은 모든 도구)이면 그 이벤트는 손대지 않는다. 아니면 Waypoint 훅만 빼고 첫 자리(없으면 끝)에 새 묶음을 넣는다. 다른 훅·키 순서는 그대로 | Waypoint 훅만 뺀다. Waypoint 훅만 있던 묶음·이벤트는 지우고 `hooks`가 비면 키를 지운다. 설치 전 사용자 설정은 바이트까지 돌아온다. 설치기가 새로 만든 파일이면 `{}`로 남는다 |
+| `statusLine` | 없으면 중계만(`bash ~/.claude/waypoint/waypoint-statusline-tap.sh`, 출력 없음. 사용량 게이지용). 다른 명령이면 중계로 감싼다: 셸 특수 문자가 없으면 뒤에 그대로, 있으면 `bash -c '<원래 명령>'`. 이미 감쌌으면 그대로 | 감싼 꼴에서 원래 명령을 되찾아 돌린다. 중계만 있었으면 `statusLine`을 지운다 |
+| `~/.claude/waypoint/waypoint-hook.sh`, `waypoint-statusline-tap.sh` | 번들 내용, 0755 | 남긴다(열린 세션이 파일 누락으로 실패하지 않게) |
+| `~/.claude/skills/tracker/SKILL.md` | 번들 내용(머리말 `name: tracker`이고 Waypoint를 말하는 옛 판은 덮어씀) | Waypoint tracker 스킬이면 지우고, 비게 된 폴더도 지운다 |
+| MCP `waypoint`(사용자 범위) | `~/.claude.json`은 읽기만. 없으면 `claude mcp add --transport http --scope user waypoint <url>`, 다른 포트의 Waypoint 주소면 `claude mcp remove waypoint -s user` 뒤 추가, 같으면 그대로 | Waypoint 주소면 `claude mcp remove waypoint -s user` |
+
+- JSON은 키 순서와 숫자 원문을 지키는 자체 해석기(`OrderedJSON`)로 읽고 쓴다. 바뀔 것이 있을 때만 다시 쓰며, 그때 들여쓰기(원문 둘째 줄)와 끝 줄바꿈은 원문을 따른다. 문자열 이스케이프는 표준 꼴(`é` → `é`, `\/` → `/`)로 바뀔 수 있다.
+- `claude` 실행 파일은 `ToolLaunch`의 탐색 폴더에서 찾고, PATH 앞에 그 폴더와 흔한 설치 폴더를 붙여 실행한다(launchd PATH 대비, 20초 제한). 못 찾으면 그 단계만 「실행 파일 없음」(`executableMissing`)으로 남고 파일 단계는 적용된 채다(`Result.isPartial`). 다시 계획하면 MCP 단계만 남는다.
+
+Codex: `scripts/install-codex.py`를 그대로 옮겼다(`CodexInstallPlanner`). 같은 입력에서 `hooks.json`·`config.toml`·스크립트·스킬이 바이트·권한까지 같고 `install.json`은 `backup` 경로만 다르다(테스트가 임시 홈에서 파이썬과 비교한다). Codex는 훅을 해시로 신뢰하므로(`[hooks.state]`) 다시 설치해도 같은 `hooks.json`이어야 신뢰가 풀리지 않는다.
+
+- 다른 점: 백업은 위 저장 폴더에 남기고, 바뀔 것이 없으면 아무것도 쓰지 않는다(파이썬은 매번 모든 파일과 `install.json`의 백업 경로를 다시 쓴다).
+- 해제는 파이썬과 같다: `config.toml`은 표시 블록만 빠져 TOML 값은 설치 전과 같지만 끝에 빈 줄 하나가 남는다(설치 때 끝 공백을 지우고 빈 줄 둘을 붙인 몫). 스크립트·`install.json`은 남는다.
+- `config.toml`은 설치기에 필요한 것만 읽는 작은 TOML 해석기(`MiniTOML`)로 본다: 구조 오류, 표시 블록 밖의 `mcp_servers.waypoint`, `features.hooks = false`. 날짜·숫자 꼴 검사는 `tomllib`보다 느슨하다.
 
 ### 기록 지표와 진단 내보내기 (2026-10-01, TRK-11)
 
