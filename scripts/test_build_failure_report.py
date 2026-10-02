@@ -76,6 +76,40 @@ class ReleaseArgumentTests(unittest.TestCase):
         result = self.release("--help")
         self.assertEqual(result.returncode, 0)
         self.assertIn("--skip-notarize", result.stdout)
+        for option in ("--poll-interval", "--notarize-timeout", "--notary-profile", "--resume-notarize"):
+            self.assertIn(option, result.stdout)
+        self.assertIn("검증은 정적 검사만", result.stdout)  # 머리말 끝까지 출력되는지
+
+    def test_poll_interval_and_timeout_must_be_positive_integers(self):
+        for args in (("--poll-interval", "0"), ("--poll-interval", "abc"), ("--notarize-timeout", "1.5"), ("--poll-interval",)):
+            result = self.release(*args)
+            self.assertEqual(result.returncode, 2, args)
+
+    def test_conflicting_notarize_options(self):
+        for args in (
+            ("--skip-notarize", "--notary-profile", "p"),
+            ("--resume-notarize", "x", "--skip-notarize"),
+            ("--resume-notarize", "x", "--notary-profile", "p"),
+            ("--resume-notarize", "x", "--version", "1.0.0"),
+            ("--resume-notarize", "x", "--check"),
+        ):
+            result = self.release(*args)
+            self.assertEqual(result.returncode, 2, args)
+            self.assertIn("같이 쓸 수 없음", result.stderr)
+
+    def test_resume_needs_submitted_archive(self):
+        result = self.release("--resume-notarize", "/nonexistent/Waypoint.xcarchive")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("아카이브가 없음", result.stderr)
+        with tempfile.TemporaryDirectory(prefix="waypoint-archive-") as directory:
+            plist = pathlib.Path(directory) / "Info.plist"
+            subprocess.run(["plutil", "-create", "xml1", str(plist)], check=True)
+            subprocess.run(["plutil", "-insert", "ApplicationProperties", "-dictionary", str(plist)], check=True)
+            subprocess.run(["plutil", "-insert", "ApplicationProperties.CFBundleShortVersionString", "-string", "0.0.1", str(plist)], check=True)
+            subprocess.run(["plutil", "-insert", "ApplicationProperties.CFBundleVersion", "-string", "1", str(plist)], check=True)
+            result = self.release("--resume-notarize", directory)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("공증 제출(upload) 기록이 없음", result.stderr)
 
 
 class BuildFailureReportTests(unittest.TestCase):
