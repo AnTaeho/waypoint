@@ -731,7 +731,7 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 | 메모 | 카드 메모(`card_note`)·다음 세션 메모(`nextSessionNote`, `kind: handoff`). 에이전트가 도구로 남긴 글도 여기 든다 | 계속 |
 | 지침 문서 | 등록한 문서의 **내용 전체**·저장 안 한 편집·충돌 때 읽은 로컬 내용·이전 판(`GuideVersion`) | 계속 |
 
-- 남기지 않는 것: AI 답변, 대화 전체, 명령 출력(끝 코드·커밋 줄만 뽑고 버린다), 지침 문서가 아닌 파일의 내용(편집 원문·읽은 파일은 저장하지 않는다. outbox에는 앱이 켜질 때까지 요청 600자와 편집 크기만 잠시 머문다).
+- 남기지 않는 것: AI 답변, 대화 전체, 명령 출력(끝 코드·커밋 줄만 뽑고 버린다), 지침 문서가 아닌 파일의 내용(편집 원문·읽은 파일은 저장하지 않는다. outbox에는 앱이 켜질 때까지 요청 600자·편집 크기·앱이 읽는 출력 줄(끝 코드·커밋 줄을 찾는 몫)이 잠시 머문다).
 - 내보내기에 넣지 않는 작동 상태 값(표의 `exported: false`): `Project.lastEventAt`, `Card.statusBeforeActive`, `Session`의 PID·블록 확인(`context*`)·상태 캐시·활동 상태·대기 중인 도구, `GuideDoc.contentHash`.
 - 어디에: 저장소 전부 = iCloud · 이 Mac과 iPhone(iCloud를 끈 실행은 「이 Mac」). 이 Mac에만: 기록 백업(`store-backups`), 지침 파일 백업(`guidance-backups`), 연결 설정 백업(`integration-backups`), 앱이 꺼진 동안 온 기록(`outbox.jsonl`), 연결 상태와 지표(`integration-health.json`·`metrics.json`), 사용량(`usage.json`).
 
