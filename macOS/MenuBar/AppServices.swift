@@ -20,6 +20,8 @@ final class AppServices {
     let onboarding = OnboardingModel()
     /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
     let reliability = ReliabilityMonitor()
+    /// 이번이나 지난 실행에서 백업으로 저장소를 되돌린 기록(TRK-46). 사람이 확인하면 지운다.
+    var storeRestore = (try? WaypointStore.supportDirectory()).flatMap { StoreRestoreRecord.load(supportDirectory: $0) }
     /// 지침·기억 출처 목록(메모리에만). 서비스를 시작하면 생긴다.
     private(set) var guidance: GuidanceMonitor?
     /// 방금 등록한 프로젝트. 메인 창이 받아서 사이드바에서 고르고 비운다.
@@ -33,6 +35,9 @@ final class AppServices {
     @ObservationIgnored var mainWindowCount = 0
     @ObservationIgnored private var initWindow: InitWindowController?
 
+    /// 떠 있는 동안의 daily 저장소 백업(10초 점검이 판정, 백업은 백그라운드). iOS는 실행 때만.
+    @ObservationIgnored let dailyBackup = (try? WaypointStore.defaultStoreURL())
+        .map { StoreDailyBackup(storeURL: $0, stamp: .current()) }
     @ObservationIgnored let container: ModelContainer
     @ObservationIgnored var processor: HookProcessor?
     @ObservationIgnored private var server: LocalServer?
@@ -221,6 +226,7 @@ final class AppServices {
             try? context.save()
         }
         reliability.saveIfNeeded()
+        dailyBackup?.startIfDue(now: now)
     }
 
     func retryIntegration() {

@@ -2,15 +2,8 @@ import Foundation
 import SwiftData
 
 public enum WaypointStore {
-    public static let schema = Schema([
-        Project.self,
-        Card.self,
-        Session.self,
-        CardSession.self,
-        Event.self,
-        GuideDoc.self,
-        GuideVersion.self,
-    ])
+    /// 지금 판(`WaypointSchemaV1`). 판을 더하면 마지막 판으로 바꾸고 `WaypointMigrationPlan`에 단계를 더한다.
+    public static let schema = Schema(versionedSchema: WaypointSchemaV1.self)
 
     /// 저장 폴더를 바꾸는 환경 변수. 훅 스크립트(`waypoint-hook.sh`)와 같은 이름이라 한 값으로 저장소·outbox를 함께 옮긴다.
     /// 확인·디버그용으로 실제 저장소를 건드리지 않고 앱을 띄울 때 쓴다.
@@ -69,7 +62,7 @@ public enum WaypointStore {
         }
         creationLock.lock()
         defer { creationLock.unlock() }
-        return try ModelContainer(for: schema, configurations: [config])
+        return try ModelContainer(for: schema, migrationPlan: WaypointMigrationPlan.self, configurations: [config])
     }
 
     static func cloudKitDatabase(_ container: String?) -> ModelConfiguration.CloudKitDatabase {

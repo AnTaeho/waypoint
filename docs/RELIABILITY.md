@@ -139,6 +139,24 @@
 2. Codex: `HOME=<임시 홈> CODEX_HOME=<임시 홈>/.codex codex login` 뒤, 대화형 `codex`에서 `/hooks`를 열어 Waypoint 훅을 신뢰하고 한 번 대화한다. 첫 기록이 오면 `firstRecord.codex`가 남는다.
 3. 「끝」을 눌러 `finishedAt`과 중앙값이 생기는지 화면으로 본다.
 
+## 저장소 백업·복구(TRK-46)
+
+2026-10-02, Waypoint Dev Debug(브랜치 `trk-46-store-backup`, 0.0.1 빌드 1). 명세는 docs/SPEC.md 「저장소 백업·복구」.
+스크래치 저장 폴더를 `WAYPOINT_SUPPORT_DIR`로 주고 `WAYPOINT_CLOUDKIT=0`으로 Dev를 `open -g -j`로 띄웠다. 저장소는 이 Mac 평소용 저장소를 `cp`로 복사한 사본(복사본 `quick_check` ok, 프로젝트 4·카드 110·이벤트 4628). 단계마다 47822 대기 → `/integration/status`의 `storeRestore` → MCP `project_resolve`(HTTP로 데이터 확인) → 저장소를 읽기 전용 `sqlite3`로 세기 → `quit app id` → 폴더 확인.
+
+| 단계 | 한 일 | 결과 |
+|---|---|---|
+| ①-a | 빈 폴더 첫 실행 | 47822 수신. 저장소 생성, `store-version.json`(0.0.1·1·1.0.0, 0600), 백업 없음 |
+| ① | 판 기록 없는 기존 저장소(사본) 첫 실행 | 열기 전 `…035452.961Z-upgrade`(store 30,285,824 B·-wal·-shm·info.json, 폴더 0700·파일 0600, `appVersion: unknown`). 47822 수신, `project_resolve` → TRK. 프로젝트 4·카드 110·이벤트 4629(세션 정리 기록 1). `store-version.json` 기록 |
+| ②-a | 같은 판으로 다시 실행 | 새 백업 없음(1개 그대로) |
+| ②-b | `store-version.json`의 빌드를 0으로 고치고 실행 | 열기 전 `…035501.863Z-upgrade`(`build: "0"` = 백업한 저장소를 마지막으로 연 빌드, -wal 148,352 B 포함). 판 기록은 다시 빌드 1 |
+| ③ | 저장소 본 파일을 0x41 64 KB로 덮어씀(-wal·-shm 그대로) 뒤 실행 | 열기 실패(`SwiftDataError.loadIssueModelContainer`) → store·-wal·-shm을 `store-failed/20261002T035510.540Z/`(0700)로 옮김, `failure.json`(`quickCheck: failed`) → 최신 백업 `…035501.863Z-upgrade` 복원 → 열림. 47822 수신, `storeRestore` = `{"kind":"automatic","backupID":"20261002T035501.863Z-upgrade","failedFolder":"20261002T035510.540Z",…}`, `project_resolve` → TRK, 프로젝트 4·카드 110·이벤트 4629. 깨진 64 KB 파일은 보존 폴더에 그대로 |
+
+- CloudKit을 켠 첫 열기: 환경 변수 없이 Dev를 Dev 자기 폴더(`Waypoint-Dev/`, 컨테이너 `iCloud.dev.antaeho.waypoint.dev`)로 띄웠다. 판 기록이 없어 열기 전 `20261002T040002.275Z-upgrade`, 판을 붙인 스키마·옮기기 계획으로 열림, Core Data 로그 「Successfully set up CloudKit integration」과 가져오기 「Success」 여러 번. `NSCocoaErrorDomain 134417`이 두 번 있었는데 바로 앞 줄이 「Failed to enqueue request」(요청 넣기 실패)이고 그 뒤 가져오기가 성공했다. 원인은 더 보지 않았다.
+- 실측 중 처음 구현이 저장 폴더 자체를 0700으로 바꾸는 것을 보고 고쳤다(만들기만 한다, 테스트 추가).
+- 사람이 확인할 것: 연동 상태 패널의 「기록을 열지 못해 … 백업으로 되돌림」 줄과 「알림 확인」(③ 상태의 Dev에서). 화면 캡처는 하지 않았다.
+- 하지 않은 것: CloudKit을 켠 상태의 복원(동기화가 이후 변경을 다시 받는지), iPhone 기기 실행(빌드만), 수동 예약 복원의 앱 실측(단위 테스트만, 화면은 TRK-47).
+
 ## 알려진 한계
 
 - 세션이 끝난 뒤 그보다 이른 시각의 기록이 실시간으로 처리되지 않고 outbox로만 오면 버린다. 실시간 서버가 그 훅을 받지 못했는데 뒤의 `SessionEnd`는 받은 경우뿐이라 실제로는 드물다. 끝난 세션에 늦은 사실 기록을 붙이는 것은 명세를 바꾸는 일이라 이번에 하지 않았다.
@@ -148,3 +166,4 @@
 - 블록 수신 확인(TRK-35)은 스크립트가 블록을 출력한 뒤 확인 요청을 하나 더 보낸다. 앱은 서버 큐에서 바로 답하므로 `SessionStart`·늦은 주입 훅이 Dev Debug에서 중앙값 10~45 ms 늘어난다(curl 한 번). 확인을 잃거나 받아 둔 확인을 앱 재시작으로 잃으면(블록은 출력됨) 다음 프롬프트에 같은 블록을 한 번 더 받는다. 설치된 스크립트를 바꾸기 전까지는 예전처럼 응답 시간 초과 때 블록을 잃는다.
 - 수신 지연 지표의 출발점은 서버 큐가 연결을 받은 시각이다(TRK-35부터). 그전 측정은 메인 큐 대기를 빼고 쟀다.
 - 재개 시간은 앱이 볼 수 있는 복사→연결까지다. 실제 작업 재개는 관찰로 따로 잰다(로드맵 「측정 방법」).
+- 앱 버전·빌드는 `project.yml`의 고정값(0.0.1, 빌드 1)이고 설치 스크립트가 올리지 않는다. 그래서 지금은 새 빌드를 깔아도 `upgrade` 백업이 뜨지 않고, 판이 바뀔 때와 판 기록이 없던 첫 실행에만 뜬다. 빌드 번호 올리기는 배포 스크립트(TRK-48) 몫.

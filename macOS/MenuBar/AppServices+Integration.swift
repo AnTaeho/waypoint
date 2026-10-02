@@ -33,8 +33,15 @@ extension AppServices {
             "history": history,
             "metrics": metrics,
             "pending": .number(Double(integration.queue.count)),
+            "storeRestore": storeRestore.flatMap { try? StoreBackup.encoder().encode($0) }.flatMap { JSONValue.parse($0) } ?? .null,
             "queueUnreadable": .bool(integration.queue.unreadable)
         ]).serializedString)
+    }
+
+    /// 저장소 복원 알림을 확인했다.
+    func acknowledgeStoreRestore() {
+        if let directory = try? WaypointStore.supportDirectory() { StoreRestoreRecord.clear(supportDirectory: directory) }
+        storeRestore = nil
     }
 
     /// 연결 설정을 연다(메뉴 막대·연동 상태 패널). 메인 창이 없으면 연다.
