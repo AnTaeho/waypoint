@@ -194,17 +194,32 @@ public enum CommandRulesCheck {
         let done = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in done.signal() }
         do { try process.run() } catch { return nil }
+        // 출력이 파이프 버퍼보다 커도 막히지 않게 끝나기를 기다리는 동안 따로 읽는다.
+        let output = ErrorOutput()
+        let read = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            output.set(errorPipe.fileHandleForReading.readDataToEndOfFile())
+            read.signal()
+        }
         if done.wait(timeout: .now() + timeout) == .timedOut {
             process.terminate()
             _ = done.wait(timeout: .now() + 1)
             return nil
         }
-        let stderr = String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        _ = read.wait(timeout: .now() + 1)
+        let stderr = String(decoding: output.get(), as: UTF8.self)
         if process.terminationStatus == 0 && !stderr.contains("failed to parse policy") {
             return Outcome(method: .codex)
         }
         let parsed = parseError(stderr, fileName: file.lastPathComponent)
         return Outcome(method: .codex, problem: parsed.message, line: parsed.line)
+    }
+    /// 다른 스레드에서 읽은 오류 출력
+    private final class ErrorOutput: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+        func set(_ value: Data) { lock.withLock { data = value } }
+        func get() -> Data { lock.withLock { data } }
     }
     #endif
 
