@@ -176,7 +176,8 @@ import Testing
         #expect(found === doc)
     }
 
-    @Test func filesOutsideProjectAreReadOnly() throws {
+    /// 전역·상위 폴더·기억·색인·rules·Codex 규칙은 파일 그대로 쓰는 대상(TRK-41). 등록 문서는 만들지 않는다.
+    @Test func filesOutsideProjectWriteDirectly() throws {
         let (_c, ctx) = try makeContext(); _ = _c
         let dir = try TempDir()
         let outside = try TempDir()
@@ -184,23 +185,49 @@ import Testing
         p.rootPath = dir.url.path
         let global = try outside.write("CLAUDE.md", "- 전역\n")
         let memory = try outside.write("memory/a.md", "기억\n")
+        let index = try outside.write("memory/MEMORY.md", "- [a](a.md)\n")
+        let rules = try outside.write("rules/default.rules", "prefix_rule(pattern=[\"ls\"], decision=\"allow\")\n")
+        let inside = try dir.write(".claude/rules/a.md", "- 규칙\n")
         let cases: [GuidanceSource] = [
             source(global.path, kind: .global, scope: .global),
             source(global.path, kind: .ancestor, scope: .ancestor(outside.url.path)),
             source(memory.path, kind: .memory, scope: .project(p.key)),
-            source(memory.path, kind: .memoryIndex, scope: .project(p.key)),
+            source(index.path, kind: .memoryIndex, scope: .project(p.key)),
+            source(rules.path, kind: .commandRules, scope: .global),
+            source(inside.path, kind: .rule, scope: .project(p.key)),
+        ]
+        for source in cases {
+            let target = GuideItemTarget.resolve(source, projects: [p])
+            guard case .file(let found) = target else { Issue.record("파일 대상 아님: \(source.kind)"); continue }
+            #expect(found.path == source.path)
+            #expect(try target.document(at: t0, context: ctx) == nil)
+        }
+        #expect((p.guideDocs ?? []).isEmpty)
+    }
+
+    @Test func readOnlySources() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let dir = try TempDir()
+        let outside = try TempDir()
+        let p = makeProject(ctx)
+        p.rootPath = dir.url.path
+        let global = try outside.write("CLAUDE.md", "- 전역\n")
+        let db = try outside.write(CodexMemoryStore.fileName, "")
+        let cases: [GuidanceSource] = [
             // 프로젝트 묶음이어도 폴더 밖 경로면 쓰지 않는다
             source(global.path, kind: .project, scope: .project(p.key)),
             // 모르는 프로젝트
             source(global.path, kind: .project, scope: .project("NONE")),
+            // Codex 기억 DB
+            GuidanceSource(kind: .codexMemory, tool: .codex, path: db.path, scope: .global),
+            // 관리 정책 파일
+            source("/Library/Application Support/ClaudeCode/CLAUDE.md", kind: .global, scope: .global),
         ]
         for source in cases {
             let target = GuideItemTarget.resolve(source, projects: [p])
             #expect(!target.isWritable, "\(source.kind) \(source.scope)")
             #expect(try target.document(at: t0, context: ctx) == nil)
         }
-        let inside = try dir.write(".claude/rules/a.md", "- 규칙\n")
-        #expect(!GuideItemTarget.resolve(source(inside.path, kind: .rule, scope: .project(p.key)), projects: [p]).isWritable)
         #expect((p.guideDocs ?? []).isEmpty)
     }
 }
