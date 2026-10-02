@@ -152,6 +152,7 @@
 | ②-b | `store-version.json`의 빌드를 0으로 고치고 실행 | 열기 전 `…035501.863Z-upgrade`(`build: "0"` = 백업한 저장소를 마지막으로 연 빌드, -wal 148,352 B 포함). 판 기록은 다시 빌드 1 |
 | ③ | 저장소 본 파일을 0x41 64 KB로 덮어씀(-wal·-shm 그대로) 뒤 실행 | 열기 실패(`SwiftDataError.loadIssueModelContainer`) → store·-wal·-shm을 `store-failed/20261002T035510.540Z/`(0700)로 옮김, `failure.json`(`quickCheck: failed`) → 최신 백업 `…035501.863Z-upgrade` 복원 → 열림. 47822 수신, `storeRestore` = `{"kind":"automatic","backupID":"20261002T035501.863Z-upgrade","failedFolder":"20261002T035510.540Z",…}`, `project_resolve` → TRK, 프로젝트 4·카드 110·이벤트 4629. 깨진 64 KB 파일은 보존 폴더에 그대로 |
 
+- CloudKit을 켠 첫 열기: 환경 변수 없이 Dev를 Dev 자기 폴더(`Waypoint-Dev/`, 컨테이너 `iCloud.dev.antaeho.waypoint.dev`)로 띄웠다. 판 기록이 없어 열기 전 `20261002T040002.275Z-upgrade`, 판을 붙인 스키마·옮기기 계획으로 열림, Core Data 로그 「Successfully set up CloudKit integration」과 가져오기 「Success」 여러 번. `NSCocoaErrorDomain 134417`이 두 번 있었는데 바로 앞 줄이 「Failed to enqueue request」(요청 넣기 실패)이고 그 뒤 가져오기가 성공했다. 원인은 더 보지 않았다.
 - 실측 중 처음 구현이 저장 폴더 자체를 0700으로 바꾸는 것을 보고 고쳤다(만들기만 한다, 테스트 추가).
 - 사람이 확인할 것: 연동 상태 패널의 「기록을 열지 못해 … 백업으로 되돌림」 줄과 「알림 확인」(③ 상태의 Dev에서). 화면 캡처는 하지 않았다.
 - 하지 않은 것: CloudKit을 켠 상태의 복원(동기화가 이후 변경을 다시 받는지), iPhone 기기 실행(빌드만), 수동 예약 복원의 앱 실측(단위 테스트만, 화면은 TRK-47).
@@ -166,3 +167,4 @@
 - 수신 지연 지표의 출발점은 서버 큐가 연결을 받은 시각이다(TRK-35부터). 그전 측정은 메인 큐 대기를 빼고 쟀다.
 - 재개 시간은 앱이 볼 수 있는 복사→연결까지다. 실제 작업 재개는 관찰로 따로 잰다(로드맵 「측정 방법」).
 - `daily` 저장소 백업은 앱을 실행할 때만 본다. 평소용은 로그인 항목이라 거의 다시 시작하지 않으므로 하루 한 번보다 드물게 뜬다(TRK-46). 업데이트(`upgrade`)는 새 버전이 처음 열 때 반드시 뜬다.
+- 앱 버전·빌드는 `project.yml`의 고정값(0.0.1, 빌드 1)이고 설치 스크립트가 올리지 않는다. 그래서 지금은 새 빌드를 깔아도 `upgrade` 백업이 뜨지 않고, 판이 바뀔 때와 판 기록이 없던 첫 실행에만 뜬다. 빌드 번호 올리기는 배포 스크립트(TRK-48) 몫.
