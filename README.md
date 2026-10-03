@@ -32,7 +32,7 @@ Claude Code·Codex 세션을 프로젝트 단위로 추적하는 개인용 Apple
 ## 설치 (앱)
 
 ```sh
-scripts/install-local.sh   # Release 빌드(팀 서명) → /Applications/Waypoint.app 교체·실행 → 로그인 항목
+scripts/install-local.sh   # Release 빌드(팀 서명) → /Applications/Waypoint.app 교체·실행(로그인 항목은 앱이 등록)
 ```
 
 Xcode 설정 > Accounts에 개발 팀(`2FCXA77MC5`)이 로그인돼 있어야 한다. 빌드가 App ID·iCloud 컨테이너·프로파일을 자동으로 받는다. Mac과 iPhone은 같은 Apple 계정의 iCloud로 기록을 나눈다(CloudKit 개인 DB, `iCloud.dev.antaeho.waypoint`).
