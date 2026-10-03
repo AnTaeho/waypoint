@@ -50,8 +50,10 @@ import Testing
         for choice in [true, false] {
             #expect(Policy.action(trigger: .onboardingFinished, isDev: false, userChoice: choice, autoApplied: false,
                                   status: .notRegistered) == .none)
+            // 설치 스크립트가 지운 경우: 켜 둔 사람은 되살리고, 끈 사람은 그대로 둔다
             #expect(Policy.action(trigger: .launch(existingUser: true, legacyRemoved: true), isDev: false,
-                                  userChoice: choice, autoApplied: false, status: .notRegistered) == .none)
+                                  userChoice: choice, autoApplied: false, status: .notRegistered)
+                    == (choice ? .register : .none))
         }
     }
 
@@ -165,5 +167,18 @@ import Testing
         controller.setEnabled(true)
         #expect(service.registers == 0 && service.unregisters == 0)
         #expect(controller.userChoice == nil && controller.status == .notRegistered)
+    }
+
+    @Test func legacyRemovalRestoresAppRegistration() {
+        typealias Policy = LoginItemPolicy
+        // 설치 스크립트가 System Events로 지운 항목이 앱이 등록한 것이어도, 사용자가 끈 적이 없으면 되살린다
+        #expect(Policy.action(trigger: .launch(existingUser: true, legacyRemoved: true), isDev: false,
+                              userChoice: nil, autoApplied: true, status: .notRegistered) == .register)
+        #expect(Policy.action(trigger: .launch(existingUser: true, legacyRemoved: true), isDev: false,
+                              userChoice: true, autoApplied: true, status: .notRegistered) == .register)
+        #expect(Policy.action(trigger: .launch(existingUser: true, legacyRemoved: true), isDev: false,
+                              userChoice: false, autoApplied: true, status: .notRegistered) == .none)
+        #expect(Policy.action(trigger: .launch(existingUser: true, legacyRemoved: true), isDev: true,
+                              userChoice: nil, autoApplied: true, status: .notRegistered) == .none)
     }
 }

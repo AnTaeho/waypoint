@@ -83,7 +83,10 @@ mv "$tmp" "$DEST" || fail "옮기기 실패: $tmp → $DEST"
 # 4. 옛 로그인 항목(System Events로 만든 것)이 있으면 지운다. 새 방식 등록은 앱이 한다(TRK-55).
 #    지웠으면 앱이 첫 실행 때 알 수 있게 표시를 남긴다(앱이 읽고 지운다). 실행 전에 해야 앱이 첫 실행에서 본다.
 login="앱이 관리"
-if [ "$DEST_DIR" = "/Applications" ]; then
+if [ "$DEST_DIR" = "/Applications" ] && [ "$(defaults read "$BUNDLE_ID" loginItem.autoApplied 2>/dev/null)" = "1" ]; then
+  # 앱이 이미 새 방식으로 등록했다. System Events 목록에 그 항목도 보이므로 지우지 않는다
+  :
+elif [ "$DEST_DIR" = "/Applications" ]; then
   removed="$(osascript -e 'tell application "System Events"
     if exists login item "Waypoint" then
       delete login item "Waypoint"
