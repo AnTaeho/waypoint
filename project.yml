@@ -81,6 +81,9 @@ targets:
         "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": Config/Waypoint-iOS.entitlements
         # macOS: `WaypointICloud`(위 WAYPOINT_ICLOUD), 자동 업데이트 키(`SU…`). 나머지 Info.plist 키는 생성한다.
         "INFOPLIST_FILE[sdk=macosx*]": Config/Waypoint-macOS-Info.plist
+        # 다중 플랫폼 타깃이라 기본 실행 경로가 iOS 형식(@executable_path/Frameworks)이다.
+        # macOS 앱은 Contents/Frameworks에 넣은 Sparkle.framework를 찾도록 경로를 더한다.
+        "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "$(inherited) @executable_path/../Frameworks"
         # iOS만: 원격 알림(백그라운드)으로 CloudKit 변경을 받는다. 나머지 Info.plist 키는 생성한다.
         "INFOPLIST_FILE[sdk=iphoneos*]": Config/Waypoint-iOS-Info.plist
         "INFOPLIST_FILE[sdk=iphonesimulator*]": Config/Waypoint-iOS-Info.plist
