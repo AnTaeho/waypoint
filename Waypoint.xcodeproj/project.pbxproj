@@ -35,6 +35,7 @@
 		28DEC8FCB58357F6F50C26C4 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC3E1C22C1721884D81223C /* OnboardingView.swift */; platformFilters = (macos, ); };
 		2BF7A1111F6FD51BD017BD1F /* InitFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60588B3D4D8F4FFA5A1DE9AE /* InitFields.swift */; platformFilters = (macos, ); };
 		2DD1C23754E17319B462F416 /* Theme+Situation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530C5A418E959337898BF318 /* Theme+Situation.swift */; };
+		2F99B712B3958ED03848A5B4 /* SystemLoginItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F34FE49F7DBC844986A97C76 /* SystemLoginItem.swift */; platformFilters = (macos, ); };
 		302718CFFF0EBCE13D5CDA0C /* NanumSquareRoundL.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 147DD09BAE6889ACD4D2B038 /* NanumSquareRoundL.ttf */; };
 		308D3C8442C32B64CABCEC31 /* ActivityEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A7C8940CD504E024CBC818 /* ActivityEventRow.swift */; platformFilters = (macos, ); };
 		31AEACD74CFCC273C5B3249C /* GuideInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C30269DEA92A22D30679441 /* GuideInspector.swift */; platformFilters = (macos, ); };
@@ -143,6 +144,7 @@
 		EBDB3B16B11964D78738CFFC /* TableWidth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F36AB1BF7B1426264EAF3E /* TableWidth.swift */; platformFilters = (macos, ); };
 		EC091F8610FAEAAACA92C238 /* UsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A89B6FA1806DF7774BAE65 /* UsageMonitor.swift */; platformFilters = (macos, ); };
 		EC5A09AE5A861570A3ACEC27 /* BoardColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83B5E7102286FAE2A09F9FD6 /* BoardColumnView.swift */; platformFilters = (macos, ); };
+		EDB150F36468194CA8ED5776 /* GeneralTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3295787F472FC82D3782464 /* GeneralTab.swift */; platformFilters = (macos, ); };
 		EF122A5B35EE03AF9D3A7179 /* CardHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 882355B5AEEAAD1B56A6093B /* CardHistoryView.swift */; platformFilters = (macos, ); };
 		F16D52C60CEA131D75FDFEFE /* GuidanceAppliedList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD4CBFC3B2F7C4E86919528 /* GuidanceAppliedList.swift */; platformFilters = (macos, ); };
 		F2BFAF7D13041C989D1F079B /* IntegrationHealthPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876A07410CA71E7DB935B6F5 /* IntegrationHealthPanel.swift */; platformFilters = (macos, ); };
@@ -289,6 +291,8 @@
 		F17DF63C0EFBD556CA5F328D /* DetailRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailRootView.swift; sourceTree = "<group>"; };
 		F1F713FBA97C05AE11B404DC /* DashboardContinue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardContinue.swift; sourceTree = "<group>"; };
 		F23428B13475D5E2645B371A /* GuidanceSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSections.swift; sourceTree = "<group>"; };
+		F3295787F472FC82D3782464 /* GeneralTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralTab.swift; sourceTree = "<group>"; };
+		F34FE49F7DBC844986A97C76 /* SystemLoginItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemLoginItem.swift; sourceTree = "<group>"; };
 		F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
 		F5600B7899166877C485F3D9 /* AppServices+Replay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServices+Replay.swift"; sourceTree = "<group>"; };
 		F7B2D45D42FB21487B5942FA /* GuideMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideMonitor.swift; sourceTree = "<group>"; };
@@ -508,12 +512,14 @@
 		589986D1E550E1DF45191720 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				F3295787F472FC82D3782464 /* GeneralTab.swift */,
 				30A0B34EACA1D61F9F835B75 /* RecordsBackupSection.swift */,
 				6AFE5117E5AF0D65CC3D1E23 /* RecordsDataSection.swift */,
 				23BAEA2547A3E866B89BD333 /* RecordsLaunch.swift */,
 				3E0E5DC15221D133DDE0C5D6 /* RecordsModel.swift */,
 				EB2AE4CB5E74C1603F6C4DF3 /* RecordsTab.swift */,
 				93ACA15FE4B6D1BD5BC3C0AF /* SettingsView.swift */,
+				F34FE49F7DBC844986A97C76 /* SystemLoginItem.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -792,6 +798,7 @@
 				970A97158CAB302DDAD9D807 /* DetailRootView.swift in Sources */,
 				40B86660844BB42A2680C750 /* DevBadge.swift in Sources */,
 				96E1CBB3E7DA3EA349350AEA /* FontRegistry.swift in Sources */,
+				EDB150F36468194CA8ED5776 /* GeneralTab.swift in Sources */,
 				F16D52C60CEA131D75FDFEFE /* GuidanceAppliedList.swift in Sources */,
 				54B5C7DAAE48AA1C5A18F5AC /* GuidanceBackupSheet.swift in Sources */,
 				16BB5F41B2B10C5F88C383FB /* GuidanceContentViews.swift in Sources */,
@@ -874,6 +881,7 @@
 				5EFB724CEBE62836E4A5AFB1 /* SituationRows.swift in Sources */,
 				62D2CC2D189C3BBDB7D2DACD /* SituationStatus.swift in Sources */,
 				D936260875A70C3573D0D792 /* SituationTile.swift in Sources */,
+				2F99B712B3958ED03848A5B4 /* SystemLoginItem.swift in Sources */,
 				BB4B19ECB8780F419DFA3ACE /* TableHeader.swift in Sources */,
 				EBDB3B16B11964D78738CFFC /* TableWidth.swift in Sources */,
 				F88A2578EB35CD881C57E559 /* Theme+Activity.swift in Sources */,

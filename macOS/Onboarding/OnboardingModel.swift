@@ -62,9 +62,10 @@ final class OnboardingModel {
     /// 이 창에 시트를 보일까
     func shows(in window: UUID) -> Bool { isPresented && (hostWindow == nil || hostWindow == window) }
 
-    /// 「끝」: 다시 자동으로 뜨지 않게 기억한다.
+    /// 「끝」: 다시 자동으로 뜨지 않게 기억하고, 고른 적이 없으면 로그인할 때 열기를 켠다.
     func finish() {
         UserDefaults.standard.set(true, forKey: OnboardingProgress.completedKey)
+        services?.loginItem.onboardingFinished()
         recordEnd(finished: true)
         isPresented = false
     }
