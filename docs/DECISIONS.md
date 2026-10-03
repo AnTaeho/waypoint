@@ -641,7 +641,7 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 피드 주소·공개 키는 빌드 설정(`WAYPOINT_FEED_URL`·`WAYPOINT_UPDATE_PUBLIC_KEY`)으로 Info.plist에 넣고, 피드가 비면 업데이트 기능을 열지 않는다(메뉴·설정 숨김). 기본값은 빈 주소. 메인 세션 결정 | 평소용·Dev는 설치 스크립트·Debug 빌드로만 바뀐다(개발 규칙). 기존 `WAYPOINT_ICLOUD` 방식과 같다 | 앱 설정에서 주소 입력 | `UpdateFeed` |
 | 서명 키는 이 Mac 로그인 키체인에 Sparkle `generate_keys`로 만들고, 계정은 기본 `ed25519` 대신 `dev.antaeho.waypoint`(내 판단) | 다른 앱에 Sparkle을 붙여도 키가 섞이지 않는다 | 기본 계정 | `--account` 인자 |
 | 배포 스크립트는 `generate_keys -x`로 키를 700 임시 폴더에 꺼내 `sign_update --ed-key-file`로 서명하고 바로 지운다(내 판단) | `sign_update`가 키체인을 직접 읽으면 키체인 접근 허용 창이 뜬다(키를 만든 도구가 아님). 무인 실행이 안 된다 | 키체인 직접 읽기(처음 한 번 「항상 허용」) | `sign_zip` |
-| appcast는 `generate_appcast` 대신 스크립트가 직접 쓴다. 이번 빌드 한 항목, 차등 업데이트 없음(내 판단) | 다운로드 주소 자리 표시(`{{DOWNLOAD_BASE}}`)와 노트를 정해진 모양으로 넣는다. `generate_appcast`는 키체인을 읽고(위 창) 옛 판 폴더가 필요하다 | `generate_appcast` | 8단계 |
+| appcast는 `generate_appcast` 대신 스크립트가 직접 쓴다. 이번 빌드 한 항목, 차등 업데이트 없음(내 판단) | 다운로드 주소 자리 표시(`{{DOWNLOAD_BASE}}`)와 노트를 정해진 모양으로 넣는다. `generate_appcast`는 옛 판을 모은 폴더가 필요하고 노트·주소 모양을 정하기 어렵다 | `generate_appcast` | 8단계 |
 | 릴리스 노트 = 지난 `mac-*` 태그 뒤 main 커밋 제목(`--first-parent`, 머지면 PR 제목) 최대 10줄, 태그가 없으면 최근 10줄(내 판단) | PR 제목이 사용자에게 보일 만한 단위다. 태그는 공개할 때 남긴다 | 손으로 쓴 노트 | 노트 두 줄 |
 | `SUEnableAutomaticChecks`를 Info.plist에 켜 둔다. 자동 설치(`SUAutomaticallyUpdate`)는 기본 끔 — Sparkle 창에서 사람이 고른다(내 판단) | 켜 두지 않으면 두 번째 실행에 Sparkle이 묻는 창을 띄운다. 저절로 확인은 하되, 바꾸는 것은 사람이 본 뒤에 | 질문 창 그대로, 자동 설치 기본 켬 | Info.plist 한 키 |
 | 화면: 메뉴 막대 「업데이트 확인…」(「연결 설정…」 아래), 설정 「일반」 「자동으로 업데이트 확인」·「지금 확인」. 앱 메뉴(Waypoint > 업데이트 확인…)에는 넣지 않았다(내 판단) | 지시서 범위. 상주 앱이라 메뉴 막대가 주 진입점 | 앱 메뉴에도 | `MenuBarContent`·`UpdateSection` |
