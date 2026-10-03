@@ -631,3 +631,23 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 설정 창 첫 탭을 「일반」으로, 기본 탭도 「일반」(내 판단) | 지시서대로 맨 앞에 둔다 | 「사용량」 기본 유지 | `SettingsTab` |
 
 검증: `swift test` 751개 통과(새 `LoginItemTests` 14개), macOS Debug 빌드, `bash -n scripts/install-local.sh`, `python3 scripts/test_build_failure_report.py` 17개 통과. Dev 설정 「일반」 탭 창 캡처(꺼짐·비활성). 평소용 등록과 옛 항목 정리는 머지 뒤 평소용 설치로 확인한다.
+
+## 2026-10-03 — 자동 업데이트 (TRK-56)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| Sparkle 2.10.0(SwiftPM, 판 고정, macOS 타깃만)으로 업데이트한다. 사용자 결정 | 서명 확인·설치·재실행을 직접 만들지 않는다. 외부 의존성이라 확인받았다 | 직접 구현, 새 zip을 사람이 다시 설치 | `project.yml` 패키지·의존성 두 줄과 `macOS/Update/` |
+| 업데이트 파일 공개 호스팅은 아직 하지 않는다. 앱 기능과 서명·appcast 스크립트까지만. 사용자 결정 | 공개 주소는 베타 보낼 때 정한다 | 지금 호스팅을 정하기 | — |
+| 피드 주소·공개 키는 빌드 설정(`WAYPOINT_FEED_URL`·`WAYPOINT_UPDATE_PUBLIC_KEY`)으로 Info.plist에 넣고, 피드가 비면 업데이트 기능을 열지 않는다(메뉴·설정 숨김). 기본값은 빈 주소. 메인 세션 결정 | 평소용·Dev는 설치 스크립트·Debug 빌드로만 바뀐다(개발 규칙). 기존 `WAYPOINT_ICLOUD` 방식과 같다 | 앱 설정에서 주소 입력 | `UpdateFeed` |
+| 서명 키는 이 Mac 로그인 키체인에 Sparkle `generate_keys`로 만들고, 계정은 기본 `ed25519` 대신 `dev.antaeho.waypoint`(내 판단) | 다른 앱에 Sparkle을 붙여도 키가 섞이지 않는다 | 기본 계정 | `--account` 인자 |
+| 배포 스크립트는 `generate_keys -x`로 키를 700 임시 폴더에 꺼내 `sign_update --ed-key-file`로 서명하고 바로 지운다(내 판단) | `sign_update`가 키체인을 직접 읽으면 키체인 접근 허용 창이 뜬다(키를 만든 도구가 아님). 무인 실행이 안 된다 | 키체인 직접 읽기(처음 한 번 「항상 허용」) | `sign_zip` |
+| appcast는 `generate_appcast` 대신 스크립트가 직접 쓴다. 이번 빌드 한 항목, 차등 업데이트 없음(내 판단) | 다운로드 주소 자리 표시(`{{DOWNLOAD_BASE}}`)와 노트를 정해진 모양으로 넣는다. `generate_appcast`는 옛 판을 모은 폴더가 필요하고 노트·주소 모양을 정하기 어렵다 | `generate_appcast` | 8단계 |
+| 릴리스 노트 = 지난 `mac-*` 태그 뒤 main 커밋 제목(`--first-parent`, 머지면 PR 제목) 최대 10줄, 태그가 없으면 최근 10줄(내 판단) | PR 제목이 사용자에게 보일 만한 단위다. 태그는 공개할 때 남긴다 | 손으로 쓴 노트 | 노트 두 줄 |
+| `SUEnableAutomaticChecks`를 Info.plist에 켜 둔다. 자동 설치(`SUAutomaticallyUpdate`)는 기본 끔 — Sparkle 창에서 사람이 고른다(내 판단) | 켜 두지 않으면 두 번째 실행에 Sparkle이 묻는 창을 띄운다. 저절로 확인은 하되, 바꾸는 것은 사람이 본 뒤에 | 질문 창 그대로, 자동 설치 기본 켬 | Info.plist 한 키 |
+| 화면: 메뉴 막대 「업데이트 확인…」(「연결 설정…」 아래), 설정 「일반」 「자동으로 업데이트 확인」·「지금 확인」. 앱 메뉴(Waypoint > 업데이트 확인…)에는 넣지 않았다(내 판단) | 지시서 범위. 상주 앱이라 메뉴 막대가 주 진입점 | 앱 메뉴에도 | `MenuBarContent`·`UpdateSection` |
+| `AppUpdater`는 `AppServices`에 둔다(로그인 항목과 같은 자리)(내 판단) | 샘플 모드는 서비스가 없어 업데이트도 꺼진다 | 앱 구조체에 따로 | `AppServices.updater` |
+| macOS 실행 경로에 `@executable_path/../Frameworks`를 더했다. 스크립트가 서명 검증 때 확인한다(내 판단, 실측에서 발견) | 다중 플랫폼 타깃 기본값이 iOS 형식이라 처음 넣은 프레임워크(Sparkle)를 못 찾고 열자마자 죽었다 | — | `LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]` |
+| 서명 검증에 Sparkle 안쪽 실행 파일(`Autoupdate`·`Updater.app`·XPC 두 개)의 Developer ID·하드닝 런타임을 더했다(내 판단) | 위쪽 앱만 보면 export가 안쪽을 다시 서명하지 못한 경우를 놓친다 | 위쪽만 | `verify_signature` |
+| 패키지를 `.build/SourcePackages`에 받아 archive와 서명 도구가 같이 쓴다(내 판단) | `--resume-notarize`에는 DerivedData가 없고, 빌드마다 다시 받지 않는다 | DerivedData 안 도구 | `-clonedSourcePackagesDirPath` |
+
+검증: `swift test` 754개 통과(새 `UpdateFeedTests` 3개), macOS Debug·iOS 시뮬레이터 빌드(iOS 앱에 Sparkle 없음), `scripts/release-mac.sh --skip-notarize --allow-dirty --feed-url … --download-base …`(Sparkle 구성 요소 Developer ID, appcast·서명 생성), Dev 9001 → 9002 업데이트 실측. [RELEASE.md](RELEASE.md) 「자동 업데이트 > 실측」.

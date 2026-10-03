@@ -621,6 +621,15 @@ Codex: `scripts/install-codex.py`를 그대로 옮겼다(`CodexInstallPlanner`).
 - **화면**: 토글은 실제 상태를 따른다(켜짐 = `enabled`·`requiresApproval`). 아래 줄에 「켜짐」「꺼짐」「승인 필요」, 등록·해제가 실패하면 「바꾸지 못함」. 승인 필요면 「시스템 설정에서 허용」(`SMAppService.openSystemSettingsLoginItems()`). 앱이 앞으로 올 때마다 상태를 다시 읽는다.
 - **옛 항목**: `scripts/install-local.sh`가 앱을 실행하기 전에 System Events로 만든 옛 항목 「Waypoint」를 지우고, 지웠으면 `defaults write dev.antaeho.waypoint WaypointLoginItemLegacyRemoved -bool true`를 남긴다. 앱은 실행 때 이 값을 읽고 지운다. 스크립트는 새 방식 항목을 만들지 않는다.
 
+### 자동 업데이트 (2026-10-03, TRK-56)
+
+macOS 앱만. Sparkle 2.10.0(SwiftPM, 사용자 승인)의 표준 화면(`SPUStandardUpdaterController`)이 새 판 찾기·내려받기·서명 확인·설치·재실행을 맡는다. 판정은 순수 타입 `UpdateFeed`(`Shared/Instance/UpdateFeed.swift`), 앱 쪽은 `AppUpdater`(`macOS/Update/`). 배포·서명 키·공개 절차는 [RELEASE.md](RELEASE.md) 「자동 업데이트」.
+
+- **꺼짐 조건**: Info.plist `SUFeedURL`(빌드 설정 `WAYPOINT_FEED_URL`)이 비었거나 `http`·`https` 주소가 아니거나, `SUPublicEDKey`가 32바이트 base64가 아니면 `UpdateFeed`가 nil이고 Sparkle을 시작하지 않는다. 메뉴·설정 항목도 없다. 기본값은 빈 주소라 평소용·Dev·피드 없이 만든 배포 빌드는 모두 꺼진다. 샘플 모드(`-WaypointSampleData`)도 꺼진다.
+- **켜질 때**: 배포 스크립트 `--feed-url`로 만든 빌드. 저절로 확인은 기본 켬(Info.plist `SUEnableAutomaticChecks`, Sparkle 기본 간격 하루) — 그래서 Sparkle의 「자동으로 확인할까요」 질문 창은 뜨지 않는다. 새 판이 있으면 Sparkle 창이 릴리스 노트와 함께 알리고, 사람이 고른다. 그 창의 「자동으로 내려받아 설치」를 고르면 다음부터는 뒤에서 받아 두었다가 앱을 끌 때 바꾼다.
+- **화면**: 메뉴 막대 메뉴 「업데이트 확인…」(「연결 설정…」 아래), 설정 「일반」 탭 「자동으로 업데이트 확인」 토글과 「지금 확인」. 확인·설치가 진행 중이면 두 버튼이 비활성(`canCheckForUpdates`).
+- **안전**: 서명(EdDSA)이 맞지 않는 zip은 설치하지 않는다. 설치가 실패하면 옛 앱이 남는다. 새 빌드가 처음 열릴 때 저장소를 백업한다(TRK-46 `store-version.json`, `upgrade`). 앱은 업데이트 서버에 피드·zip 요청 말고는 보내지 않는다(시스템 정보 전송 `SUEnableSystemProfiling` 끔 — Sparkle 기본).
+
 ### 기록 지표와 진단 내보내기 (2026-10-01, TRK-11)
 
 이 기기에서만 숫자와 시각을 모은다(`ReliabilityMetrics`, 저장 폴더 `metrics.json` 0600, 10초 점검 때 저장, CloudKit 아님): 실시간 훅의 수신(서버가 연결을 받은 시각)→저장·화면 반영 지연 최근 1000건, 재개 시간(재개 문맥을 처음 복사한 시각 → 그 카드에 같은 도구의 새 메인 세션이 연결된 시각, 최근 100건), 연동 실패(서버 시작·형식 오류·저장 실패), 복구(outbox 흡수·보존·격리, 세션 정리) 횟수. 연동 상태 패널에 짧게 보이고, 「진단 정보 복사」를 누를 때만 같은 숫자를 내보낸다. 프로젝트명·경로·세션 ID·대화는 담지 않는다. `/integration/status`가 `metrics`로 돌려준다. 기준·측정 방법·관측값은 docs/RELIABILITY.md.

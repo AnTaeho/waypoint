@@ -20,6 +20,8 @@ final class AppServices {
     let onboarding = OnboardingModel()
     /// 로그인할 때 열기(TRK-55). Dev는 등록하지 않는다
     let loginItem = LoginItemController.forCurrentApp()
+    /// 자동 업데이트(TRK-56). 피드 주소가 없는 빌드(평소용·Dev 기본)는 nil
+    let updater = AppUpdater.forCurrentApp()
     /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
     let reliability = ReliabilityMonitor()
     /// 이번이나 지난 실행에서 백업으로 저장소를 되돌린 기록(TRK-46). 사람이 확인하면 지운다.

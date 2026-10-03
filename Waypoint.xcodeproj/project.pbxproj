@@ -68,6 +68,7 @@
 		60D8AD7C833441AC71F2DBF4 /* Theme+Integration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59B811F1DE3AC3DC226F1C4E /* Theme+Integration.swift */; };
 		62D2CC2D189C3BBDB7D2DACD /* SituationStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F27B2B042A9231EE95EF23 /* SituationStatus.swift */; platformFilters = (macos, ); };
 		63C993348C2590184352F18D /* GuidanceItemsView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AF75CAA2434B36EAADEE33 /* GuidanceItemsView+Actions.swift */; platformFilters = (macos, ); };
+		647647EA5CA352723CC1A2E8 /* UpdateSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E394BA407F39358B0C0C02 /* UpdateSection.swift */; platformFilters = (macos, ); };
 		64DA885EA5000630F5FE0452 /* ProjectBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3905FDAF71CEBAF40695A08 /* ProjectBoardView.swift */; platformFilters = (macos, ); };
 		664F7F251DB8D0EBA16ED7F6 /* waypoint-hook.sh in Resources */ = {isa = PBXBuildFile; fileRef = 077351F456AF1ADAC9E0A6C2 /* waypoint-hook.sh */; platformFilters = (macos, ); };
 		678C65EC66445DBD7A7F916E /* BoardSessionTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BA220A766EFABD5B33123B /* BoardSessionTileView.swift */; platformFilters = (macos, ); };
@@ -84,6 +85,7 @@
 		7BCF4AB93F95F3EC62939D07 /* RecentEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10953BB751280167D0C7C35D /* RecentEventRow.swift */; platformFilters = (macos, ); };
 		82176669D0031154252B5090 /* GuidanceItemEditBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E99658C45DA84EB7B27B927 /* GuidanceItemEditBox.swift */; platformFilters = (macos, ); };
 		8228932BCA3E371ABBA655AC /* NanumSquareRoundB.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7579DAE684178D0E8821A0EE /* NanumSquareRoundB.ttf */; };
+		85C666FE51923BF64BE3B1E0 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76963807F1F6E9F2E0929421 /* AppUpdater.swift */; platformFilters = (macos, ); };
 		87178D322B769663C9B92465 /* GuidanceSourceList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5182AAF26F00C37D627FC1AE /* GuidanceSourceList.swift */; platformFilters = (macos, ); };
 		8CBED4BF058DC174E880EBEE /* RecordsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB2AE4CB5E74C1603F6C4DF3 /* RecordsTab.swift */; platformFilters = (macos, ); };
 		8DDDF628EB44D6378567C942 /* CardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F79E43D0AD5525DEAADCE1F /* CardDetailView.swift */; platformFilters = (macos, ); };
@@ -118,6 +120,7 @@
 		BC713A647294B86A45898ABF /* GuideHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1428C1C9DF33957DF12915D /* GuideHeaderBar.swift */; platformFilters = (macos, ); };
 		C1BD533F5FE9F200D7314416 /* IntegrationMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E9CD0EB19EC76CDDFEFAFD /* IntegrationMonitor.swift */; platformFilters = (macos, ); };
 		C1D56D73E14D9A95E32184DF /* GuidanceItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE32072CBF255EF907DBFB5 /* GuidanceItemsView.swift */; platformFilters = (macos, ); };
+		C44E658D1AFC76D30051E379 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 6E4353D7D3D04084BF671AE3 /* Sparkle */; };
 		C4D93D3CFB3DC216A0E4AA8F /* GuidanceDeletedDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26DAEC051B147B7C415F9607 /* GuidanceDeletedDetail.swift */; platformFilters = (macos, ); };
 		C6379F2FF1F7323723AC6397 /* GuideEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEF1F62190715D2269F95AF /* GuideEditor.swift */; platformFilters = (macos, ); };
 		CA376468607C6C2C8159BE47 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA82393508D897437A7F5856 /* RootView.swift */; platformFilters = (macos, ); };
@@ -177,6 +180,7 @@
 		1C31DE45B2536C9E57E0B79B /* GuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideView.swift; sourceTree = "<group>"; };
 		1F3B60D09C1EDAC5EC81AA0E /* CardInspectorLists.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInspectorLists.swift; sourceTree = "<group>"; };
 		1F4A7D7AF9C02C92C35E3D73 /* RootInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootInspector.swift; sourceTree = "<group>"; };
+		22E394BA407F39358B0C0C02 /* UpdateSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSection.swift; sourceTree = "<group>"; };
 		22E9CD0EB19EC76CDDFEFAFD /* IntegrationMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationMonitor.swift; sourceTree = "<group>"; };
 		23BAEA2547A3E866B89BD333 /* RecordsLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLaunch.swift; sourceTree = "<group>"; };
 		24E0447C0C3D3564FA361133 /* GuideVersionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideVersionSheet.swift; sourceTree = "<group>"; };
@@ -227,6 +231,7 @@
 		7579DAE684178D0E8821A0EE /* NanumSquareRoundB.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NanumSquareRoundB.ttf; sourceTree = "<group>"; };
 		7589B21E222DC5DBB867A617 /* MarkdownBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBlockView.swift; sourceTree = "<group>"; };
 		7674D8B0BD32470880BE4993 /* GuidanceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceMonitor.swift; sourceTree = "<group>"; };
+		76963807F1F6E9F2E0929421 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		786633AF6FAB07F8719504A1 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		799B6BB6C2822534A015D8FA /* IntegrationStatusButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationStatusButton.swift; sourceTree = "<group>"; };
 		7A2CF0FCA811E696C8AADA1E /* OnboardingProjectStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingProjectStep.swift; sourceTree = "<group>"; };
@@ -311,6 +316,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				40B9BBAE36C499828E03B0CF /* WaypointKit in Frameworks */,
+				C44E658D1AFC76D30051E379 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -408,6 +414,7 @@
 				9AD13A9C19AE151779A25A60 /* MenuBar */,
 				1FE2DB05D1885FA740B519F4 /* Onboarding */,
 				589986D1E550E1DF45191720 /* Settings */,
+				FFA09B139594A21AD13CD004 /* Update */,
 				D375A5968A791C220749573E /* Usage */,
 			);
 			path = macOS;
@@ -520,6 +527,7 @@
 				EB2AE4CB5E74C1603F6C4DF3 /* RecordsTab.swift */,
 				93ACA15FE4B6D1BD5BC3C0AF /* SettingsView.swift */,
 				F34FE49F7DBC844986A97C76 /* SystemLoginItem.swift */,
+				22E394BA407F39358B0C0C02 /* UpdateSection.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -678,6 +686,14 @@
 			path = tracker;
 			sourceTree = "<group>";
 		};
+		FFA09B139594A21AD13CD004 /* Update */ = {
+			isa = PBXGroup;
+			children = (
+				76963807F1F6E9F2E0929421 /* AppUpdater.swift */,
+			);
+			path = Update;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -696,6 +712,7 @@
 			name = Waypoint;
 			packageProductDependencies = (
 				40BCBD52B88D9C65C146385E /* WaypointKit */,
+				6E4353D7D3D04084BF671AE3 /* Sparkle */,
 			);
 			productName = Waypoint;
 			productReference = BA0E993CFF4FC1F5EB46A65E /* Waypoint.app */;
@@ -726,6 +743,7 @@
 			mainGroup = E6D07D279A9539D3CB3AC7C2;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				4BCE53F533B1F02AB1911A8F /* XCRemoteSwiftPackageReference "Sparkle" */,
 				72E210A10BEDF3C6E5C71441 /* XCLocalSwiftPackageReference "." */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -772,6 +790,7 @@
 				A2A739615BDA68CB8BC0E1BE /* AppServices+Lifecycle.swift in Sources */,
 				34D50AE2074CD44F0EACBE01 /* AppServices+Replay.swift in Sources */,
 				9DA64E17CECB64D0588A9110 /* AppServices.swift in Sources */,
+				85C666FE51923BF64BE3B1E0 /* AppUpdater.swift in Sources */,
 				AE8010717EC3BCB93185B8C3 /* BoardCardView.swift in Sources */,
 				EC5A09AE5A861570A3ACEC27 /* BoardColumnView.swift in Sources */,
 				A6AFC6300AD9C9F662C6BCE0 /* BoardSessionBox.swift in Sources */,
@@ -895,6 +914,7 @@
 				2DD1C23754E17319B462F416 /* Theme+Situation.swift in Sources */,
 				4DAAB619BA15440C409EC1FC /* Theme.swift in Sources */,
 				B298C90D29F59A11610D1FDF /* ToolLauncher.swift in Sources */,
+				647647EA5CA352723CC1A2E8 /* UpdateSection.swift in Sources */,
 				CAE9446A3A4BE6ED82FA2DCA /* UsageGaugeView.swift in Sources */,
 				EC091F8610FAEAAACA92C238 /* UsageMonitor.swift in Sources */,
 				EB1BAD26D6D1B3B7B8E383E5 /* WaypointApp.swift in Sources */,
@@ -931,6 +951,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.antaeho.waypoint.dev;
 				PRODUCT_NAME = Waypoint;
@@ -942,7 +963,9 @@
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WAYPOINT_CONTAINER = iCloud.dev.antaeho.waypoint.dev;
+				WAYPOINT_FEED_URL = "";
 				WAYPOINT_ICLOUD = YES;
+				WAYPOINT_UPDATE_PUBLIC_KEY = "rQ94D4N8zL7HR322vQkicieI0AwuMkKgVIPX40PSgkE=";
 			};
 			name = Debug;
 		};
@@ -1098,6 +1121,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.antaeho.waypoint;
 				PRODUCT_NAME = Waypoint;
@@ -1109,7 +1133,9 @@
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WAYPOINT_CONTAINER = iCloud.dev.antaeho.waypoint;
+				WAYPOINT_FEED_URL = "";
 				WAYPOINT_ICLOUD = YES;
+				WAYPOINT_UPDATE_PUBLIC_KEY = "rQ94D4N8zL7HR322vQkicieI0AwuMkKgVIPX40PSgkE=";
 			};
 			name = Release;
 		};
@@ -1143,10 +1169,26 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		4BCE53F533B1F02AB1911A8F /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		40BCBD52B88D9C65C146385E /* WaypointKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WaypointKit;
+		};
+		6E4353D7D3D04084BF671AE3 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4BCE53F533B1F02AB1911A8F /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -4,5 +4,11 @@
 <dict>
 	<key>WaypointICloud</key>
 	<string>$(WAYPOINT_ICLOUD)</string>
+	<key>SUFeedURL</key>
+	<string>$(WAYPOINT_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(WAYPOINT_UPDATE_PUBLIC_KEY)</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>

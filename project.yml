@@ -13,6 +13,10 @@ settings:
 packages:
   WaypointKit:
     path: .
+  # 자동 업데이트(TRK-56). macOS 타깃만 쓴다. 판을 올릴 때는 docs/RELEASE.md 「자동 업데이트」를 본다.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
 targets:
   Waypoint:
     type: application
@@ -38,6 +42,8 @@ targets:
         destinationFilters: [macOS]
     dependencies:
       - package: WaypointKit
+      - package: Sparkle
+        destinationFilters: [macOS]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.antaeho.waypoint
@@ -64,11 +70,20 @@ targets:
         # iCloud 동기화를 켜고 빌드하는가. Info.plist `WaypointICloud`로 들어가 `AppInstance.cloudKitContainer`가 읽는다.
         # 평소용·개발용은 켬. 외부 베타 배포(`scripts/release-mac.sh`)만 기본으로 NO를 넘긴다. 엔타이틀먼트는 그대로 둔다.
         WAYPOINT_ICLOUD: YES
+        # 자동 업데이트(TRK-56). Info.plist `SUFeedURL`·`SUPublicEDKey`로 들어가 `UpdateFeed`가 읽는다.
+        # 피드 주소가 비어 있으면 업데이트 기능이 꺼진다(메뉴·설정 항목도 숨김). 평소용·개발용은 늘 비워 둔다.
+        # 외부 베타 배포(`scripts/release-mac.sh --feed-url <주소>`)만 값을 넘긴다.
+        WAYPOINT_FEED_URL: ""
+        # 업데이트 서명 공개 키. 개인 키는 이 Mac 로그인 키체인(계정 dev.antaeho.waypoint)에만 있다(docs/RELEASE.md).
+        WAYPOINT_UPDATE_PUBLIC_KEY: rQ94D4N8zL7HR322vQkicieI0AwuMkKgVIPX40PSgkE=
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Config/Waypoint-macOS.entitlements
         "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]": Config/Waypoint-iOS.entitlements
         "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": Config/Waypoint-iOS.entitlements
-        # macOS: `WaypointICloud`(위 WAYPOINT_ICLOUD). 나머지 Info.plist 키는 생성한다.
+        # macOS: `WaypointICloud`(위 WAYPOINT_ICLOUD), 자동 업데이트 키(`SU…`). 나머지 Info.plist 키는 생성한다.
         "INFOPLIST_FILE[sdk=macosx*]": Config/Waypoint-macOS-Info.plist
+        # 다중 플랫폼 타깃이라 기본 실행 경로가 iOS 형식(@executable_path/Frameworks)이다.
+        # macOS 앱은 Contents/Frameworks에 넣은 Sparkle.framework를 찾도록 경로를 더한다.
+        "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "$(inherited) @executable_path/../Frameworks"
         # iOS만: 원격 알림(백그라운드)으로 CloudKit 변경을 받는다. 나머지 Info.plist 키는 생성한다.
         "INFOPLIST_FILE[sdk=iphoneos*]": Config/Waypoint-iOS-Info.plist
         "INFOPLIST_FILE[sdk=iphonesimulator*]": Config/Waypoint-iOS-Info.plist

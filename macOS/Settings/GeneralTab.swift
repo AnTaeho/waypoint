@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import WaypointKit
 
-/// 설정 창 「일반」 탭(TRK-55): 로그인할 때 열기. 토글은 실제 로그인 항목 상태를 따른다.
+/// 설정 창 「일반」 탭: 로그인할 때 열기(TRK-55), 업데이트(TRK-56). 로그인 토글은 실제 로그인 항목 상태를 따른다.
 struct GeneralTab: View {
     /// 샘플 모드에서는 nil(꺼짐·비활성으로 보인다)
     @Environment(AppServices.self) private var services: AppServices?
@@ -14,6 +14,9 @@ struct GeneralTab: View {
         Form {
             Section {
                 LoginItemRow(controller: loginItem)
+            }
+            if let updater = services?.updater {
+                UpdateSection(updater: updater)
             }
         }
         .formStyle(.grouped)
