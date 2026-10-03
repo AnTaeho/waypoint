@@ -200,3 +200,13 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 - 다시 시작은 `WAYPOINT_*` 변수를 넘기고 인자는 넘기지 않는다. `WAYPOINT_RELAUNCH_HIDDEN=1`이면 다시 뜬 앱도 숨긴 채(`-j`).
 - 확인: 백업은 `$P/support/store-backups/*/info.json`, 복원은 `store-restore.json`과 `curl -s 127.0.0.1:47822/integration/status`의 `storeRestore`, 지우기는 `sqlite3 "file:$P/support/Waypoint.store?mode=ro"`의 `ZPROJECT`·`ZCARD`… 행 수.
 - 복원이 실제로 되돌리는지 보려면 백업 뒤 `POST 127.0.0.1:47822/hooks/SessionStart`(등록된 폴더 `cwd`, 새 `session_id`)로 세션을 하나 더하고 복원 뒤 그 세션이 없는지 본다.
+
+## 원격·컨테이너 실측 (TRK-53)
+
+사용자 절차는 [`REMOTE.md`](REMOTE.md). 개발 중 실측은 실제 원격 서버 대신 Docker 컨테이너로 한다(Docker Desktop은 `open -g -j -a Docker`로 뒤에서 켜고, 끝나면 `osascript -e 'quit app "Docker"'`).
+
+- 설치기 명령행: `swift build --product waypoint-integration` → `.build/debug/waypoint-integration <plan|install|remove> --home <임시 홈> --command-home <원격 $HOME> [--provider claude|codex] [--instance stable|dev] [--backup-root <폴더>]`. 앱 설치기와 같은 코드다. MCP 등록 명령은 돌리지 않고 `command …` 줄로 보인다.
+- `scripts/remote-setup.sh --dev <대상> -- <ssh 옵션>`: Dev(47822)로 잇는다. 사용자 `~/.ssh`를 쓰지 않도록 `-F /dev/null -i <임시 키> -o UserKnownHostsFile=<임시 파일>`을 넘긴다.
+- sshd 컨테이너를 원격으로 삼고 `ssh -N -R 47822:127.0.0.1:47822`로 터널을 연다. 실측 폴더(`~/workspace/waypoint-probe`)에 origin이 없으면 임시 bare 저장소를 origin으로 붙이고, 컨테이너 안 클론의 origin을 같은 문자열로 맞춘다(끝나면 실측 폴더의 origin을 지운다).
+- 훅 스크립트 단위 확인: `bash integration/hooks/test-waypoint-hook.sh`(8번 묶음이 `WAYPOINT_URL`·원격 정보·replay).
+

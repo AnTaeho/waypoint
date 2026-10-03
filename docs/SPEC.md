@@ -378,6 +378,44 @@ outbox 형식: 한 줄에 `{"event":"<EventName>","receivedAt":<unix>,"claudePid
 
 Claude Code PID 찾기(스크립트): 조상 프로세스를 4단계까지 올라가며(`ps -o ppid=,comm= -p`) 실행 파일 이름(`comm`의 마지막 경로 조각)이 `claude`인 첫 프로세스. 인자(`args`)로는 비교하지 않는다 — 이 스크립트 경로 `~/.claude/waypoint/…`가 셸 인자에 들어 있다. 2.1.283 실측에서는 스크립트 바로 위 부모가 `claude`라 `ps`를 한 번 부르고, 훅 한 번에 약 3 ms가 늘었다(중앙값 15.9 → 18.7 ms).
 
+
+### 원격·컨테이너 수집 (2026-10-03, TRK-53)
+
+SSH 원격 서버·개발 컨테이너에서 도는 Claude Code·Codex의 훅을 Mac 앱이 받는다. 사용자 설정 절차는 [`REMOTE.md`](REMOTE.md). 웹·클라우드 세션은 다루지 않는다. 저장 형식(모델·이벤트 종류)은 바꾸지 않았다.
+
+보낼 곳(스크립트):
+
+- `WAYPOINT_URL`(예 `http://host.docker.internal:47821`)이 있으면 그 주소로, 없으면 `http://127.0.0.1:${WAYPOINT_PORT:-47821}`. 훅 POST·`/hooks/ack`·replay가 같은 주소를 쓴다. 타임아웃 1초·exit 0·stdout 규칙은 그대로.
+- 원격 모드: `WAYPOINT_REMOTE=1`이면 켜고 `0`이면 끈다. 없으면 `WAYPOINT_URL`이 있거나 macOS가 아닐 때(`$OSTYPE`) 켠다. macOS 로컬은 기본으로 꺼져 payload·outbox 동작이 전과 같다.
+- 저장 폴더 기본값: macOS `~/Library/Application Support/Waypoint`, 그 밖 `${XDG_STATE_HOME:-~/.local/state}/waypoint`.
+
+원격 주소(원격 모드):
+
+- 스크립트가 훅 `cwd`에서 위로 `.git`(폴더 또는 `gitdir:` 파일, worktree는 `commondir`)을 찾아 `config`의 `[remote "origin"] url`과 `HEAD`의 브랜치를 읽고 payload 맨 앞에 붙인다: `"waypoint_remote": {"origin": "<url 원문>", "root": "<작업 트리 최상위>", "branch": "<브랜치, 없으면 뺌>", "host": "<$HOSTNAME>"}`. git 명령도 하위 셸도 쓰지 않는다(Ubuntu 컨테이너 0.3 ms, git 명령 두 번은 22 ms). origin이 없거나 값에 따옴표·역슬래시·제어 문자가 있으면 붙이지 않는다.
+- outbox 줄에도 남긴다(`OUTBOX_FILTER`의 최상위 허용 필드, jq가 없을 때의 최소 줄에도).
+
+원격 주소 매칭(앱, `RemoteMatcher`·`HookProcessor.linkRemote`):
+
+- 정규화(`GitRemoteURL.normalize`): 스킴·사용자 정보(`user@`, `user:token@`)·포트·끝 `.git`·끝 `/`를 떼고 소문자로. scp 꼴 `git@host:a/b`도 같다. 로컬 경로(`/srv/b.git`, `file://`)는 경로만.
+- 등록 프로젝트의 로컬 origin: `rootPath`가 든 작업 트리의 `.git/config`를 읽는다(git 명령 없음, `LocalOrigin.read`). 프로젝트 폴더마다 5분 기억(`LocalOriginCache`). 원격 훅이 올 때만 읽는다.
+- 잇는 조건: ① 훅에 `waypoint_remote`가 있고 ② 훅 `cwd`가 어떤 등록 폴더(보관 포함)와도 맞지 않고 ③ 원격 작업 트리 경로가 이 Mac에 없고 ④ 같은 정규화 주소를 가진 보관 안 된 등록 프로젝트들의 로컬 작업 트리가 **하나**일 때. 서로 다른 작업 트리(클론) 둘 이상이면 잇지 않는다. 한 작업 트리 안의 여러 프로젝트(모노레포 하위 폴더)는 하나로 본다.
+- 이으면 처리 전에 훅의 `cwd`와 파일 경로(`tool_input.file_path`·`workdir`·`cwd`, `bashEditDiff`, Codex `apply_patch`)를 원격 작업 트리 최상위 → 로컬 작업 트리 최상위로 옮긴다. 그 뒤 프로젝트 매칭·`file.changed`의 `path`(등록 `rootPath` 기준 상대 경로)는 로컬과 같은 규칙. 작업 트리 밖 파일은 남기지 않는다.
+- 세션 `cwd`는 원격 쪽 원래 폴더, `gitBranch`는 `waypoint_remote.branch`. `file.changed`의 `checkout`은 `<host>:<원격 작업 트리>`(host가 없으면 경로) — Mac의 같은 저장소 체크아웃과 다른 작업 트리로 본다(5장 「같은 파일 작업 중」).
+- 잇지 못한 원격 세션의 시작 블록(미등록 안내)에는 `remote: <origin 원문>` 줄이 붙는다. MCP `project_resolve`는 `remote`(origin 주소)를 받아 같은 규칙으로 찾는다(7장).
+- 세션을 만든 훅보다 이른 시각의 훅이 늦게 들어오면(replay) 세션 `startedAt`과 가장 이른 `session.start` 기록을 그 시각으로 당기고, `SessionStart`의 `source`를 채운다.
+
+원격 outbox replay:
+
+- 원격 모드에서 훅이 앱에 닿으면(`200`·`204`) 쌓인 outbox가 있을 때 replay를 뒤에서 띄운다(표준 입출력을 모두 `/dev/null`로, `disown`). 훅은 replay를 기다리지 않는다.
+- 순서(스크립트): 원격 모드에서 쌓인 줄(`outbox.jsonl`·`outbox.pending.jsonl`·`outbox.claim-*`)이 있으면 `SessionStart`·`UserPromptSubmit` 밖의 이벤트는 실시간으로 보내지 않고 outbox 끝에 붙인 뒤 replay를 띄운다. 먼저 보내면 앱이 그 세션의 이른 줄을 늦게 받아 「끝난 세션의 지난 기록」으로 버릴 수 있다(다시 이어진 뒤 첫 훅이 `SessionEnd`인 경우 등). 블록이 필요한 두 이벤트는 실시간으로 보낸다.
+- replay: 잠금 `replay.lock`(mkdir, 2분 넘으면 죽은 것으로 보고 치운다) → `outbox.pending.jsonl`이 비면 `outbox.jsonl`을 떼어 붙임 → 앞에서부터 100줄(500KB 넘으면 그 전까지)씩 `POST /hooks/replay`(`Content-Type: application/x-ndjson`, `--max-time 10`), 한 번에 5묶음까지. 보내는 동안 새로 쌓인 줄도 이어서 보내고, 잠금을 푸는 사이에 온 줄이 있으면 한 번 더 돈다. `200`을 받은 줄만 지운다. 받지 못하면(옛 앱 `404`, 시간 초과) 남겨 다음 훅 때 다시. 한 줄짜리 묶음이 `400`이면 그 줄은 `outbox.rejected.jsonl`로 옮긴다.
+- `POST /hooks/replay`(앱): 본문은 outbox 줄(JSON Lines, 500줄 이하). 읽을 수 있는 줄(`Outbox.parse`)만 저장 폴더의 `replay/outbox.jsonl` 끝에 한 번의 `O_APPEND` 쓰기로 붙인 뒤 바로 `200 {"accepted":n,"rejected":m}`(원격은 200을 받아야 줄을 지운다). 읽을 수 있는 줄이 없거나 상한을 넘으면 `400`, 붙이지 못하면 `500`, POST가 아니면 `405`.
+- 처리(앱, `RemoteReplay`·`AppServices+Replay`): 메인 큐 한 차례에 0.1초(적어도 한 줄)씩 실시간 훅과 같은 경로(`HookProcessor.handle(_:)`, 블록 없음)로 처리하고 남으면 다음 차례로 넘긴다(`Outbox.drain`의 `deadline`, 남은 줄은 떼어 낸 파일에 다시 써서 순서 유지). 그사이 온 로컬 훅이 먼저 처리된다. 저장에 실패하면 그 줄부터 남기고 10초 점검에서 다시 한다. 같은 묶음을 다시 받아도 `tool_use_id`·`prompt_id`/`turn_id`로 한 번만 남는다. 처리한 줄은 outbox 흡수 지표(`recordAbsorb`)에 센다. 앱을 다시 켜면 남은 줄부터 이어 간다.
+- 순서(앱): replay 줄이 남은 동안 `SessionStart`·`UserPromptSubmit` 밖의 실시간 훅은 처리하지 않고 `replay/outbox.jsonl` 뒤에 붙인 뒤 `204`(`HookRouter.defersWhileDraining`, `Outbox.line`).
+- Mac 로컬 outbox(원격 모드 아님)는 전과 같이 앱이 직접 흡수한다. 스크립트는 건드리지 않는다.
+
+앱 서버는 계속 `127.0.0.1`에만 열린다. SSH는 원격 포트 포워딩(`RemoteForward 47821 127.0.0.1:47821`), Docker Desktop 컨테이너는 `host.docker.internal`로 닿는다.
+
 ## 7. MCP 도구 (스킬용)
 
 스킬이 호출한다. Claude Code에서의 도구 이름은 `mcp__waypoint__<도구>`(실측).
@@ -407,7 +445,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 
 | 도구 | 입력(필수 굵게) | 동작 |
 |---|---|---|
-| `project_resolve` | **`cwd`** | 폴더 → `{key, name, summary, rootPath}`, 없으면 `null`(오류 아님) |
+| `project_resolve` | **`cwd`**, `remote` | 폴더 → `{key, name, summary, rootPath}`, 없으면 `null`(오류 아님). `cwd`가 어떤 등록 폴더와도 맞지 않고 `remote`(git origin 주소)가 있으면 같은 원격 주소의 등록 프로젝트(로컬 작업 트리가 하나일 때, 그 작업 트리의 가장 바깥 프로젝트). 6장 「원격·컨테이너 수집」 |
 | `project_init` | **`cwd`**, **`name`**, `key`, `summary`, `stack`, `guideFiles`, `seedCards` | 앱에 등록 확인 창을 띄우고 바로 `pending`으로 답한다(아래 「project_init」) |
 | `card_list` | **`project`**, `status`, `query` | status를 안 주면 done·archived를 뺀다. 순서: active → next → idea → done → archived, 같은 상태는 번호순. `query`는 ID·제목·본문 부분 일치 |
 | `card_get` | **`id`** | 카드 + `body`, `origin`, `nextSessionNote`, `children`, 최근 기록 20개 |

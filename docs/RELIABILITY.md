@@ -10,6 +10,7 @@
 | 도구 | Claude Code 로컬 CLI 훅(2.1.283 실측), Codex CLI 로컬 훅(공식 문서 기준 `doc-codex-*`) | 클라우드 실행 Codex, 전사 파일 감시 |
 | 폴더 | 등록한 프로젝트 폴더와 그 하위 폴더(가장 가까운 등록 폴더) | 등록 전·미등록 폴더의 훅(기록하지 않는다), 보관한 프로젝트 |
 | 전달 | 실시간 POST, 앱이 꺼졌거나 1초 안에 답하지 못한 훅의 outbox 재수신 | CloudKit 전달 시간(이 기준에 넣지 않는다) |
+| 원격(TRK-53) | SSH 원격(원격 포트 포워딩)·Docker Desktop 개발 컨테이너(`host.docker.internal`)의 훅, 같은 git origin의 등록 프로젝트에 잇기, 원격 outbox replay | 웹·클라우드 세션, Docker Desktop 밖 컨테이너 런타임(확인 안 함) |
 
 ## 실패할 때의 동작
 
@@ -212,7 +213,48 @@
 - SwiftData가 `$0.session?.…` 같은 선택적 관계 비교를 `CASE … END = ?`로 바꿔 색인을 쓰지 못한다. 이벤트 표를 훑는 질의(최근 파일·겹침 색인·지금 상황)는 이벤트 수에 비례한다. 지금 6~7천 건에서 한 번에 1~3 ms. 두 단계 관계(`$0.session?.parent?.…`)는 틀린 SQL을 만들거나 예외로 멈춰서 쓰지 않는다.
 - 이벤트·세션이 쌓이는 것 자체(보관 정책)는 이번에 다루지 않았다.
 
+## 원격·컨테이너 (TRK-53)
+
+2026-10-03, Dev(47822) Debug, Docker Desktop 29.6, 원격 역할은 Ubuntu 24.04 컨테이너(curl 8.5, jq, sshd). 훅은 실제 스크립트에 실측 픽스처(`real-*`)의 `cwd`·파일 경로를 원격 폴더로 바꿔 넣었다. 실제 `claude`·`codex`는 컨테이너에서 돌리지 않았다. 실측 폴더 `~/workspace/waypoint-probe`(PRB)에는 origin이 없어 임시 bare 저장소를 origin으로 붙이고 컨테이너 안 클론도 같은 주소로 맞췄다(끝난 뒤 지웠다). 기록은 Dev 저장소를 읽기 전용(`sqlite3 -readonly`)으로 확인했다.
+
+| 단계 | 결과 |
+|---|---|
+| 컨테이너 → `127.0.0.1`에만 열린 앱 | `curl http://host.docker.internal:47822/integration/status` → `200`. 앱 서버를 다른 인터페이스로 열지 않았다 |
+| 개발 컨테이너(`WAYPOINT_URL=http://host.docker.internal:47822`, `/workspaces/waypoint-probe`, 브랜치 `ctr-branch`) | `SessionStart` stdout `Waypoint: PRB (waypoint-probe)`. 세션: 프로젝트 PRB, 폴더 `/workspaces/waypoint-probe`, 브랜치 `ctr-branch`. `user.prompt` 1, `file.changed` `notes.txt` +2 −1 `checkout` `<컨테이너 ID>:/workspaces/waypoint-probe`, `session.end`. 훅 다섯 개 모두 exit 0, 157~237 ms(파이썬 실행·앱 처리 포함) |
+| SSH ① `remote-setup.sh --dev` | 원격 `settings.json`(사용자 훅 `echo user-hook`과 `model` 유지)에 Waypoint 훅 10개, 훅 스크립트·상태줄 중계(0755)·tracker 스킬. 바뀌기 전 `settings.json`을 `~/.waypoint-backups/<시각>.tgz`로. 다시 돌리면 「이미 맞음」. `--dry-run`은 쓰지 않음 |
+| SSH ② MCP | 원격에 `claude`가 없으면 명령만 보인다. 가짜 `claude`(인자 기록)를 두면 `mcp remove waypoint -s user` → `mcp add --transport http --scope user waypoint http://127.0.0.1:47822/mcp`. 컨테이너에서 `project_resolve(cwd: 원격 폴더, remote: origin)` → PRB, `remote` 없이 → `null` |
+| SSH ③ 터널(`ssh -N -R 47822:127.0.0.1:47822`)로 설치된 훅 명령 실행 | `SessionStart` stdout `Waypoint: PRB …`, 세션 폴더 `/home/dev/waypoint-probe`, 브랜치 `ssh-branch`, `file.changed` `notes.txt`. 163~271 ms |
+| SSH ④ 터널 끊고 훅 4개 | 각 28~38 ms에 exit 0, 원격 `~/Library/Application Support/Waypoint-Dev/outbox.jsonl`(설치기 Dev 접두사) 4줄, 줄마다 `waypoint_remote`. Dev에는 아무것도 없음 |
+| SSH ④ 다시 연결 후 `Stop` 한 번 | 훅 125~133 ms(replay를 기다리지 않음). 2초 뒤 원격 outbox·pending·잠금 없음. Dev: 세션 PRB, `session.start`(`source: startup`, 원래 시각), `user.prompt`, `file.changed` — 시작 시각은 가장 이른 훅 |
+
+| SSH ④′ 끊긴 동안 훅 4개 → 다시 연결 뒤 첫 훅이 **같은 세션의 `SessionEnd`**(가장 나쁜 순서, 스크립트·앱 순서 규칙 뒤) | 끊긴 동안 15~18 ms. `SessionEnd`는 쌓인 줄 뒤에 서고(실시간으로 보내지 않음) replay가 다섯 줄을 차례로 보낸다. Dev: `session.start`(`startup`, 원래 시각) → `user.prompt` → `file.changed` → `session.end`, 세션 끝남. 원격 outbox·pending·잠금 없음. 쌓인 줄이 있을 때 훅 하나 22~30 ms |
+| 500줄 replay와 동시에 로컬 `SessionStart`(Mac, Dev) | 아래 표 |
+
+처음 실측에서 ④의 시작 기록이 다시 이어진 뒤 첫 훅(`Stop`) 시각에 `source` 없이 남았다. 실시간 훅이 세션을 먼저 만들고 쌓인 이른 줄이 뒤에 들어오기 때문이다. 이른 훅이 늦게 오면 시작 시각·시작 기록을 당기게 고친 뒤(`HookProcessor.moveStart`) 다시 재서 위 결과를 얻었다.
+
+지연:
+
+| 측정 | 값 |
+|---|---|
+| Mac 로컬 `SessionStart` 훅 전체(Dev, n=30, 두 번씩 번갈아) | 바꾸기 전 중앙값 289.8 / 299.2 ms, 바꾼 뒤 295.3 / 302.8 ms(p95 313~329 / 305~316). 차이는 측정 흔들림 안. 로컬은 원격 모드가 꺼져 하는 일이 같다. 원격 모드를 Mac에서 강제로 켜면 307.1 ms |
+| git 원격 정보 읽기(`remote_field` 1,000번 평균) | Ubuntu 컨테이너 0.30 ms, Mac(bash 3.2) 1.7 ms. 같은 정보를 git 명령 두 번으로 읽으면 컨테이너 22 ms |
+
+500줄 replay(한 세션의 `SessionStart` 1 + `PostToolUse` 499, Mac에서 `curl`로 `/hooks/replay`)를 보내고 1초 간격으로 로컬 `SessionStart` 훅을 실제 스크립트로 보냈다. 이 Dev 저장소는 큰 기록 사본이라 평소에도 `SessionStart` 하나가 약 300 ms다.
+
+| 구현 | replay 응답 | 동시 로컬 `SessionStart` | 500줄 처리 |
+|---|---|---|---|
+| 처음: Mac outbox에 붙이고 그 자리에서 흡수(`absorbOutbox`) | 68.6초 | 1,198 ms, 시간 초과로 블록 없이 outbox로 | 68초(메인 액터를 내내 잡음) |
+| 응답 먼저, 흡수는 0.25초씩 조각(`absorbOutbox` + 다시 읽기) | 0.04초 | 717~1,402 ms, 6번 중 2번 시간 초과 | 215초(조각마다 다시 읽기가 비쌌다) |
+| 지금: `replay/`에 붙이고 실시간 경로로 0.1초씩 | 0.03~0.06초 | 348~626 ms, 14번 모두 블록 받음 | 141~160초(한 세션에 기록이 쌓일수록 줄마다 느려진다) |
+
+replay로 들어온 줄은 앱의 outbox 흡수 지표(`recordAbsorb`)에 함께 센다. 실시간 수신 지연 지표에는 들지 않는다.
+
 ## 알려진 한계
+
+- 큰 기록 저장소에서 replay 처리는 초당 3~4줄이다(위 표). 수백 줄이면 몇 분 걸리고, 그동안 원격 세션의 블록이 필요 없는 훅은 그 뒤에 서서 늦게 보인다.
+- 원격 outbox는 원격 쪽 훅이 앱에 닿을 때만 비운다. 터널을 다시 열어도 다음 훅이 오기 전에는 들어오지 않는다. 컨테이너를 앱이 꺼진 채로 지우면 그 안에 쌓인 기록은 잃는다.
+- 원격의 같은 저장소 클론이 Mac에 둘 이상 등록돼 있으면(서로 다른 작업 트리) 원격 세션을 잇지 않는다.
+- 원격 `curl`이 7.84 미만이면 시작 블록 수신 확인(TRK-35)을 보내지 못해 블록이 다음 프롬프트에 한 번 더 붙을 수 있다. `remote-setup.sh`가 알린다.
 
 - 세션이 끝난 뒤 그보다 이른 시각의 기록이 실시간으로 처리되지 않고 outbox로만 오면 버린다. 실시간 서버가 그 훅을 받지 못했는데 뒤의 `SessionEnd`는 받은 경우뿐이라 실제로는 드물다. 끝난 세션에 늦은 사실 기록을 붙이는 것은 명세를 바꾸는 일이라 이번에 하지 않았다.
 - `tool_use_id`가 없는 도구 훅은 재수신을 거르지 못한다(Claude 실측·Codex 문서 모두 있다).

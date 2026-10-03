@@ -586,3 +586,32 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | `UnfiledWork.Item.eventCount`를 뺐다(내 판단) | 쓰는 곳이 없고, 모든 세션의 변경 수를 세려면 이벤트를 다 읽어야 한다 | 블록에 보이는 것만 채우기 | `Item` |
 
 검증: `swift test` 720개 통과, macOS Debug 빌드. 전후 숫자는 docs/RELIABILITY.md 「큰 기록 성능 (TRK-66)」.
+
+## 2026-10-03 — 원격·컨테이너 세션 (TRK-53)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| 이번에는 SSH 원격·개발 컨테이너만. 웹·클라우드 세션은 만들지 않는다. 메인 세션 결정 | 클라우드 세션은 Mac 앱에 닿을 길을 새로 만들어야 하고 방식은 사용자 결정 대기 | 중계 서버, git 푸시 읽기 | — |
+| 보낼 곳 `WAYPOINT_URL`, 없으면 지금처럼 `127.0.0.1:${WAYPOINT_PORT}`. ack·replay도 같은 주소. 메인 세션 결정 | 컨테이너는 `host.docker.internal`, SSH는 터널로 원격의 `127.0.0.1`이 앱으로 간다 | 포트만 | 스크립트 `base` |
+| 앱 서버는 `127.0.0.1`에만 연다. 메인 세션 결정 | 보안. Docker Desktop의 `host.docker.internal`이 루프백에 닿는 것을 실측으로 확인해 열 필요가 없었다 | 모든 인터페이스 | — |
+| 원격 세션은 같은 git origin을 가진 등록 프로젝트에 잇는다(저장 형식 그대로). 정규화 `git@host:a/b.git` = `https://host/a/b`. 둘 이상이면 잇지 않는다. MCP `project_resolve`도 같은 규칙. 메인 세션 결정 | 원격 경로는 Mac 경로와 달라 버려졌다. 원격 주소는 클론이 달라도 같다 | 경로 대응 표를 사용자가 등록 | `HookProcessor.linkRemote` 호출 한 줄 |
+| 원격 outbox는 훅이 앱에 닿을 때 뒤에서 한 번에 상한 있게 보낸다. Mac 로컬 outbox는 그대로. 메인 세션 결정 | 훅을 막지 않으면서 끊긴 동안의 기록을 들인다 | 원격에서 주기적으로 보내는 상주 프로세스 | `start_replay` |
+| `remote-setup.sh`는 원격 설정을 임시 홈에 받아 앱 설치기로 고치고 원격 백업 뒤 되돌려 놓는다. MCP는 `127.0.0.1:<포트>/mcp`(터널), `RemoteForward`는 출력만. 메인 세션 결정 | 앱과 같은 병합 규칙을 쓰고 사용자 `~/.ssh`는 건드리지 않는다 | 원격에서 설치 스크립트 실행 | 스크립트 삭제 |
+| 원격 모드 판별: `WAYPOINT_REMOTE`(1/0), 없으면 `WAYPOINT_URL`이 있거나 macOS가 아닐 때. Mac 로컬은 payload·outbox가 전과 같다(내 판단) | 로컬에서 원격 정보를 붙이면 Mac의 미등록 클론·worktree가 등록 프로젝트에 이어져 지금 동작이 바뀐다. Mac 로컬 outbox를 스크립트가 옮기면 앱의 흡수와 경합한다 | 늘 붙이기 | `remote_mode` |
+| git 정보는 `.git/config`·`HEAD`를 bash로 읽는다. git 명령·하위 셸 없음(내 판단) | 컨테이너에서 0.3 ms, git 명령 두 번은 22 ms. 원격에 git이 없어도 된다 | `git config --get`·`git rev-parse` | `remote_field` |
+| payload 필드 `waypoint_remote: {origin, root, branch, host}`를 맨 앞에 붙이고 outbox 필터·jq 없는 최소 줄에도 남긴다(내 판단) | 끊긴 동안의 줄도 이어져야 한다. 맨 앞에 붙이면 JSON을 다시 쓰지 않는다 | 머리(`X-Waypoint-…`)로 보내기 — outbox에 남지 않는다 | 필터 키 하나 |
+| 잇기는 훅 `cwd`가 어떤 등록 폴더(보관 포함)와도 안 맞고 원격 작업 트리 경로가 이 Mac에 없을 때만(내 판단) | 원격 모드를 켠 Mac(원격 Mac 등)에서도 로컬의 다른 클론을 잇지 않는다 | 원격 정보가 있으면 늘 | `RemoteMatcher.link` |
+| 「둘 이상」은 서로 다른 로컬 작업 트리 둘 이상. 한 작업 트리 안의 여러 프로젝트(모노레포 하위 폴더)는 잇고, 옮긴 경로에서 가까운 프로젝트가 고른다. 보관한 프로젝트는 후보에서 뺀다(내 판단, 지시서는 「프로젝트 둘 이상」) | 모노레포는 경로를 옮기면 어느 프로젝트인지 정해진다. 보관한 옛 클론이 막지 않게 | 프로젝트 수로 판정 | `localCheckout`의 `Set` |
+| 이은 훅은 처리 전에 `cwd`·파일 경로를 원격 작업 트리 → 로컬 작업 트리로 옮긴다. 세션 `cwd`는 원격 폴더, 브랜치는 원격 브랜치(내 판단) | 매칭·상대 경로·도구 프로젝트 판정을 바꾸지 않고 그대로 쓴다. 화면의 폴더·브랜치는 실제로 일한 곳 | 매칭 함수마다 원격 분기 | `HookInput.localPath`·`sessionCwd` |
+| 원격 파일의 `checkout`은 `<host>:<원격 작업 트리>`(내 판단) | 로컬 체크아웃 경로를 쓰면 Mac과 원격에서 같은 파일을 고칠 때 「같은 작업 트리」로 잘못 경고한다 | 원격 경로만 | `checkoutPath` |
+| 로컬 origin은 `.git/config`를 직접 읽고 프로젝트 폴더마다 5분 기억(내 판단) | 앱에서 프로세스를 띄우지 않는다. 원격 훅이 올 때만 읽는다 | `git config` 실행, 파일 감시 | `LocalOriginCache` |
+| `/hooks/replay`는 받은 줄을 `replay/outbox.jsonl`에 붙인 뒤 바로 200, 처리는 메인 큐 한 차례에 0.1초씩 실시간 경로로(내 판단, 실측으로 두 번 고침) | Mac outbox에 붙이고 그 자리에서 흡수하니 500줄에 응답 68초·메인 액터를 내내 잡아 로컬 블록을 잃었다. 흡수를 조각내니 조각마다 다시 읽기가 비싸 215초·여전히 시간 초과. 실시간 경로는 줄마다 저장하고 다시 읽기는 실패 때만 한다 | `absorbOutbox` 그대로 | `RemoteReplay`·`AppServices+Replay` |
+| replay 줄이 남은 동안 블록이 필요 없는 훅은 뒤에 세운다 — 스크립트(원격에 쌓인 줄이 있으면 outbox에 붙인다)와 앱(`replay/`에 붙인다) 둘 다(내 판단, 실측에서 발견) | 다시 이어진 뒤 첫 실시간 훅이 `SessionEnd`이면 그 세션의 이른 줄이 「끝난 세션의 지난 기록」으로 버려진다. 블록이 필요한 `SessionStart`·`UserPromptSubmit`은 실시간 | 끝난 세션에도 이른 기록 받기 — 명세를 바꾼다 | `has_backlog`·`deferBehindReplay` |
+| replay 묶음 100줄(500KB)·한 번 5묶음, 잠금 `mkdir`(2분 넘으면 치움), 한 줄짜리 `400`은 `outbox.rejected.jsonl`로(내 판단) | 앱 본문 상한 1 MB 안. 깨진 한 줄에 영원히 막히지 않게 | 한 번에 전부 | `replay_outbox` |
+| 원격 기본 저장 폴더 `~/.local/state/waypoint`(macOS 아닌 곳, 내 판단) | 리눅스에 `~/Library`를 만들지 않는다. 설치기 Dev 접두사는 그대로 Mac 경로를 쓴다(실측용) | 그대로 | 스크립트 `dir` |
+| 세션을 만든 훅보다 이른 훅이 늦게 오면 `startedAt`과 가장 이른 `session.start`를 당긴다(내 판단, 실측에서 발견) | 다시 이어진 뒤 첫 실시간 훅이 쌓인 줄보다 먼저 와서 시작 시각이 늦고 `source`가 비었다 | 훅이 replay 뒤에 실시간을 보내기 — 훅이 기다리게 된다 | `moveStart` |
+| 설치기 명령행 `waypoint-integration`(Package 실행 대상). MCP 등록 명령은 돌리지 않고 원격에서 `claude mcp remove` 뒤 `add`(내 판단) | 파이썬으로 다시 쓰면 병합 규칙이 두 벌. 이 Mac의 `claude`를 돌리면 임시 홈의 `~/.claude.json`이 바뀐다 | 파이썬 설치기 | `Tools/waypoint-integration` |
+| 미등록 원격 세션의 시작 블록에 `remote: <origin>` 줄, `project_resolve`에 `remote` 인자, 모노레포면 그 작업 트리의 가장 바깥 프로젝트(내 판단) | 원격의 에이전트가 원격 주소로 직접 찾을 수 있게. MCP는 원격 작업 트리 최상위를 받지 않아 하위 폴더를 고를 수 없다 | `remoteRoot` 인자 추가 | `projectResolve` |
+| 원격에도 상태줄 중계가 설치된다(내 판단) | 설치기를 그대로 쓴다. Mac 사용량 게이지에는 들어가지 않는다 | 원격용 옵션 | — |
+
+검증: `swift test` 737개 중 735개 통과(실패 2개는 `RealInstallStateTests` — 저장소 훅 스크립트·tracker 스킬이 이 Mac에 설치된 것과 달라졌다, 설치하면 통과), `bash integration/hooks/test-waypoint-hook.sh` 66개 통과, macOS Debug 빌드. 실측은 docs/RELIABILITY.md 「원격·컨테이너 (TRK-53)」.
