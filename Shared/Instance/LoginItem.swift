@@ -54,7 +54,13 @@ public enum LoginItemPolicy {
     public static func action(
         trigger: Trigger, isDev: Bool, userChoice: Bool?, autoApplied: Bool, status: LoginItemStatus
     ) -> Action {
-        if isDev || userChoice != nil || autoApplied { return .none }
+        if isDev { return .none }
+        // 설치 스크립트가 지운 항목은 이 앱이 등록한 것일 수 있다(System Events 목록에 새 방식 항목도 보인다).
+        // 사용자가 끈 적이 없으면 되살린다.
+        if case .launch(_, true) = trigger, userChoice != false {
+            return status.isOn ? .markApplied : .register
+        }
+        if userChoice != nil || autoApplied { return .none }
         switch trigger {
         case .launch(let existingUser, let legacyRemoved):
             guard existingUser || legacyRemoved else { return .none }
