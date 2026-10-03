@@ -96,7 +96,7 @@ extension HookProcessor {
             }
         } else {
             let name = (input.agentType ?? "").isEmpty ? nil : input.agentType
-            sub = Session(id: agentID, kind: .subagent, agentName: name, cwd: input.cwd,
+            sub = Session(id: agentID, kind: .subagent, agentName: name, cwd: input.sessionCwd,
                           gitBranch: parent.gitBranch, startedAt: date, provider: input.provider)
             context.insert(sub)
             sub.project = parent.project
@@ -116,18 +116,19 @@ extension HookProcessor {
 
     /// 파일 변경·커밋을 지금 작업중 카드에 남긴다. 서브에이전트가 카드 없이 일하면 부모 세션의 카드로.
     func postToolUse(_ input: HookInput, at date: Date) {
-        let files = HookParsing.changedFiles(input)
+        // 원격 작업 트리에 이은 훅이면 파일 경로를 로컬 작업 트리 경로로 옮긴다(TRK-53).
+        let files = HookParsing.changedFiles(input).map { (path: input.localPath($0.path), added: $0.added, removed: $0.removed) }
         let projects = (try? context.fetch(FetchDescriptor<Project>())) ?? []
         let matches = files.compactMap { ProjectMatcher.project(for: $0.path, in: projects, home: home) }
         var main = mainSession(input, at: date, create: true)
         // 시작 폴더가 미등록이어도 실제 변경 파일이 한 프로젝트에 속하면 세션을 만들 수 있다.
-        let workdir = input.toolInput["workdir"] as? String ?? input.toolInput["cwd"] as? String
+        let workdir = (input.toolInput["workdir"] as? String ?? input.toolInput["cwd"] as? String).map(input.localPath)
         let workingProject = workdir.flatMap { $0.hasPrefix("/") ? ProjectMatcher.project(for: $0, in: projects, home: home) : nil }
         let keys = Set(matches.map(\.id))
         // 이미 있는 세션(끝난 뒤 늦게 온 기록 포함)을 같은 ID로 또 만들지 않는다.
         if main == nil, fetchSession(input.sessionID) == nil,
            !matches.isEmpty || workingProject != nil, !isArchivedFolder(input) {
-            let created = Session(id: input.sessionID, cwd: input.cwd, startedAt: date, provider: input.provider)
+            let created = Session(id: input.sessionID, cwd: input.sessionCwd, startedAt: date, provider: input.provider)
             context.insert(created)
             created.claudePid = input.claudePid
             created.processPid = input.processPid
@@ -163,7 +164,7 @@ extension HookProcessor {
             var payload = tool.merging(["path": .string(path), "added": .int(file.added),
                                         "removed": .int(file.removed)]) { $1 }
             // 같은 파일 작업 중 판정(TRK-17): 그 파일의 git 작업 트리. worktree는 다른 값이 된다.
-            if let checkout = checkoutPath(file.path, cwd: input.cwd) { payload["checkout"] = .string(checkout) }
+            if let checkout = checkoutPath(file.path, input: input) { payload["checkout"] = .string(checkout) }
             for card in targets.isEmpty ? [Card?.none] : targets.map(Optional.some) {
                 Event.record(.fileChanged, in: context, project: project, card: card, session: acting, at: date,
                              payload: payload)
@@ -223,10 +224,16 @@ extension HookProcessor {
     // MARK: - 도우미
 
     /// 바뀐 파일의 git 작업 트리 최상위. 상대 경로면 훅 `cwd` 기준으로 펼친다. 모르면 nil.
-    func checkoutPath(_ path: String, cwd: String) -> String? {
+    /// 원격 작업 트리에 이은 훅의 파일은 원격 작업 트리 값(`RemoteCheckout.checkoutID`) — 로컬 체크아웃과 다른 작업 트리다.
+    func checkoutPath(_ path: String, input: HookInput) -> String? {
+        let cwd = input.cwd
         let expanded = ProjectMatcher.normalize(path, home: home)
         let absolute = expanded.hasPrefix("/") ? expanded
             : cwd.hasPrefix("/") ? (cwd as NSString).appendingPathComponent(expanded) : nil
+        if let remote = input.remote, let local = input.linkedCheckout {
+            guard let absolute else { return nil }
+            return ProjectMatcher.isInside(absolute, root: local) ? remote.checkoutID : checkoutRoot(absolute)
+        }
         return absolute.flatMap(checkoutRoot)
     }
 
@@ -234,7 +241,7 @@ extension HookProcessor {
     /// (Claude가 `cd`하면 따라 바뀐다 — hooks 문서 「cwd follows Claude」). 훅 `cwd`가 등록 밖이면 세션의 프로젝트
     /// (미등록 상위 폴더에서 시작해 `session_bind`한 경우). 보관된 프로젝트 폴더면 nil.
     func toolProject(_ input: HookInput, acting: Session, projects: [Project]) -> Project? {
-        if let workdir = input.toolInput["workdir"] as? String ?? input.toolInput["cwd"] as? String {
+        if let workdir = (input.toolInput["workdir"] as? String ?? input.toolInput["cwd"] as? String).map(input.localPath) {
             return workdir.hasPrefix("/") ? ProjectMatcher.project(for: workdir, in: projects, home: home) : nil
         }
         guard let here = ProjectMatcher.nearest(for: input.cwd, in: projects, home: home) else { return acting.project }

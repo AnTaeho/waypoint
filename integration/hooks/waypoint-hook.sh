@@ -9,9 +9,12 @@
 # 사용: waypoint-hook.sh <EventName>   (stdin: 훅 입력 JSON)
 # 환경 변수:
 #   WAYPOINT_PORT      앱 포트(기본 47821)
+#   WAYPOINT_URL       앱 주소(예 http://host.docker.internal:47821). 있으면 WAYPOINT_PORT보다 먼저(컨테이너·원격, TRK-53)
+#   WAYPOINT_REMOTE    1이면 원격 모드: payload에 git 원격 정보(waypoint_remote)를 붙이고, 앱에 닿으면 쌓인 outbox를
+#                      뒤에서 앱으로 보낸다(/hooks/replay). 0이면 끈다. 없으면 WAYPOINT_URL이 있거나 macOS가 아닐 때 켠다.
 #   WAYPOINT_AGENT     claude(기본) / codex. 경로·PID·outbox의 도구를 구분한다.
 #   WAYPOINT_HOOK_LOG  1이면 받은 입력을 그대로 hook-log/<날짜>.jsonl 에도 남긴다(실제 필드 확인용, 원본 그대로)
-#   WAYPOINT_SUPPORT_DIR  저장 폴더(기본 ~/Library/Application Support/Waypoint, 테스트용)
+#   WAYPOINT_SUPPORT_DIR  저장 폴더(기본 macOS ~/Library/Application Support/Waypoint, 그 밖 ~/.local/state/waypoint)
 #   WAYPOINT_JQ        outbox를 줄일 jq(기본 /usr/bin/jq, 테스트용)
 
 # 훅을 부른 도구 PID. 셸 래퍼를 포함해 조상을 8단계까지 확인한다.
@@ -81,7 +84,7 @@ if type != "object" then error("not an object") else . end
 | .tool_name as $tool
 | keep(["session_id", "cwd", "hook_event_name", "agent_id", "agent_type", "source", "reason",
         "prompt", "prompt_text", "prompt_id", "turn_id", "tool_name", "tool_use_id", "tool_input", "tool_response",
-        "error", "is_interrupt"])
+        "error", "is_interrupt", "waypoint_remote"])
 # PostToolUseFailure 설명: 앱은 첫 줄 `Exit code N`만 본다. 나머지(명령 출력)는 버린다.
 | if has("error") then .error |= (if type == "string" then (split("\n")[0] | if test("^Exit code -?[0-9]+$") then . else null end) else null end) else . end
 | if has("is_interrupt") then .is_interrupt |= (if type == "boolean" then . else null end) else . end
@@ -128,24 +131,156 @@ if type != "object" then error("not an object") else . end
 '
 
 # outbox용 payload. jq가 없거나 실패하면 session_id·cwd만(따옴표·역슬래시 없는 값일 때). 그것도 없으면 빈 값 → 줄을 쓰지 않는다.
+# $4: 원격 정보 JSON(remote_field, 없으면 빈 값). jq가 없어도 원격 세션이 등록 프로젝트에 이어지게 남긴다.
 outbox_payload() {
-  local payload="$1" provider="$2" event="$3" trimmed sid cwd
+  local payload="$1" provider="$2" event="$3" remote="${4:-}" trimmed sid cwd
   trimmed="$(printf '%s' "$payload" | "${WAYPOINT_JQ:-/usr/bin/jq}" -c --arg provider "$provider" "$OUTBOX_FILTER" 2>/dev/null)"
   if [ -n "$trimmed" ] && [ "${trimmed:0:1}" = "{" ]; then printf '%s' "$trimmed"; return 0; fi
   [[ "$payload" =~ \"session_id\"[[:space:]]*:[[:space:]]*\"([^\"\\]+)\" ]] || return 0
   sid="${BASH_REMATCH[1]}"
   [[ "$payload" =~ \"cwd\"[[:space:]]*:[[:space:]]*\"([^\"\\]*)\" ]] && cwd="${BASH_REMATCH[1]}"
-  printf '{"session_id":"%s","cwd":"%s","hook_event_name":"%s"}' "$sid" "$cwd" "$event"
+  printf '{"session_id":"%s","cwd":"%s","hook_event_name":"%s"%s}' "$sid" "$cwd" "$event" "${remote:+,\"waypoint_remote\":$remote}"
 }
 
-# 블록 수신 확인. $1 포트, $2 응답 ID. ID 꼴(소문자 UUID)이 아니면 보내지 않는다(옛 앱은 머리가 없어 빈 값).
+# 원격 모드인지(WAYPOINT_REMOTE). macOS 로컬은 기본으로 끈다: 앱이 같은 outbox를 직접 흡수하고, payload도 그대로 둔다.
+remote_mode() {
+  case "${WAYPOINT_REMOTE:-}" in 1) return 0 ;; 0) return 1 ;; esac
+  [ -n "${WAYPOINT_URL:-}" ] && return 0
+  case "${OSTYPE:-}" in darwin*) return 1 ;; esac
+  return 0
+}
+
+# JSON 문자열에 그대로 넣어도 되는 값인지(따옴표·역슬래시·제어 문자 없음)
+json_safe() {
+  case "$1" in ''|*\"*|*\\*|*[[:cntrl:]]*) return 1 ;; esac
+  return 0
+}
+
+# cwd의 git 작업 트리 → REMOTE_JSON={"origin":…,"root":…,"branch":…,"host":…}. git 명령도 하위 셸도 쓰지 않는다
+# (.git/HEAD·config만 읽는다). origin이 없으면(원격 주소 없는 저장소, git 밖) 빈 값. worktree·하위 모듈(.git이 파일)은 gitdir:·commondir를 따라간다.
+remote_field() {
+  REMOTE_JSON=""
+  local dir="${1%/}" gitdir="" common line section="" origin="" branch="" out
+  case "$dir" in /*) ;; *) return 0 ;; esac
+  while :; do
+    if [ -d "$dir/.git" ]; then gitdir="$dir/.git"; break; fi
+    if [ -f "$dir/.git" ]; then
+      read -r line < "$dir/.git" || return 0
+      case "$line" in gitdir:*) ;; *) return 0 ;; esac
+      gitdir="${line#gitdir:}"; gitdir="${gitdir# }"
+      case "$gitdir" in /*) ;; *) gitdir="$dir/$gitdir" ;; esac
+      break
+    fi
+    [ -z "$dir" ] && return 0
+    dir="${dir%/*}"
+  done
+  common="$gitdir"
+  if [ -f "$gitdir/commondir" ] && read -r line < "$gitdir/commondir"; then
+    case "$line" in /*) common="$line" ;; *) common="$gitdir/$line" ;; esac
+  fi
+  [ -f "$common/config" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line#"${line%%[![:space:]]*}"}"; line="${line%"${line##*[![:space:]]}"}"
+    case "$line" in
+      \[*) section="$line" ;;
+      url*=*)
+        [ "$section" = '[remote "origin"]' ] || continue
+        line="${line#url}"; line="${line#"${line%%[![:space:]]*}"}"
+        case "$line" in =*) ;; *) continue ;; esac
+        line="${line#=}"; origin="${line#"${line%%[![:space:]]*}"}"
+        break ;;
+    esac
+  done < "$common/config"
+  json_safe "$origin" || return 0
+  if read -r line < "$gitdir/HEAD" 2>/dev/null; then
+    case "$line" in "ref: refs/heads/"*) branch="${line#ref: refs/heads/}" ;; esac
+  fi
+  [ -z "$dir" ] && dir="/"
+  json_safe "$dir" || return 0
+  out="\"origin\":\"$origin\",\"root\":\"$dir\""
+  json_safe "$branch" && out="$out,\"branch\":\"$branch\""
+  json_safe "${HOSTNAME:-}" && out="$out,\"host\":\"$HOSTNAME\""
+  REMOTE_JSON="{$out}"
+}
+
+# 원격 outbox를 앱으로 보낸다(TRK-53). 훅이 앱에 닿았을 때(또는 쌓인 줄 뒤에 섰을 때) 뒤에서 돈다(훅 응답을 기다리게 하지 않는다).
+# 잠금(mkdir)으로 한 번에 하나만. outbox.jsonl을 떼어 outbox.pending.jsonl 끝에 붙인 뒤 앞에서부터 100줄(또는 500KB)씩,
+# 한 번에 5묶음까지 POST /hooks/replay. 200을 받은 줄만 지운다. 받지 못하면(옛 앱 404, 시간 초과) 남겨 다음에 다시 보낸다.
+# 앱이 한 줄도 받지 않는 400은 그 묶음이 한 줄일 때만 outbox.rejected.jsonl로 옮긴다(같은 줄에 영원히 막히지 않게).
+# 보내는 동안 새로 쌓인 줄도 이어서 보낸다. 잠금을 푸는 사이에 온 줄이 있으면 한 번 더 돈다.
+replay_outbox() {
+  local base="$1" dir="$2" lock="$2/replay.lock" pending="$2/outbox.pending.jsonl" claim f status n i round
+  for round in 1 2; do
+    if ! mkdir "$lock" 2>/dev/null; then
+      # 2분 넘은 잠금은 죽은 replay가 남긴 것으로 본다
+      [ -n "$(find "$lock" -maxdepth 0 -mmin +2 2>/dev/null)" ] || return 0
+      rm -rf "$lock"; mkdir "$lock" 2>/dev/null || return 0
+    fi
+    for f in "$dir"/outbox.claim-*; do
+      [ -f "$f" ] && cat "$f" >> "$pending" && rm -f "$f"
+    done
+    status=200
+    for i in 1 2 3 4 5; do
+      if [ ! -s "$pending" ] && [ -s "$dir/outbox.jsonl" ]; then
+        claim="$dir/outbox.claim-$$"
+        mv "$dir/outbox.jsonl" "$claim" 2>/dev/null && cat "$claim" >> "$pending" && rm -f "$claim"
+      fi
+      [ -s "$pending" ] || break
+      awk 'NR > 100 { exit } { n += length($0) + 1; if (NR > 1 && n > 500000) exit; print }' "$pending" > "$lock/batch"
+      n="$(wc -l < "$lock/batch" | tr -d ' ')"
+      [ "${n:-0}" -gt 0 ] || break
+      status="$(curl -sS --noproxy '*' --max-time 10 --connect-timeout 2 -o /dev/null -w '%{http_code}' \
+        -X POST -H 'Content-Type: application/x-ndjson' --data-binary @"$lock/batch" "$base/hooks/replay" 2>/dev/null)"
+      if [ "$status" = "400" ] && [ "$n" = "1" ]; then
+        cat "$lock/batch" >> "$dir/outbox.rejected.jsonl"
+      elif [ "$status" != "200" ]; then
+        break
+      fi
+      tail -n +"$((n + 1))" "$pending" > "$lock/rest" && mv "$lock/rest" "$pending" || break
+    done
+    [ -s "$pending" ] || rm -f "$pending"
+    rm -rf "$lock"
+    [ "$status" = "200" ] || [ "$status" = "400" ] || return 0
+    [ "$i" = "5" ] && return 0
+    [ -s "$dir/outbox.jsonl" ] || return 0
+  done
+}
+
+# 쌓인 줄이 있는지(원격 outbox·보내는 중인 줄)
+has_backlog() {
+  [ -s "$1/outbox.jsonl" ] || [ -s "$1/outbox.pending.jsonl" ] && return 0
+  local f
+  for f in "$1"/outbox.claim-*; do [ -f "$f" ] && return 0; done
+  return 1
+}
+
+# 블록 수신 확인. $1 앱 주소, $2 응답 ID. ID 꼴(소문자 UUID)이 아니면 보내지 않는다(옛 앱은 머리가 없어 빈 값).
 # 실패해도 아무것도 하지 않는다(outbox에 쓰지 않는다. 확인이 없으면 앱이 다음 프롬프트에 블록을 다시 준다).
 send_ack() {
   [[ "$2" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || return 0
   curl -sS --noproxy '*' --max-time 1 --connect-timeout 1 -o /dev/null \
     -X POST -H 'Content-Type: application/json' --data-binary "{\"contextId\":\"$2\"}" \
-    "http://127.0.0.1:$1/hooks/ack" >/dev/null 2>&1
+    "$1/hooks/ack" >/dev/null 2>&1
   return 0
+}
+
+# 원격 모드에서 쌓인 outbox가 있으면 replay를 뒤에서 띄운다. 표준 입출력을 모두 끊어 Claude Code가 기다리지 않게 한다.
+start_replay() {
+  [ "$1" = "1" ] || return 0
+  [ -s "$3/outbox.jsonl" ] || [ -s "$3/outbox.pending.jsonl" ] || return 0
+  replay_outbox "$2" "$3" </dev/null >/dev/null 2>&1 &
+  disown 2>/dev/null
+  return 0
+}
+
+# main의 지역 변수(event·now·providerfield·pidfield·payload·provider·remote·dir)로 outbox 한 줄을 쓴다.
+write_outbox() {
+  local trimmed
+  trimmed="$(outbox_payload "$payload" "$provider" "$event" "$remote")"
+  [ -z "$trimmed" ] && return 0
+  mkdir -p "$dir" 2>/dev/null
+  printf '{"event":"%s","receivedAt":%s%s%s,"trimmed":true,"payload":%s}\n' \
+    "$event" "$now" "$providerfield" "$pidfield" "$trimmed" >> "$dir/outbox.jsonl" 2>/dev/null
 }
 
 main() {
@@ -157,14 +292,39 @@ main() {
     codex) path="/hooks/codex/$event"; pidkey="processPid"; pidname="X-Waypoint-Process-PID"; providerfield=',"provider":"codex"' ;;
     *) return 0 ;;
   esac
-  local dir="${WAYPOINT_SUPPORT_DIR:-$HOME/Library/Application Support/Waypoint}"
-  local payload now line response status rest body ctxid pid pidfield=""
+  local base="${WAYPOINT_URL:-http://127.0.0.1:${port}}"
+  base="${base%/}"
+  local dir="${WAYPOINT_SUPPORT_DIR:-}"
+  if [ -z "$dir" ]; then
+    case "${OSTYPE:-}" in
+      darwin*) dir="$HOME/Library/Application Support/Waypoint" ;;
+      *) dir="${XDG_STATE_HOME:-$HOME/.local/state}/waypoint" ;;
+    esac
+  fi
+  local payload now line response status rest body ctxid pid pidfield="" remote="" remote_on=0
   local -a pidheader=() ackheader=()
   # 블록을 줄 수 있는 이벤트: 이 스크립트는 출력 뒤 확인을 보낸다고 알린다(없으면 앱은 옛 스크립트로 보고 바로 확정).
   case "$event" in SessionStart|UserPromptSubmit) ackheader=(-H 'X-Waypoint-Context-Ack: 1') ;; esac
 
   payload="$(cat)"
   [ -z "$payload" ] && return 0
+  # 원격 모드: 시작 폴더의 git 원격 정보를 payload 맨 앞에 붙인다(앱이 같은 원격 주소의 등록 프로젝트에 잇는다, TRK-53)
+  if remote_mode; then
+    remote_on=1
+    payload="${payload#"${payload%%[![:space:]]*}"}"
+    if [ "${payload:0:1}" = "{" ] && [[ "$payload" =~ \"cwd\"[[:space:]]*:[[:space:]]*\"([^\"\\]*)\" ]]; then
+      remote_field "${BASH_REMATCH[1]}"
+      remote="$REMOTE_JSON"
+      if [ -n "$remote" ]; then
+        rest="${payload#\{}"
+        if [[ "$rest" =~ ^[[:space:]]*\} ]]; then
+          payload="{\"waypoint_remote\":$remote$rest"
+        else
+          payload="{\"waypoint_remote\":$remote,$rest"
+        fi
+      fi
+    fi
+  fi
   now="$(date +%s)"
   pid="$(agent_pid)"
   if [ -n "$pid" ]; then
@@ -179,10 +339,18 @@ main() {
     printf '%s\n' "$line" >> "$dir/hook-log/$(date +%Y-%m-%d).jsonl" 2>/dev/null
   fi
 
+  # 원격 모드에서 앞서 쌓인 줄이 있으면 블록이 필요 없는 이벤트는 그 뒤에 세운다(outbox에 붙이고 replay를 띄운다).
+  # 실시간으로 먼저 보내면 앱이 늦게 받는 그 세션의 이른 줄을 「끝난 세션의 지난 기록」으로 버릴 수 있다.
+  if [ "$remote_on" = "1" ] && [ "$event" != "SessionStart" ] && [ "$event" != "UserPromptSubmit" ] && has_backlog "$dir"; then
+    write_outbox
+    start_replay "$remote_on" "$base" "$dir"
+    return 0
+  fi
+
   response="$(printf '%s' "$payload" | curl -sS --noproxy '*' --max-time 1 --connect-timeout 1 \
     -X POST -H 'Content-Type: application/json' "${pidheader[@]}" "${ackheader[@]}" \
     --data-binary @- -w '\n%header{x-waypoint-context-id}\n%{http_code}' \
-    "http://127.0.0.1:${port}${path}" 2>/dev/null)"
+    "${base}${path}" 2>/dev/null)"
   # 응답 = 본문 \n 응답 ID(없으면 빈 줄) \n 상태 코드
   status="${response##*$'\n'}"
   rest="${response%$'\n'*}"
@@ -196,21 +364,17 @@ main() {
       SessionStart|UserPromptSubmit)
         if [ "$status" = "200" ] && [ -n "$body" ]; then
           # 출력에 실패하면(stdout이 닫힘 등) 확인을 보내지 않는다
-          printf '%s\n' "$body" || return 0
-          send_ack "$port" "$ctxid"
+          printf '%s\n' "$body" || { start_replay "$remote_on" "$base" "$dir"; return 0; }
+          send_ack "$base" "$ctxid"
         fi
         ;;
     esac
+    start_replay "$remote_on" "$base" "$dir"
     return 0
   fi
 
   # 앱이 꺼져 있거나 응답 없음 → 줄인 payload로 outbox 적재 (앱 실행 시 흡수)
-  local trimmed
-  trimmed="$(outbox_payload "$payload" "$provider" "$event")"
-  [ -z "$trimmed" ] && return 0
-  mkdir -p "$dir" 2>/dev/null
-  printf '{"event":"%s","receivedAt":%s%s%s,"trimmed":true,"payload":%s}\n' \
-    "$event" "$now" "$providerfield" "$pidfield" "$trimmed" >> "$dir/outbox.jsonl" 2>/dev/null
+  write_outbox
   return 0
 }
 

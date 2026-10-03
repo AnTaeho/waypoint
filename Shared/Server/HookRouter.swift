@@ -49,6 +49,33 @@ public enum HookRouter {
                             headers: [contextIDHeader: id])
     }
 
+    // MARK: - 원격 replay (TRK-53)
+
+    /// 원격·컨테이너 훅이 앱에 닿지 못해 쌓아 둔 outbox 줄(JSON Lines)을 다시 보내는 곳.
+    public static let replayPath = "/hooks/replay"
+
+    /// 흡수가 남은 동안 처리하지 않고 outbox 뒤에 세울 수 있는 이벤트(응답 본문이 필요 없는 것).
+    public static func defersWhileDraining(_ event: String) -> Bool {
+        !contextEvents.contains(event) && !lateContextEvents.contains(event)
+    }
+
+    /// `POST /hooks/replay`. 줄을 이 Mac의 outbox에 붙인 뒤에만 `200 {"accepted":n,"rejected":m}`(원격은 200을 받아야 줄을 지운다).
+    /// 줄이 상한(`Outbox.replayLineLimit`)을 넘거나 읽을 수 있는 줄이 하나도 없으면 `400`, 붙이지 못하면 `500`.
+    public static func respondReplay(to request: HTTPRequest, append: (Data) throws -> Outbox.AppendResult) -> HTTPResponse {
+        guard request.method == "POST" else { return .methodNotAllowed }
+        let lines = request.body.split(separator: UInt8(ascii: "\n")).count
+        guard lines > 0, lines <= Outbox.replayLineLimit else { return .badRequest }
+        let result: Outbox.AppendResult
+        do {
+            result = try append(request.body)
+        } catch {
+            return HTTPResponse(status: 500, contentType: "text/plain; charset=utf-8", body: Data())
+        }
+        guard result.accepted > 0 else { return .badRequest }
+        return HTTPResponse(status: 200, contentType: "application/json",
+                            body: Data("{\"accepted\":\(result.accepted),\"rejected\":\(result.rejected)}".utf8))
+    }
+
     // MARK: - 수신 확인 (TRK-35)
 
     /// 블록을 stdout에 출력한 스크립트가 응답 ID를 돌려보내는 곳. Claude·Codex 공용(ID가 세션을 가리킨다).

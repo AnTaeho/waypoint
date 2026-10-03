@@ -6,7 +6,14 @@ public struct HookInput {
     public let provider: AgentProvider
     public let event: String
     public let sessionID: String
-    public let cwd: String
+    /// 훅의 시작 폴더. 원격 세션을 로컬 작업 트리에 이으면(`linkRemote`) 로컬 경로로 옮긴 값이다.
+    public internal(set) var cwd: String
+    /// 원격 모드 훅 스크립트가 붙인 git 작업 트리(`waypoint_remote`, TRK-53). 로컬 훅이면 nil.
+    public let remote: RemoteCheckout?
+    /// 원격 작업 트리를 이은 로컬 작업 트리. 처리기가 정한다(`HookProcessor.linkRemote`). 잇지 않았으면 nil.
+    public internal(set) var linkedCheckout: String?
+    /// 이었을 때 원래(원격 쪽) 시작 폴더. 세션 `cwd`에는 이 값을 적는다(화면에 보이는 폴더).
+    public internal(set) var remoteCwd: String?
     /// 서브에이전트 안에서 난 훅이면 서브에이전트 실행 ID
     public let agentID: String?
     public let agentType: String?
@@ -50,6 +57,7 @@ public struct HookInput {
         self.provider = provider
         self.sessionID = provider.sessionID(sessionID)
         self.cwd = string("cwd") ?? ""
+        self.remote = RemoteCheckout(object["waypoint_remote"])
         self.agentID = string("agent_id").map { provider.sessionID($0) }
         self.agentType = object["agent_type"] as? String
         self.source = string("source")
@@ -68,6 +76,15 @@ public struct HookInput {
             self.toolResponse = object["tool_response"] as? [String: Any] ?? [:]
         }
     }
+
+    /// 원격 작업 트리에 이었으면 그 아래 경로를 로컬 경로로 옮긴다. 아니면 그대로.
+    public func localPath(_ path: String) -> String {
+        guard let remote, let linkedCheckout else { return path }
+        return RemoteMatcher.map(path, from: remote.root, to: linkedCheckout)
+    }
+
+    /// 세션에 적을 시작 폴더(이었으면 원격 쪽 원래 폴더)
+    public var sessionCwd: String { remoteCwd ?? cwd }
 }
 
 /// 훅 입력에서 뽑는 사실들. 순수 함수라 픽스처로 바로 테스트한다.
