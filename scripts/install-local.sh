@@ -1,5 +1,6 @@
 #!/bin/bash
-# 평소용 Waypoint를 새 버전으로 바꾼다: Release 빌드(팀 서명) → 서명 확인 → 떠 있는 평소용 정상 종료 → /Applications 교체 → 실행 → 포트 확인 → 로그인 항목.
+# 평소용 Waypoint를 새 버전으로 바꾼다: Release 빌드(팀 서명) → 서명 확인 → 떠 있는 평소용 정상 종료 → /Applications 교체 → 옛 로그인 항목 정리 → 실행 → 포트 확인.
+# 로그인 항목은 앱이 `SMAppService`로 등록한다(TRK-55). 스크립트는 옛 방식(System Events) 항목만 지운다.
 # 여러 번 돌려도 안전하다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 강제 종료는 하지 않는다.
 #
 # 사용: scripts/install-local.sh
@@ -79,7 +80,29 @@ ditto "$BUILT" "$tmp" || fail "복사 실패: $BUILT → $tmp"
 rm -rf "$DEST" || fail "옛 앱을 지울 수 없음: $DEST"
 mv "$tmp" "$DEST" || fail "옮기기 실패: $tmp → $DEST"
 
-# 4. 실행(경로로 연다. 같은 번들 ID의 다른 빌드가 디스크에 남아 있을 수 있다). -g: 쓰던 앱의 초점을 뺏지 않게 뒤에서
+# 4. 옛 로그인 항목(System Events로 만든 것)이 있으면 지운다. 새 방식 등록은 앱이 한다(TRK-55).
+#    지웠으면 앱이 첫 실행 때 알 수 있게 표시를 남긴다(앱이 읽고 지운다). 실행 전에 해야 앱이 첫 실행에서 본다.
+login="앱이 관리"
+if [ "$DEST_DIR" = "/Applications" ]; then
+  removed="$(osascript -e 'tell application "System Events"
+    if exists login item "Waypoint" then
+      delete login item "Waypoint"
+      return "removed"
+    end if
+  end tell' 2>/dev/null)"
+  rc=$?
+  if [ "$removed" = "removed" ]; then
+    defaults write "$BUNDLE_ID" WaypointLoginItemLegacyRemoved -bool true
+    login="앱이 관리(옛 항목 지움)"
+  elif [ "$rc" -ne 0 ]; then
+    # 자동화 권한이 없으면 옛 항목이 남아 두 줄이 될 수 있다
+    login="앱이 관리(옛 항목 확인 못 함 — 시스템 설정 > 일반 > 로그인 항목에서 확인)"
+  fi
+else
+  login="건너뜀(설치 위치가 /Applications 아님)"
+fi
+
+# 5. 실행(경로로 연다. 같은 번들 ID의 다른 빌드가 디스크에 남아 있을 수 있다). -g: 쓰던 앱의 초점을 뺏지 않게 뒤에서
 step "실행"
 open -g "$DEST" || fail "실행 실패: $DEST"
 pid=""
@@ -94,19 +117,6 @@ case "$comm" in
   "$DEST"/*) ;;
   *) fail "포트 $PORT 를 연 것이 설치한 앱이 아님: $pid $comm" ;;
 esac
-
-# 5. 로그인 항목(System Events). 이미 있으면 그대로 둔다.
-login="이미 있음"
-if [ "$DEST_DIR" = "/Applications" ]; then
-  exists="$(osascript -e 'tell application "System Events" to exists login item "Waypoint"' 2>/dev/null)"
-  if [ "$exists" != "true" ]; then
-    osascript -e "tell application \"System Events\" to make login item at end with properties {path:\"$DEST\", hidden:false}" >/dev/null 2>&1 \
-      || fail "로그인 항목 추가 실패(시스템 설정 > 일반 > 로그인 항목에서 직접 추가)"
-    login="추가함"
-  fi
-else
-  login="건너뜀(설치 위치가 /Applications 아님)"
-fi
 
 version="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$DEST/Contents/Info.plist" 2>/dev/null)"
 build="$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$DEST/Contents/Info.plist" 2>/dev/null)"
