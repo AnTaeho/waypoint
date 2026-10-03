@@ -610,6 +610,17 @@ Codex: `scripts/install-codex.py`를 그대로 옮겼다(`CodexInstallPlanner`).
 - **진입점**: 첫 실행 자동 표시(등록된 프로젝트가 보관 포함 하나도 없고 「끝」을 누른 적이 없을 때, UserDefaults `onboarding.completed`), 연동 상태 패널의 「연결 설정」, 메뉴 막대 「연결 설정…」. 「닫기」는 끝낸 것으로 기억하지 않는다.
 - **Dev 제한**: Dev 앱(`AppInstance.isDev`)이 실제 홈에 설치·해제하면 평소용 연결이 47822로 바뀌어 평소용 기록이 끊긴다. 그래서 Dev는 연결이 다 된 상태가 아니면 연결 단계에서 막히고(「Waypoint Dev는 평소용 연결을 바꾸지 않음」), 도구 단계의 다시 설치·연결 해제도 비활성이다(`IntegrationHomePolicy.installBlock`, 링크를 푼 경로로 비교). Debug 빌드는 `WAYPOINT_INTEGRATION_HOME`이 있으면 그 폴더를 홈으로 써서(설치기 컨텍스트·`IntegrationMonitor` 둘 다) 설치를 허용한다. Release는 이 변수를 무시한다.
 
+### 로그인할 때 열기 (2026-10-03, TRK-55)
+
+앱이 `SMAppService.mainApp`(macOS 13+)으로 자기 자신을 로그인 항목에 등록·해제한다. System Events·Apple Events는 쓰지 않는다. 판정은 순수 타입 `LoginItemPolicy`, 상태·기억은 `LoginItemController`(`Shared/Instance/LoginItem.swift`), 실제 등록은 `SystemLoginItemService`(`macOS/Settings/`).
+
+- **저절로 켜기**: 온보딩 「끝」에서 켠다. 실행 때는 기존 사용자(등록된 프로젝트가 있거나 `onboarding.completed`)이거나 설치 스크립트가 옛 항목을 지웠다는 표시가 있으면 켠다. 처음 쓰는 사람은 실행 때 켜지 않고 「끝」을 기다린다.
+- **한 번만**: 저절로 켜기가 성공하면 `loginItem.autoApplied`를 남기고 다시 하지 않는다. 시스템 설정에서 끈 것을 되살리지 않는다. 등록이 실패하면 남기지 않아 다음 실행 때 다시 해 본다. 이미 켜져 있거나 승인 대기면 등록하지 않고 표시만 남긴다.
+- **사용자 선택**: 설정 「일반」 탭의 「로그인할 때 열기」를 한 번이라도 바꾸면 `loginItem.userChoice`(켬·끔)를 남기고, 그 뒤로는 저절로 켜지 않는다.
+- **Dev**: 등록하지 않고 상태도 읽지 않는다. 토글은 꺼짐·비활성.
+- **화면**: 토글은 실제 상태를 따른다(켜짐 = `enabled`·`requiresApproval`). 아래 줄에 「켜짐」「꺼짐」「승인 필요」, 등록·해제가 실패하면 「바꾸지 못함」. 승인 필요면 「시스템 설정에서 허용」(`SMAppService.openSystemSettingsLoginItems()`). 앱이 앞으로 올 때마다 상태를 다시 읽는다.
+- **옛 항목**: `scripts/install-local.sh`가 앱을 실행하기 전에 System Events로 만든 옛 항목 「Waypoint」를 지우고, 지웠으면 `defaults write dev.antaeho.waypoint WaypointLoginItemLegacyRemoved -bool true`를 남긴다. 앱은 실행 때 이 값을 읽고 지운다. 스크립트는 새 방식 항목을 만들지 않는다.
+
 ### 기록 지표와 진단 내보내기 (2026-10-01, TRK-11)
 
 이 기기에서만 숫자와 시각을 모은다(`ReliabilityMetrics`, 저장 폴더 `metrics.json` 0600, 10초 점검 때 저장, CloudKit 아님): 실시간 훅의 수신(서버가 연결을 받은 시각)→저장·화면 반영 지연 최근 1000건, 재개 시간(재개 문맥을 처음 복사한 시각 → 그 카드에 같은 도구의 새 메인 세션이 연결된 시각, 최근 100건), 연동 실패(서버 시작·형식 오류·저장 실패), 복구(outbox 흡수·보존·격리, 세션 정리) 횟수. 연동 상태 패널에 짧게 보이고, 「진단 정보 복사」를 누를 때만 같은 숫자를 내보낸다. 프로젝트명·경로·세션 ID·대화는 담지 않는다. `/integration/status`가 `metrics`로 돌려준다. 기준·측정 방법·관측값은 docs/RELIABILITY.md.

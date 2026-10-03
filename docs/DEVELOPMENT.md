@@ -9,7 +9,7 @@ Waypoint로 다른 저장소의 세션을 늘 추적하면서 Waypoint 자체도
 | 표시 | 메뉴 막대 `signpost.right` | 메뉴 막대 `hammer`, 「Waypoint Dev 열기」, 사이드바 맨 위 「Dev」 |
 | 포트 | 47821 | 47822 |
 | 저장 폴더 | `~/Library/Application Support/Waypoint/` | `~/Library/Application Support/Waypoint-Dev/` |
-| 켜짐 | 로그인 항목, 늘 | 개발할 때만 |
+| 켜짐 | 로그인 항목(앱이 `SMAppService`로 등록), 늘 | 개발할 때만(로그인 항목에 등록하지 않는다) |
 | 훅·MCP | 전역 설정(`~/.claude/settings.json`, `~/.claude.json` 사용자 범위) | 실측 폴더의 프로젝트 설정만 |
 | CloudKit 컨테이너 | `iCloud.dev.antaeho.waypoint` | `iCloud.dev.antaeho.waypoint.dev` |
 | iPhone 앱 | 「Waypoint」(Release) | 「Waypoint Dev」(Debug) |
@@ -32,7 +32,7 @@ Waypoint로 다른 저장소의 세션을 늘 추적하면서 Waypoint 자체도
 scripts/install-local.sh
 ```
 
-Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`, 빌드 번호 = 커밋 수) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 뒤에서 실행(`open -g`, 쓰던 창의 초점을 뺏지 않는다) → 47821을 설치한 앱이 여는지 확인 → 로그인 항목이 없으면 System Events로 추가. 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
+Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`, 빌드 번호 = 커밋 수) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 뒤에서 실행(`open -g`, 쓰던 창의 초점을 뺏지 않는다) → 47821을 설치한 앱이 여는지 확인. 실행 전에 옛 방식(System Events) 로그인 항목이 있으면 지우고 `defaults`에 `WaypointLoginItemLegacyRemoved`를 남긴다. 로그인 항목 등록은 앱이 첫 실행 때 `SMAppService`로 한다(TRK-55). 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
 
 외부 베타용 배포 빌드(Developer ID·공증)는 [`docs/RELEASE.md`](RELEASE.md), `scripts/release-mac.sh`.
 
@@ -173,7 +173,7 @@ scripts/dev-probe-setup.sh --remove ~/workspace/waypoint-probe # 되돌리기
 
 - 실측 폴더: `scripts/dev-probe-setup.sh --remove <폴더>`.
 - 개발용 데이터: Dev를 끄고 `~/Library/Application Support/Waypoint-Dev/`를 지운다.
-- 평소용 로그인 항목: 시스템 설정 > 일반 > 로그인 항목에서 Waypoint를 빼거나 `osascript -e 'tell application "System Events" to delete login item "Waypoint"'`.
+- 평소용 로그인 항목: 설정(⌘,) → 「일반」 → 「로그인할 때 열기」를 끄거나 시스템 설정 > 일반 > 로그인 항목에서 Waypoint를 뺀다. 한 번 끈 뒤로 앱이 다시 켜지 않는다(UserDefaults `loginItem.userChoice`·`loginItem.autoApplied`).
 - CloudKit: `WaypointApp.makeContainer`에서 `cloudKitContainer:`를 빼면 로컬만. 올라간 기록은 CloudKit 대시보드에서 영역 `com.apple.coredata.cloudkit.zone`을 지운다(Development 환경은 「Reset Environment」로 통째로 비울 수 있다). App ID·컨테이너는 개발자 계정에 남는다(컨테이너는 지울 수 없다).
 - 서명: `project.yml`의 `DEVELOPMENT_TEAM`·`CODE_SIGN_IDENTITY`·`CODE_SIGN_ENTITLEMENTS…`를 빼고 `install-local.sh`에 `CODE_SIGN_IDENTITY=-`를 되돌리면 M6 전 애드혹 빌드. CloudKit은 함께 빼야 한다.
 - iPhone 앱: 기기에서 앱을 길게 눌러 삭제.

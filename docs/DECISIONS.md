@@ -615,3 +615,19 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 원격에도 상태줄 중계가 설치된다(내 판단) | 설치기를 그대로 쓴다. Mac 사용량 게이지에는 들어가지 않는다 | 원격용 옵션 | — |
 
 검증: `swift test` 737개 중 735개 통과(실패 2개는 `RealInstallStateTests` — 저장소 훅 스크립트·tracker 스킬이 이 Mac에 설치된 것과 달라졌다, 설치하면 통과), `bash integration/hooks/test-waypoint-hook.sh` 66개 통과, macOS Debug 빌드. 실측은 docs/RELIABILITY.md 「원격·컨테이너 (TRK-53)」.
+
+## 2026-10-03 — 로그인 때 자동 실행 (TRK-55)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| `SMAppService.mainApp`으로 앱이 스스로 등록·해제한다. 외부 의존성 없음. 메인 세션 결정 | 배포판에는 로그인 항목이 없어 재부팅 뒤 직접 열기 전까지 기록이 안 들어왔다. System Events는 자동화 권한이 필요하다 | 설치 스크립트의 System Events 항목, LaunchAgent plist | `LoginItemController.launch`·`onboardingFinished` 호출 두 줄 |
+| 평소용·배포판은 온보딩 「끝」에서 켠다. 온보딩을 거치지 않은 기존 사용자는 첫 실행 때 한 번 켠다. 설정에서 고른 적이 있으면 건드리지 않는다. 메인 세션 결정 | 기록이 끊기지 않는 쪽을 기본으로, 사용자가 끈 것은 존중 | 설정에서 직접 켜기만 | `LoginItemPolicy` |
+| Dev는 등록하지 않는다(토글 꺼짐·비활성). 메인 세션 결정 | 평소용과 겹쳐 뜨지 않게 | — | `forCurrentApp` |
+| 옛 System Events 항목은 `install-local.sh`가 지우고 앱은 새 방식만 등록한다. 앱은 System Events·Apple Events를 쓰지 않는다. 메인 세션 결정 | 두 줄·중복 실행 방지, 앱에 자동화 권한을 요구하지 않는다 | 앱이 옛 항목을 지우기 | 스크립트 4단계 |
+| 「기존 사용자」 = 등록된 프로젝트가 있거나 `onboarding.completed`. 온보딩 자동 표시 조건의 반대(내 판단) | 자동 표시가 뜨는 사람은 곧 「끝」에서 켜진다. 둘이 겹치지 않는다 | 첫 실행 표시 키를 새로 두기 | `startLoginItem` |
+| 스크립트는 옛 항목을 지웠으면 `defaults`에 `WaypointLoginItemLegacyRemoved`를 남기고, 앱은 실행 때 읽고 지운다. 이 표시가 있으면 처음 쓰는 사람 조건이어도 켠다(내 판단) | 옛 항목이 있었다는 것은 로그인 때 열리기를 원했다는 뜻. 앱은 옛 항목을 직접 볼 수단이 없다 | 표시 없이 기존 사용자 조건만 | 스크립트 `defaults write` 한 줄 |
+| 저절로 켜기는 등록이 성공했을 때만 「했음」으로 남긴다(내 판단) | 앱 위치 무작위화 등으로 실패하면 옮긴 뒤 다음 실행에서 다시 해 본다 | 실패해도 한 번으로 끝 | `apply`의 `.register` |
+| 스크립트 끝 줄은 「로그인 항목 앱이 관리」(옛 항목을 지웠으면 「(옛 항목 지움)」)(내 판단) | 새 방식 등록 여부를 스크립트에서 볼 수단이 `sfltool`뿐이다 | `sfltool dumpbtm` 파싱 | 끝 줄 |
+| 설정 창 첫 탭을 「일반」으로, 기본 탭도 「일반」(내 판단) | 지시서대로 맨 앞에 둔다 | 「사용량」 기본 유지 | `SettingsTab` |
+
+검증: `swift test` 751개 통과(새 `LoginItemTests` 14개), macOS Debug 빌드, `bash -n scripts/install-local.sh`, `python3 scripts/test_build_failure_report.py` 17개 통과. Dev 설정 「일반」 탭 창 캡처(꺼짐·비활성). 평소용 등록과 옛 항목 정리는 머지 뒤 평소용 설치로 확인한다.

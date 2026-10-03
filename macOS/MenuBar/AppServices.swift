@@ -18,6 +18,8 @@ final class AppServices {
     let integration = IntegrationMonitor(port: AppInstance.current.port(), home: IntegrationEnvironment.home)
     /// 연결 설정(온보딩) 진행 상태
     let onboarding = OnboardingModel()
+    /// 로그인할 때 열기(TRK-55). Dev는 등록하지 않는다
+    let loginItem = LoginItemController.forCurrentApp()
     /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
     let reliability = ReliabilityMonitor()
     /// 이번이나 지난 실행에서 백업으로 저장소를 되돌린 기록(TRK-46). 사람이 확인하면 지운다.
@@ -161,7 +163,14 @@ final class AppServices {
         self.timer = timer
         observeLifecycle()
         OnboardingLaunch.start(onboarding, container: container)
+        startLoginItem()
         RecordsLaunch.start(records)
+    }
+
+    /// 기존 사용자(프로젝트가 있거나 온보딩을 마침)는 첫 실행 때 한 번 켠다. 처음 쓰는 사람은 온보딩 「끝」에서.
+    private func startLoginItem() {
+        let count = (try? container.mainContext.fetchCount(FetchDescriptor<Project>())) ?? 0
+        loginItem.launch(existingUser: count > 0 || OnboardingModel.completed)
     }
 
     /// iPhone에서 온 변경(CloudKit 가져오기)을 메인 context에 들인다(`RemoteCardMerge`). 그대로 두면 iPhone에서
