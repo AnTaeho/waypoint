@@ -42,6 +42,7 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 - Codex의 `project_init`과 `card_create`에는 `provider: codex`도 전달한다. 연결 세션이 있으면 서버가 그 세션의 도구를 만든 곳으로 기록한다.
 - 실제 세션 ID만 사용한다. 훅 블록에 없으면 Codex 실행 환경의 `CODEX_SESSION_ID` 또는 `CODEX_THREAD_ID`를 읽어 사용할 수 있다(둘 다 있으면 같은 값인지 확인). Codex 원본 ID에 `codex:`가 없으면 한 번만 붙인다. 둘 다 없으면 추측하거나 다른 세션의 ID를 찾지 않고 추적할 수 없음을 짧게 알린다.
 - 블록이 없거나 프로젝트가 다를 때도 요청과 실제 수정 폴더로 작업 대상이 분명하면 `project_resolve(작업 대상 절대 경로)`를 쓴다. 등록된 프로젝트면 `session_bind(project, sessionId, provider, cwd: 세션 시작 폴더)`로 연결한다. 결과의 context와 sessionId를 이후 기록에 사용한다. 프로젝트 전환 때도 같은 절차를 따른다. `project_init`은 등록을 요청받았을 때만 쓴다.
+- SSH 원격·개발 컨테이너처럼 Mac에 없는 폴더에서는 주입 블록의 `remote:` 값(없으면 `git config --get remote.origin.url`)을 `project_resolve(cwd, remote)`에 함께 보낸다.
 
 | 도구 | 쓰는 때 |
 |---|---|
@@ -56,7 +57,7 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 | `card_evidence(id, criterion?, command, outcome, detail?, sessionId?)` | 완료 조건을 확인하려고 실행한 명령과 결과. criterion은 1부터, outcome은 pass·fail·skipped |
 | `project_status(project, text?, sessionId?)` | 프로젝트 지금 상황 갱신(600자·8줄 이내, 전체를 새로 쓴다). text를 빼면 읽기 |
 | `work_file(sessionId, cardId?)` | 정리 안 된 작업 정리. 블록의 짧은 ID 그대로. cardId를 빼면 넘김 |
-| `project_resolve(cwd)` | 폴더 → 프로젝트(주입 블록이 없을 때 확인용) |
+| `project_resolve(cwd, remote?)` | 폴더 → 프로젝트(주입 블록이 없을 때 확인용). 원격·컨테이너 폴더는 git origin 주소를 `remote`로 |
 | `project_init(cwd, name, key?, summary?, stack?, guideFiles?, seedCards?)` | `/tracker init`에서만. 앱에 등록 확인 창을 띄운다 |
 
 카드 ID는 `PRB-1` 꼴이다.

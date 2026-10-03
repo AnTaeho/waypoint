@@ -18,6 +18,8 @@ public final class MCPTools {
     /// `project_init` 초안을 두는 곳. 없으면 `project_init`은 실패한다.
     public var drafts: ProjectDraftQueue?
     let fileManager = FileManager.default
+    /// 등록 프로젝트 폴더 → 로컬 git 작업 트리·origin(`project_resolve`의 `remote`, TRK-53). 테스트에서 바꾼다.
+    public var localOrigin: (String) -> LocalOrigin? = { LocalOriginCache.shared.origin(for: $0) }
     /// `card_get`에 싣는 최근 기록 수
     public static let recentEventLimit = 20
     /// 응답 `overlaps`로 이미 알린 파일(`<내 세션 ID>|<상대 단위 메인 세션 ID>` → 파일). 메모리에만 둔다(TRK-17).
@@ -54,9 +56,21 @@ public final class MCPTools {
 
     // MARK: - 도구
 
+    /// `remote`(원격·컨테이너 작업 트리의 git origin 주소)를 주면, `cwd`가 어떤 등록 폴더와도 맞지 않을 때 같은 원격 주소의
+    /// 등록 프로젝트를 찾는다(훅과 같은 규칙, TRK-53). 작업 트리가 둘 이상이면 null.
     func projectResolve(_ args: JSONValue) throws -> JSONValue {
         let cwd = try requiredString(args, "cwd")
-        guard let project = ProjectMatcher.project(for: cwd, in: allProjects(), home: home) else { return .null }
+        let projects = allProjects()
+        if let project = ProjectMatcher.project(for: cwd, in: projects, home: home) { return projectJSON(project) }
+        guard let origin = optionalString(args, "remote")?.trimmingCharacters(in: .whitespacesAndNewlines), !origin.isEmpty,
+              ProjectMatcher.nearest(for: cwd, in: projects, home: home) == nil,
+              let local = RemoteMatcher.localCheckout(origin: origin, in: projects, home: home, localOrigin: localOrigin)
+        else { return .null }
+        // 원격 시작 폴더의 작업 트리 안 위치를 모르므로(작업 트리 최상위를 받지 않는다) 그 작업 트리의 가장 바깥 프로젝트
+        let inside = projects.filter {
+            $0.archivedAt == nil && ProjectMatcher.isInside(ProjectMatcher.normalize($0.rootPath, home: home), root: local)
+        }
+        guard let project = inside.min(by: { $0.rootPath.count < $1.rootPath.count }) else { return .null }
         return projectJSON(project)
     }
 

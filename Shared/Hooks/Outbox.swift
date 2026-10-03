@@ -27,6 +27,8 @@ public enum Outbox {
         public var skipped = 0
         /// 처리 실패로 원본을 보존했다. 다음 점검에서 이 줄부터 다시 시도한다.
         public var retryPending = false
+        /// 시간 예산(`deadline`)이 다 돼 남은 줄을 두고 멈췄다. 곧 이어서 처리한다(원격 replay, TRK-53).
+        public var more = false
     }
 
     /// 한 줄의 저장 실패. `drain`의 `handle`이 던져 그 줄부터 남기게 한다.
@@ -61,10 +63,13 @@ public enum Outbox {
     /// handle이 실패하면(또는 격리 파일에 쓰지 못하면) 해당 줄과 이후 줄을 보존하고 모든 파일의 처리를 중단한다.
     /// 다음 drain이 그 줄부터 다시 시도한다. 횟수 제한은 없다(DECISIONS 2026-10-01).
     /// 남은 줄 저장마저 실패하면 원본 전체를 유지한다(기록 손실보다 재수신을 우선).
+    /// `deadline`이 있으면 한 줄 이상 처리한 뒤 그 시각이 지나면 남은 줄을 떼어 낸 파일에 다시 쓰고 멈춘다(`more`).
+    /// 다음 drain이 그 줄부터 이어 간다(순서 유지). 원격 replay가 메인 액터를 오래 잡지 않게 한다(`RemoteReplay`, TRK-53).
     @discardableResult
     public static func drain(
         directory: URL,
         fileManager: FileManager = .default,
+        deadline: Date? = nil,
         handle: (Entry) throws -> Void
     ) -> DrainResult {
         var result = DrainResult()
@@ -81,6 +86,12 @@ public enum Outbox {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
             let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
             for (index, line) in lines.enumerated() {
+                if let deadline, result.processed + result.skipped > 0, Date() >= deadline {
+                    var paused = preserve(lines[index...], at: url, result: result)
+                    paused.retryPending = result.retryPending
+                    paused.more = true
+                    return paused
+                }
                 if let entry = parse(line: line) {
                     do {
                         try handle(entry)
@@ -98,6 +109,57 @@ public enum Outbox {
             try? fileManager.removeItem(at: url)
         }
         return result
+    }
+
+    // MARK: - 원격 replay (TRK-53)
+
+    /// `POST /hooks/replay` 한 번에 받는 최대 줄 수. 훅 스크립트는 100줄씩 보낸다.
+    public static let replayLineLimit = 500
+
+    public struct AppendResult: Equatable, Sendable {
+        public var accepted = 0
+        /// 읽을 수 없어 받지 않은 줄
+        public var rejected = 0
+    }
+
+    /// outbox 줄(JSON Lines)을 `directory`의 outbox 끝에 붙인다(원격 replay는 `RemoteReplay.directory`).
+    /// 읽을 수 있는 줄(`parse`)만 붙이고 나머지는 센다. 한 번의 쓰기(O_APPEND)로 붙여 훅 스크립트가 같은 파일에
+    /// 쓰는 줄과 섞이지 않는다. 쓰지 못하면 오류(호출 쪽은 5xx로 답해 원격이 줄을 지우지 않게 한다).
+    public static func append(_ body: Data, directory: URL, fileManager: FileManager = .default) throws -> AppendResult {
+        var result = AppendResult()
+        var accepted = Data()
+        let text = String(decoding: body, as: UTF8.self)
+        for line in text.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+            guard parse(line: Substring(trimmed)) != nil else {
+                result.rejected += 1
+                continue
+            }
+            accepted.append(Data((trimmed + "\n").utf8))
+            result.accepted += 1
+        }
+        guard !accepted.isEmpty else { return result }
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let path = directory.appendingPathComponent(fileName).path
+        let fd = open(path, O_WRONLY | O_APPEND | O_CREAT, 0o600)
+        guard fd >= 0 else { throw SaveFailed() }
+        defer { close(fd) }
+        let written = accepted.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+        guard written == accepted.count else { throw SaveFailed() }
+        return result
+    }
+
+    /// 실시간 훅 하나를 outbox 한 줄로(끝 줄바꿈 포함). 본문이 JSON 객체가 아니면 nil.
+    /// 원격 replay가 남은 동안 블록이 필요 없는 실시간 훅을 그 뒤에 세워 순서를 지킨다(`AppServices`, TRK-53).
+    public static func line(event: String, provider: AgentProvider, receivedAt: Date, pid: Int?, payload body: Data) -> Data? {
+        guard let payload = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else { return nil }
+        var object: [String: Any] = ["event": event, "receivedAt": receivedAt.timeIntervalSince1970, "payload": payload]
+        if provider != .claude { object["provider"] = provider.rawValue }
+        if let pid { object[provider == .claude ? "claudePid" : "processPid"] = pid }
+        guard var data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return nil }
+        data.append(UInt8(ascii: "\n"))
+        return data
     }
 
     /// 처리하지 못한 줄부터 끝까지를 떼어 낸 파일에 다시 쓴다. 쓰지 못하면 파일을 그대로 둔다.
@@ -151,6 +213,8 @@ extension HookProcessor {
         scratch.autosaveEnabled = false
         let worker = HookProcessor(context: scratch, stallTimeout: stallTimeout, home: home, gitBranch: gitBranch)
         worker.saveContext = saveContext
+        worker.localOrigin = localOrigin
+        worker.pathExists = pathExists
         worker.pendingSpawns = pendingSpawns
         worker.seenSpawns = seenSpawns
         let result = Outbox.drain(directory: directory, fileManager: fileManager) { entry in

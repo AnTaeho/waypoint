@@ -50,6 +50,10 @@ final class AppServices {
     @ObservationIgnored private var importObserver: NSObjectProtocol?
     /// 마지막 요청 문장 정리 시각(`PromptRetention`). 시작 직후 첫 점검에서 한 번 돌고 하루마다 다시 돈다.
     @ObservationIgnored private var lastPromptRetention: Date?
+    /// 원격 replay 처리가 메인 큐에 예약돼 있다(`AppServices+Replay`)
+    @ObservationIgnored var replayScheduled = false
+    /// 원격 replay 줄이 남았다. 이 동안 블록이 필요 없는 실시간 훅은 그 뒤에 세운다(TRK-53).
+    @ObservationIgnored var replayBacklog = false
 
     /// `SessionEnd` 없이 끝난 세션 정리와 멈춤 판정 캐시를 맞추는 주기(초). 화면 판정은 `TimelineView`가 따로 다시 계산한다.
     static let refreshInterval: TimeInterval = 10
@@ -65,6 +69,8 @@ final class AppServices {
         let processor = HookProcessor(context: container.mainContext)
         self.processor = processor
         drainOutbox()
+        // 지난 실행에서 다 처리하지 못한 원격 replay 줄(TRK-53)
+        if let directory = replayDirectory, RemoteReplay.hasBacklog(directory: directory) { scheduleReplay() }
 
         let initWindow = InitWindowController(queue: drafts, container: container) { [weak self] project in
             self?.showRegistered(project)
@@ -98,6 +104,9 @@ final class AppServices {
                     return response
                 }
             }
+            if request.path == HookRouter.replayPath {
+                return self?.receiveReplay(request) ?? HTTPResponse(status: 500)
+            }
             return HookRouter.respond(to: request, handle: { provider, event, body, pid in
                 guard SessionActivityRules.hookEvents.contains(event),
                       let input = HookInput(event: event, json: body, provider: provider) else {
@@ -106,6 +115,8 @@ final class AppServices {
                     return nil
                 }
                 let now = Date()
+                if self?.deferBehindReplay(event: event, provider: provider, body: body, pid: pid,
+                                           receivedAt: request.receivedAt ?? now) == true { return nil }
                 let result = processor.handle(event: event, json: body, at: now,
                                  claudePid: provider == .claude ? pid : nil,
                                  provider: provider, processPid: provider == .codex ? pid : nil,
@@ -210,6 +221,7 @@ final class AppServices {
     /// (`CardLifecycle.closeStrayLinks`), 남은 세션의 상태 캐시를 맞춘다.
     func refreshStates() {
         drainOutbox()
+        if replayBacklog { drainReplay() }
         let now = Date()
         defer { lastDataChange = now }
         let swept = processor?.sweep(now: now, probe: SessionSweep.systemProbe) ?? 0
@@ -231,6 +243,9 @@ final class AppServices {
         reliability.saveIfNeeded()
         dailyBackup?.startIfDue(now: now)
     }
+
+    /// 기록이 바뀌었다(화면 갱신). 다른 파일의 확장(`AppServices+Replay`)에서 부른다.
+    func markDataChanged() { lastDataChange = Date() }
 
     func retryIntegration() {
         if serverState != .ready { server?.start() }

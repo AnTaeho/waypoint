@@ -38,6 +38,7 @@
 		302718CFFF0EBCE13D5CDA0C /* NanumSquareRoundL.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 147DD09BAE6889ACD4D2B038 /* NanumSquareRoundL.ttf */; };
 		308D3C8442C32B64CABCEC31 /* ActivityEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A7C8940CD504E024CBC818 /* ActivityEventRow.swift */; platformFilters = (macos, ); };
 		31AEACD74CFCC273C5B3249C /* GuideInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C30269DEA92A22D30679441 /* GuideInspector.swift */; platformFilters = (macos, ); };
+		34D50AE2074CD44F0EACBE01 /* AppServices+Replay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5600B7899166877C485F3D9 /* AppServices+Replay.swift */; platformFilters = (macos, ); };
 		381513581A9C9D901D66CE33 /* CardInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156FAE3D89B42EB90C338012 /* CardInspector.swift */; platformFilters = (macos, ); };
 		39A9696D87266887CD68F06F /* GuideEmptyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94EBAFA75014DA1B1767C2DE /* GuideEmptyView.swift */; platformFilters = (macos, ); };
 		39D19E54F546D79E86A631EB /* ActiveWorkRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513714242E8675B19C5134DA /* ActiveWorkRowView.swift */; platformFilters = (macos, ); };
@@ -289,6 +290,7 @@
 		F1F713FBA97C05AE11B404DC /* DashboardContinue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardContinue.swift; sourceTree = "<group>"; };
 		F23428B13475D5E2645B371A /* GuidanceSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSections.swift; sourceTree = "<group>"; };
 		F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
+		F5600B7899166877C485F3D9 /* AppServices+Replay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServices+Replay.swift"; sourceTree = "<group>"; };
 		F7B2D45D42FB21487B5942FA /* GuideMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideMonitor.swift; sourceTree = "<group>"; };
 		F7F27B2B042A9231EE95EF23 /* SituationStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SituationStatus.swift; sourceTree = "<group>"; };
 		F9707BBA1A140671895B23A3 /* GuideAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideAddMenu.swift; sourceTree = "<group>"; };
@@ -561,6 +563,7 @@
 				9EE919FAD36CA5AC89AEC861 /* AppServices.swift */,
 				09475FCBA9E35F2B22254CED /* AppServices+Integration.swift */,
 				E99F74BF0C8A31746501F1C3 /* AppServices+Lifecycle.swift */,
+				F5600B7899166877C485F3D9 /* AppServices+Replay.swift */,
 				F3F87927AB65ABF3AEB877F4 /* MenuBarContent.swift */,
 			);
 			path = MenuBar;
@@ -761,6 +764,7 @@
 				4F89666F33494B88D94779A0 /* ActivitySessionSection.swift in Sources */,
 				7525FC1FD847071E6EFB47DE /* AppServices+Integration.swift in Sources */,
 				A2A739615BDA68CB8BC0E1BE /* AppServices+Lifecycle.swift in Sources */,
+				34D50AE2074CD44F0EACBE01 /* AppServices+Replay.swift in Sources */,
 				9DA64E17CECB64D0588A9110 /* AppServices.swift in Sources */,
 				AE8010717EC3BCB93185B8C3 /* BoardCardView.swift in Sources */,
 				EC5A09AE5A861570A3ACEC27 /* BoardColumnView.swift in Sources */,

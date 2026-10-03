@@ -18,6 +18,10 @@ public final class HookProcessor {
     public var gitBranch: (String) -> String?
     /// 바뀐 파일(절대 경로) → 그 파일의 git 작업 트리 최상위(`file.changed`의 `checkout`, TRK-17). 테스트에서 바꾼다.
     public var checkoutRoot: (String) -> String?
+    /// 등록 프로젝트 폴더 → 로컬 git 작업 트리·origin(원격 세션 잇기, TRK-53). 테스트에서 바꾼다.
+    public var localOrigin: (String) -> LocalOrigin? = { LocalOriginCache.shared.origin(for: $0) }
+    /// 경로가 이 Mac에 있는지(원격 작업 트리 판정). 테스트에서 바꾼다.
+    public var pathExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
     /// 저장. 테스트에서 실패를 흉내 낸다.
     var saveContext: (ModelContext) throws -> Void = { try $0.save() }
 
@@ -78,6 +82,7 @@ public final class HookProcessor {
     public func handle(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {
         lastSaveFailed = false
         lastContextID = nil
+        let input = linkRemote(input)
         // 저장에 실패하면 DB와 함께 메모리의 대기 항목도 되돌린다. 같은 훅을 다시 처리해도 대기 항목이 겹치거나 사라지지 않게.
         // rollback이 되돌리지 못한 메모리 값은 저장소 값으로 다시 읽는다(`ContextReload`). 그대로 두면 다음 저장에 섞인다.
         let spawns = pendingSpawns
@@ -141,6 +146,26 @@ public final class HookProcessor {
         return (try? context.fetch(descriptor))?.first
     }
 
+    /// 원격·컨테이너 훅(`waypoint_remote`)을 같은 원격 주소의 등록 프로젝트 작업 트리에 잇는다(TRK-53, SPEC 「원격·컨테이너 수집」).
+    /// 이으면 `cwd`를 로컬 경로로 옮기고 원래 폴더는 `remoteCwd`에 둔다. 이후 매칭·상대 경로는 로컬 경로로 그대로 계산한다.
+    func linkRemote(_ input: HookInput) -> HookInput {
+        guard let remote = input.remote, input.linkedCheckout == nil else { return input }
+        let projects = (try? context.fetch(FetchDescriptor<Project>())) ?? []
+        guard let local = RemoteMatcher.link(remote, cwd: input.cwd, in: projects, home: home,
+                                             localOrigin: localOrigin, pathExists: pathExists)
+        else { return input }
+        var linked = input
+        linked.linkedCheckout = local
+        linked.remoteCwd = input.cwd
+        linked.cwd = RemoteMatcher.map(input.cwd, from: remote.root, to: local)
+        return linked
+    }
+
+    /// 세션의 git 브랜치. 원격 작업 트리에 이은 훅은 훅이 읽어 보낸 브랜치(로컬 `.git/HEAD`는 다른 작업 트리다).
+    func branch(of input: HookInput) -> String? {
+        input.linkedCheckout != nil ? input.remote?.branch : gitBranch(input.cwd)
+    }
+
     func matchProject(_ cwd: String) -> Project? {
         let projects = (try? context.fetch(FetchDescriptor<Project>())) ?? []
         return ProjectMatcher.project(for: cwd, in: projects, home: home)
@@ -163,6 +188,7 @@ public final class HookProcessor {
             guard session.project?.archivedAt == nil else { return nil }
             guard let endedAt = session.endedAt else {
                 recordPid(session, input, at: date)
+                if date < session.startedAt { moveStart(session, input, to: date) }
                 return session
             }
             guard create, date > endedAt else { return nil }
@@ -178,8 +204,8 @@ public final class HookProcessor {
         }
         guard create, let project = matchProject(input.cwd) else { return nil }
         let session = Session(
-            id: input.sessionID, kind: .main, cwd: input.cwd,
-            gitBranch: gitBranch(input.cwd), startedAt: date, provider: input.provider
+            id: input.sessionID, kind: .main, cwd: input.sessionCwd,
+            gitBranch: branch(of: input), startedAt: date, provider: input.provider
         )
         context.insert(session)
         session.project = project
@@ -198,6 +224,19 @@ public final class HookProcessor {
             if session.claudePid == nil || date >= session.lastSeenAt { session.claudePid = pid }
         } else if session.processPid == nil || date >= session.lastSeenAt {
             session.processPid = pid
+        }
+    }
+
+    /// 세션을 만든 훅보다 이른 훅이 늦게 들어오면(원격 outbox replay: 다시 이어진 뒤의 첫 훅이 쌓인 줄보다 먼저 온다, TRK-53)
+    /// 시작 시각과 가장 이른 `session.start` 기록을 그 시각으로 당기고, 시작 훅의 `source`가 비어 있으면 채운다.
+    private func moveStart(_ session: Session, _ input: HookInput, to date: Date) {
+        session.startedAt = date
+        guard let start = (session.events ?? []).filter({ $0.typeRaw == EventType.sessionStart.rawValue })
+            .min(by: { $0.at < $1.at }), start.at > date
+        else { return }
+        start.at = date
+        if let source = input.source, input.event == "SessionStart", start.payloadValues["source"] == nil {
+            start.payload = EventValue.encode(start.payloadValues.merging(["source": .string(source)]) { $1 })
         }
     }
 

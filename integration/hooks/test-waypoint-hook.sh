@@ -1,6 +1,6 @@
 #!/bin/bash
 # waypoint-hook.sh 동작 확인. 임시 폴더만 쓰고 실제 Application Support는 건드리지 않는다.
-# 사용: bash integration/hooks/test-waypoint-hook.sh   (python3 필요)
+# 사용: bash integration/hooks/test-waypoint-hook.sh   (python3, git 필요)
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 HOOK="$HERE/waypoint-hook.sh"
@@ -287,5 +287,128 @@ printf '%s' '{"session_id":"s-bad","cwd":"/w","tool_response":{"stdout":"SECRET'
 check "깨진 JSON: 최소 정보만" 'expect minimal "$TMP/line" s-bad'
 printf '%s' 'not json SECRET' | outbox_of Stop; code=$?
 check "session_id 없음: exit 0, 줄 안 씀" '[ $code -eq 0 ] && [ ! -s "$TMP/line" ]'
+
+# 8) 원격·컨테이너(TRK-53): 보낼 곳(WAYPOINT_URL), git 원격 정보(waypoint_remote), 원격 outbox replay
+cat > "$TMP/remote-server.py" <<'PY'
+import http.server, json, os, sys, time
+log = sys.argv[2]
+def flag(name):
+    try:
+        return open(os.path.join(os.path.dirname(log), name)).read().strip()
+    except OSError:
+        return None
+class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        data = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+        if self.path == '/hooks/replay':
+            if flag('replaydelay'):
+                time.sleep(float(flag('replaydelay')))
+            code = int(flag('replaycode') or 200)
+            if code == 200:
+                with open(log + '.replay', 'a') as f:
+                    f.write(data.decode())
+        else:
+            with open(log, 'a') as f:
+                f.write(json.dumps({"path": self.path, "body": data.decode()}) + '\n')
+            code = 204
+        try:
+            self.send_response(code); self.send_header('Content-Length', '0'); self.end_headers()
+        except BrokenPipeError:
+            pass
+    def log_message(self, *a): pass
+http.server.ThreadingHTTPServer(('127.0.0.1', int(sys.argv[1])), H).serve_forever()
+PY
+R="$TMP/remote"; mkdir -p "$R"
+python3 "$TMP/remote-server.py" 47997 "$R/requests.jsonl" & RSERVER=$!
+trap 'kill $SERVER $RSERVER 2>/dev/null; rm -rf "$TMP"' EXIT
+sleep 1
+export WAYPOINT_PORT=47999   # 닫힌 포트. WAYPOINT_URL이 있으면 이 포트로 가지 않아야 한다
+REPO="$TMP/repo"; mkdir -p "$REPO/sub"
+git -C "$REPO" init -q -b feature/x && git -C "$REPO" remote add origin git@github.com:me/ledger.git
+with_cwd() {  # $1 픽스처, $2 cwd → 표준 출력에 cwd를 바꾼 훅 입력
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["cwd"]=sys.argv[2]; print(json.dumps(d))' "$FIX/$1.json" "$2"
+}
+last_path() { tail -n 1 "$R/requests.jsonl" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["path"])'; }
+last_body() { tail -n 1 "$R/requests.jsonl" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["body"])'; }
+has_remote() { last_body | python3 -c 'import json,sys; print("waypoint_remote" in json.load(sys.stdin))'; }
+lines_of() { if [ -e "$1" ]; then wc -l < "$1" | tr -d ' '; else echo 0; fi; }
+wait_for() { local i; for i in $(seq 1 100); do eval "$1" && return 0; sleep 0.1; done; return 1; }
+rm -f "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
+
+with_cwd doc-Stop "$REPO/sub" | WAYPOINT_URL=http://127.0.0.1:47997/ WAYPOINT_REMOTE=0 bash "$HOOK" Stop; code=$?
+check "WAYPOINT_URL: 그 주소로 보낸다(끝 / 허용), exit 0" '[ $code -eq 0 ] && [ "$(last_path)" = /hooks/Stop ]'
+check "WAYPOINT_REMOTE=0: payload 그대로" '[ "$(has_remote)" = False ]'
+check "WAYPOINT_URL: outbox 안 씀" '[ ! -e "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" ]'
+
+with_cwd doc-Stop "$REPO/sub" | WAYPOINT_URL=http://127.0.0.1:47997 bash "$HOOK" Stop
+check "WAYPOINT_URL이 있으면 원격 모드: origin·root·branch·host" 'last_body | python3 -c "
+import json,sys; r=json.load(sys.stdin)[\"waypoint_remote\"]
+assert r[\"origin\"]==\"git@github.com:me/ledger.git\" and r[\"root\"]==sys.argv[1] and r[\"branch\"]==\"feature/x\", r
+assert r.get(\"host\")" "$REPO"'
+check "원격 모드: 나머지 payload는 그대로" 'last_body | python3 -c "
+import json,sys; d=json.load(sys.stdin); d.pop(\"waypoint_remote\"); o=json.load(open(sys.argv[1])); o[\"cwd\"]=sys.argv[2]; assert d==o" "$FIX/doc-Stop.json" "$REPO/sub"'
+
+with_cwd doc-Stop "$REPO/sub" | WAYPOINT_PORT=47997 bash "$HOOK" Stop
+check "macOS 기본(WAYPOINT_URL 없음): 원격 정보 없음" '[ "$(last_path)" = /hooks/Stop ] && [ "$(has_remote)" = False ]'
+with_cwd doc-Stop "$TMP" | WAYPOINT_PORT=47997 WAYPOINT_REMOTE=1 bash "$HOOK" Stop
+check "git 밖: 원격 정보 없음" '[ "$(has_remote)" = False ]'
+git -C "$REPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init && git -C "$REPO" worktree add -q "$TMP/wt" -b wt-branch 2>/dev/null
+with_cwd doc-Stop "$TMP/wt" | WAYPOINT_PORT=47997 WAYPOINT_REMOTE=1 bash "$HOOK" Stop
+check "worktree(.git 파일): root는 worktree, origin은 공용 config" 'last_body | python3 -c "
+import json,sys; r=json.load(sys.stdin)[\"waypoint_remote\"]; assert r[\"root\"]==sys.argv[1] and r[\"origin\"]==\"git@github.com:me/ledger.git\" and r[\"branch\"]==\"wt-branch\", r" "$TMP/wt"'
+
+# 원격 outbox: 앱에 못 닿으면 원격 정보가 든 줄을 쌓는다(jq 있음·없음 모두)
+with_cwd real-PostToolUse-Edit "$REPO/sub" | WAYPOINT_REMOTE=1 bash "$HOOK" PostToolUse
+with_cwd doc-Stop "$REPO/sub" | WAYPOINT_REMOTE=1 WAYPOINT_JQ=/nonexistent/jq bash "$HOOK" Stop
+# 두 번째 훅은 쌓인 줄 뒤에 서고 replay를 띄운다(앱이 없어 pending에 남는다)
+wait_for '[ ! -d "$WAYPOINT_SUPPORT_DIR/replay.lock" ]'
+cat "$WAYPOINT_SUPPORT_DIR/outbox.pending.jsonl" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" > "$R/backlog.jsonl" 2>/dev/null
+check "원격 outbox: 두 줄 모두 waypoint_remote(jq 없음 포함)" 'python3 -c "
+import json,sys
+ls=[json.loads(l) for l in open(sys.argv[1])]
+assert len(ls)==2 and all(l[\"payload\"][\"waypoint_remote\"][\"root\"]==sys.argv[2] for l in ls), ls
+assert set(ls[1][\"payload\"])=={\"session_id\",\"cwd\",\"hook_event_name\",\"waypoint_remote\"}" "$R/backlog.jsonl" "$REPO"'
+rm -f "$WAYPOINT_SUPPORT_DIR/outbox.pending.jsonl" "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
+
+# replay: 앱에 닿은 훅이 쌓인 줄을 뒤에서 /hooks/replay로 보낸다. 훅은 replay를 기다리지 않는다
+python3 -c 'import json
+for i in range(598): print(json.dumps({"event":"Stop","receivedAt":1700000000+i,"trimmed":True,"payload":{"session_id":"r","cwd":"/w","n":i}}))' > "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
+printf '5' > "$R/replaydelay"
+start=$(python3 -c 'import time; print(time.time())')
+out="$(with_cwd doc-SessionStart "$REPO" | WAYPOINT_URL=http://127.0.0.1:47997 bash "$HOOK" SessionStart | cat)"; code=$?
+elapsed=$(python3 -c "import time; print(time.time() - $start)")
+check "replay: 앱이 5초 늦게 답해도 훅은 바로 끝난다(stdout 파이프를 잡지 않는다)" '[ $code -eq 0 ] && python3 -c "import sys; sys.exit(0 if $elapsed < 2 else 1)"'
+rm -f "$R/replaydelay"
+wait_for '[ ! -d "$WAYPOINT_SUPPORT_DIR/replay.lock" ]'
+check "replay 상한: 한 번에 500줄(100줄 × 5)" '[ "$(lines_of "$R/requests.jsonl.replay")" -eq 500 ]'
+check "replay 상한: 남은 98줄은 pending으로, outbox는 비움" '[ "$(lines_of "$WAYPOINT_SUPPORT_DIR/outbox.pending.jsonl")" -eq 98 ] && [ ! -e "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" ]'
+live_stops() { grep -c '"/hooks/Stop"' "$R/requests.jsonl" | tr -d ' '; }
+stops0="$(live_stops)"
+printf '404' > "$R/replaycode"
+with_cwd doc-Stop "$REPO" | WAYPOINT_URL=http://127.0.0.1:47997 bash "$HOOK" Stop
+sleep 0.3; wait_for '[ ! -d "$WAYPOINT_SUPPORT_DIR/replay.lock" ]'
+check "replay: 앱이 받지 않으면(옛 앱 404) 줄을 지우지 않는다" '[ "$(lines_of "$WAYPOINT_SUPPORT_DIR/outbox.pending.jsonl")" -eq 98 ]'
+check "쌓인 줄이 있으면 블록이 필요 없는 훅은 실시간으로 보내지 않고 그 뒤에 선다" '[ "$(live_stops)" -eq "$stops0" ] && [ "$(lines_of "$WAYPOINT_SUPPORT_DIR/outbox.jsonl")" -eq 1 ]'
+rm -f "$R/replaycode"
+mkdir "$WAYPOINT_SUPPORT_DIR/replay.lock"
+with_cwd doc-Stop "$REPO" | WAYPOINT_URL=http://127.0.0.1:47997 bash "$HOOK" Stop; sleep 0.5
+check "replay: 다른 replay가 돌고 있으면(잠금) 손대지 않는다" '[ "$(lines_of "$WAYPOINT_SUPPORT_DIR/outbox.pending.jsonl")" -eq 98 ] && [ "$(lines_of "$R/requests.jsonl.replay")" -eq 500 ] && [ "$(lines_of "$WAYPOINT_SUPPORT_DIR/outbox.jsonl")" -eq 2 ]'
+rmdir "$WAYPOINT_SUPPORT_DIR/replay.lock"
+with_cwd doc-Stop "$REPO" | WAYPOINT_URL=http://127.0.0.1:47997 bash "$HOOK" Stop
+sleep 0.3; wait_for '[ ! -e "$WAYPOINT_SUPPORT_DIR/outbox.pending.jsonl" ] && [ ! -e "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" ] && [ ! -d "$WAYPOINT_SUPPORT_DIR/replay.lock" ]'
+check "replay: 다음 번에 나머지와 뒤에 선 훅까지 모두 한 번씩, 순서대로(598줄 + Stop 3)" 'python3 -c "
+import json,sys; ls=[json.loads(l) for l in open(sys.argv[1])]
+ns=[l[\"payload\"].get(\"n\") for l in ls]; assert ns[:598]==list(range(598)), (len(ns), ns[:3])
+tail=ls[598:]; assert len(tail)==3 and all(l[\"event\"]==\"Stop\" and l[\"payload\"][\"waypoint_remote\"][\"root\"]==sys.argv[2] for l in tail), tail" "$R/requests.jsonl.replay" "$REPO"'
+check "뒤에 섰던 훅도 실시간으로는 한 번도 가지 않았다" '[ "$(live_stops)" -eq "$stops0" ]'
+printf '%s\n' '{"event":"Stop","receivedAt":1,"trimmed":true,"payload":{"session_id":"b","cwd":"/w"}}' > "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
+out="$(with_cwd doc-SessionStart "$REPO" | WAYPOINT_URL=http://127.0.0.1:47997 bash "$HOOK" SessionStart)"
+wait_for '[ ! -e "$WAYPOINT_SUPPORT_DIR/outbox.jsonl" ] && [ ! -d "$WAYPOINT_SUPPORT_DIR/replay.lock" ]'
+check "쌓인 줄이 있어도 SessionStart는 실시간(블록), 그 뒤 쌓인 줄을 보낸다" '[ "$(last_path)" = /hooks/SessionStart ] && [ "$(tail -n 1 "$R/requests.jsonl.replay" | python3 -c "import json,sys; print(json.load(sys.stdin)[\"payload\"][\"session_id\"])")" = b ]'
+replayed="$(lines_of "$R/requests.jsonl.replay")"
+printf '%s\n' '{"event":"Stop","receivedAt":1,"payload":{"session_id":"m"}}' > "$WAYPOINT_SUPPORT_DIR/outbox.jsonl"
+with_cwd doc-Stop "$REPO" | WAYPOINT_PORT=47997 bash "$HOOK" Stop; sleep 0.5
+check "macOS 로컬(원격 모드 아님): outbox를 건드리지 않고 실시간으로 보낸다(앱이 흡수)" '[ "$(lines_of "$WAYPOINT_SUPPORT_DIR/outbox.jsonl")" -eq 1 ] && [ "$(lines_of "$R/requests.jsonl.replay")" -eq "$replayed" ] && [ "$(live_stops)" -eq $((stops0 + 1)) ]'
+kill $RSERVER 2>/dev/null; wait $RSERVER 2>/dev/null
 
 exit $FAIL

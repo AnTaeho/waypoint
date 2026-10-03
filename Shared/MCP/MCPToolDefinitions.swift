@@ -16,8 +16,10 @@ extension MCPTools {
     public static let definitions: [MCPToolDefinition] = [
         MCPToolDefinition(
             name: "project_resolve",
-            description: "폴더 경로로 Waypoint 프로젝트를 찾는다. 없으면 null.",
-            inputSchema: schema(["cwd": string("폴더 절대 경로")], required: ["cwd"])
+            description: "폴더 경로로 Waypoint 프로젝트를 찾는다. 없으면 null. SSH 원격·개발 컨테이너처럼 Mac에 없는 폴더면 remote에 git origin 주소를 함께 보낸다.",
+            inputSchema: schema(["cwd": string("폴더 절대 경로"),
+                                 "remote": string("git remote.origin.url(원격·컨테이너 폴더일 때). 같은 원격 주소의 등록 프로젝트를 찾는다")],
+                                required: ["cwd"])
         ),
         MCPToolDefinition(
             name: "project_init",

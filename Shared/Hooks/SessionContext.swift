@@ -9,10 +9,12 @@ public enum SessionContext {
     public static let unregistered = "Waypoint: 이 폴더는 Waypoint에 없음. `/tracker init`으로 등록할 수 있음."
 
     /// 미등록 시작 폴더에서도 실제 ID를 전달해 작업 대상 프로젝트를 명시적으로 연결할 수 있다.
+    /// 원격·컨테이너 훅(`waypoint_remote`)이면 git origin 주소도 준다(`project_resolve`의 `remote`, TRK-53).
     public static func awaitingProject(_ input: HookInput) -> String {
-        [unregistered, "sessionId: \(input.sessionID)", "provider: \(input.provider.rawValue)",
-         "작업 대상 폴더가 정해지면 project_resolve로 확인하고 session_bind로 연결한 뒤 tracker 스킬을 따른다."]
-            .joined(separator: "\n")
+        var lines = [unregistered, "sessionId: \(input.sessionID)", "provider: \(input.provider.rawValue)"]
+        if let remote = input.remote { lines.append("remote: \(remote.origin)") }
+        lines.append("작업 대상 폴더가 정해지면 project_resolve로 확인하고 session_bind로 연결한 뒤 tracker 스킬을 따른다.")
+        return lines.joined(separator: "\n")
     }
 
     /// 블록 마지막 줄. 스킬이 이 블록을 보고 켜지게 한다.
