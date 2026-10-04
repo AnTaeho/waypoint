@@ -11,7 +11,7 @@ p50/p95/최대를 출력한다. 요청마다 스크립트 쪽 왕복 시간도 �
 - 모든 세션은 SessionEnd로 닫는다. 등록된 측정용 프로젝트 폴더(--root) 안의 경로만 쓴다(파일은 만들지 않는다).
 - 표준 라이브러리만 쓴다.
 
-사용: python3 scripts/measure-latency.py [--count 500] [--sessions 6] [--root ~/workspace/waypoint-probe] [--json 결과.json]
+사용: python3 scripts/measure-latency.py [--count 500] [--sessions 6] [--root ~/workspace/projects/waypoint/waypoint-probe] [--json 결과.json]
 """
 import argparse
 import json
@@ -192,7 +192,7 @@ def main():
     parser.add_argument("--port", type=int, default=int(os.environ.get("WAYPOINT_PORT", 47822)))
     parser.add_argument("--count", type=int, default=500)
     parser.add_argument("--sessions", type=int, default=6)
-    parser.add_argument("--root", default=os.path.expanduser("~/workspace/waypoint-probe"))
+    parser.add_argument("--root", default=os.path.expanduser("~/workspace/projects/waypoint/waypoint-probe"))
     parser.add_argument("--pace", type=float, default=1.0, help="간격 배율(0이면 쉬지 않고 몰아 보낸다)")
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--json", help="결과를 이 파일에도 쓴다")
