@@ -75,7 +75,14 @@ public enum Outbox {
         var result = DrainResult()
         let outbox = directory.appendingPathComponent(fileName)
         if fileManager.fileExists(atPath: outbox.path) {
-            let claimed = directory.appendingPathComponent("\(processingPrefix)\(Int(Date().timeIntervalSince1970 * 1000))-\(UUID().uuidString).jsonl")
+            // 남아 있는 처리 중 파일 모두보다 뒤에 정렬되는 이름을 짓는다(같은 밀리초에 다시 흡수해도 순서 유지)
+            let latest = ((try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? [])
+                .filter { $0.hasPrefix(processingPrefix) && $0.hasSuffix(".jsonl") }
+                .compactMap { Int($0.dropFirst(processingPrefix.count).prefix { ("0"..."9").contains($0) }) }
+                .max() ?? -1
+            let stamp = max(Int(Date().timeIntervalSince1970 * 1000), min(latest, Int.max - 1) + 1)
+            let padded = String(repeating: "0", count: max(0, 13 - String(stamp).count)) + String(stamp)
+            let claimed = directory.appendingPathComponent("\(processingPrefix)\(padded)-\(UUID().uuidString).jsonl")
             try? fileManager.moveItem(at: outbox, to: claimed)
         }
         let pending = ((try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? [])

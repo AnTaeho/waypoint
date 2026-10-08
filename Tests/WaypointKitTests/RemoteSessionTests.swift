@@ -289,6 +289,24 @@ import Testing
         #expect(seen == ["s0", "s1", "s2", "s3", "s4", "late"])
     }
 
+    /// 남아 있던 처리 중 파일의 밀리초가 지금 시각 이상이어도 새로 온 줄은 그 뒤에 선다.
+    @Test func drainKeepsLeftoverBeforeNewlyClaimedLines() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-order-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let leftover = dir.appendingPathComponent("\(Outbox.processingPrefix)9000000000000-\(UUID().uuidString).jsonl")
+        try (#"{"event":"Stop","receivedAt":1,"payload":{"session_id":"early"}}"# + "\n")
+            .write(to: leftover, atomically: true, encoding: .utf8)
+        _ = try Outbox.append(Data(#"{"event":"Stop","receivedAt":9,"payload":{"session_id":"late"}}"#.utf8), directory: dir)
+        var seen: [String] = []
+        let result = Outbox.drain(directory: dir) { entry in
+            let object = try JSONSerialization.jsonObject(with: entry.payload) as? [String: Any]
+            seen.append(object?["session_id"] as? String ?? "?")
+        }
+        #expect(result.processed == 2 && !result.more && !result.retryPending)
+        #expect(seen == ["early", "late"])
+    }
+
     /// 흡수가 남은 동안 outbox 뒤에 세우는 실시간 훅: 블록이 필요 없는 이벤트만, 흡수가 읽는 한 줄 꼴로.
     @Test func liveHookLineMatchesOutboxFormat() throws {
         #expect(HookRouter.defersWhileDraining("Stop"))
