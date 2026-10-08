@@ -106,4 +106,14 @@ import Testing
         done.status = .done
         #expect(tracker.check([done], now: t0 + 1).isEmpty && tracker.isEmpty)
     }
+
+    // 복사하고 딱 하루 뒤에 연결을 알아채도 재개 시간으로 센다.
+    @Test func resumeStillCountsExactlyAtLifetime() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "재개", status: .next, at: t0)
+        var tracker = ResumeTracker()
+        tracker.copied(CardResumeAttempt(card: card, provider: .claude, at: t0))
+        CardLifecycle.attach(card, makeSession(h.context, h.project, id: "new"), at: t0 + 45, in: h.context)
+        #expect(tracker.check([card], now: t0 + ResumeTracker.lifetime) == [45])
+    }
 }

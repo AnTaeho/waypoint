@@ -157,6 +157,23 @@ import Testing
         #expect(sub.endedAt == nil)
     }
 
+    // 자동 정리로 끝난 세션만 다시 이을 수 있다. 종료 기록의 이유만 보고 다른 기록의 이유는 보지 않는다.
+    @Test func onlyAutoEndedSessionsCanReconnect() throws {
+        let h = try HookHarness()
+        let open = makeSession(h.context, h.project, id: "open")
+        #expect(SessionSweep.canReconnect(open))
+        let swept = makeSession(h.context, h.project, id: "swept")
+        swept.endedAt = t0 + 10
+        Event.record(.sessionEnd, in: h.context, session: swept, at: t0 + 10, payload: ["reason": .string(SessionSweep.reasonProcessGone)])
+        Event.record(.cardDetached, in: h.context, session: swept, at: t0 + 20, payload: ["reason": "logout"])
+        #expect(SessionSweep.canReconnect(swept))
+        let closed = makeSession(h.context, h.project, id: "closed")
+        closed.endedAt = t0 + 10
+        Event.record(.sessionEnd, in: h.context, session: closed, at: t0 + 10, payload: ["reason": "logout"])
+        Event.record(.cardDetached, in: h.context, session: closed, at: t0 + 20, payload: ["reason": .string(SessionSweep.reasonProcessGone)])
+        #expect(!SessionSweep.canReconnect(closed))
+    }
+
     // MARK: - macOS 프로세스 확인
 
     #if os(macOS)
@@ -173,6 +190,11 @@ import Testing
         #expect(SessionSweep.systemProbe(Int(task.processIdentifier)) == nil)
         #expect(SessionSweep.systemProbe(0) == nil)
         #expect(SessionSweep.systemProbe(-5) == nil)
+    }
+
+    // PID 1(launchd)은 살아 있어도 세션 프로세스로 보지 않는다.
+    @Test func systemProbeIgnoresLaunchd() {
+        #expect(SessionSweep.systemProbe(1) == nil)
     }
     #endif
 }

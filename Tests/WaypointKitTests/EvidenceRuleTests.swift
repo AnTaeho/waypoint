@@ -161,4 +161,24 @@ import Testing
         // 옛 앱처럼 note로 읽어도 text가 없어 메모로 보이지 않는다
         #expect(event.payloadValues["text"] == nil)
     }
+
+    // 조건 글 없이 남은 보고는 번호만 맞으면 그 조건의 근거다.
+    @Test func reportWithoutCriterionTextCountsByIndex() {
+        let record = CheckRecord(at: t0, command: "swift test", outcome: .pass, source: .agent, criterion: 1)
+        let result = CardEvidence.evaluate(criteria: criteria, records: [record], changes: [])
+        #expect(result.map(\.state) == [.unverified, .passed, .unverified])
+    }
+
+    // 보고 딱 15분 전의 훅 실행까지 보고를 확인한다.
+    @Test func hookExactlyAtWindowEdgeConfirms() {
+        let records = [hook("swift test", .pass, at: t0 - CardEvidence.confirmWindow), agent(0, "swift test", .pass, at: t0)]
+        #expect(CardEvidence.evaluate(criteria: criteria, records: records, changes: [])[0].source == .hook)
+    }
+
+    // 근거 기록 한 건은 그 뒤의 파일 변경으로만 오래된다. 같은 시각의 변경은 아니다.
+    @Test func recordIsStaleOnlyForLaterChanges() {
+        let record = agent(0, "swift test", .pass, at: t0)
+        #expect(!CardEvidence.isStale(record, changes: [t0 - 1, t0]))
+        #expect(CardEvidence.isStale(record, changes: [t0, t0 + 1]))
+    }
 }

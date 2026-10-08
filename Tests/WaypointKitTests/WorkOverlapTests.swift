@@ -291,6 +291,19 @@ import Testing
         let line = try #require(text.split(separator: "\n").first { $0.hasPrefix("- PRB-1 ") })
         #expect(line.hasSuffix(" · 최근 파일: Old.swift, Token.swift, Lexer.swift"))
     }
+
+    // 카드 없는 세션이 하나도 없어도 상황판은 겹친 파일 수를 센다.
+    @Test func situationCountsOverlapWhenEverySessionHasACard() throws {
+        let s = try Scene(now: now)
+        let parser = s.project.makeCard(in: s.context, title: "파서", at: t0)
+        let board = s.project.makeCard(in: s.context, title: "보드", at: t0)
+        CardLifecycle.attach(parser, s.a, at: now - 500, in: s.context)
+        CardLifecycle.attach(board, s.b, at: now - 500, in: s.context)
+        s.change(s.a, "A.swift", at: now - 100, card: parser)
+        s.change(s.b, "A.swift", at: now - 50, card: board)
+        let tile = ProjectSituation.make(for: s.project, now: now, status: nil, unfiledCount: 0)
+        #expect(tile.inProgress.map(\.overlapFileCount) == [1, 1])
+    }
 }
 
 /// 실제 저장소 **사본**으로 겹침 색인·시작 블록 시간을 잰다. `WAYPOINT_REAL_STORE_COPY`(사본 `.store` 경로)가 있을 때만 돈다.

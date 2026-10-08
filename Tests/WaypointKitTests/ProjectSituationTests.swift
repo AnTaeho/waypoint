@@ -185,6 +185,22 @@ private func status(_ ctx: ModelContext, _ project: Project, _ text: String, at 
         #expect(searched.first?.next.map(\.title) == ["다음 검색"])
         #expect(searched.first?.nextCount == 1)
     }
+
+    // 지금 상황 글은 빈 줄을 빼고 딱 8줄까지 받는다.
+    @Test func statusTextAcceptsExactlyLineLimit() throws {
+        let lines = (1...ProjectStatus.lineLimit).map { "줄 \($0)" }
+        #expect(try ProjectStatus.normalized(lines.joined(separator: "\n\n")) == lines.joined(separator: "\n"))
+        #expect(throws: MCPToolError.self) { try ProjectStatus.normalized((lines + ["줄 9"]).joined(separator: "\n")) }
+    }
+
+    // 저장소에 넣지 않은 프로젝트의 지금 상황은 상황 기록에서만 읽는다.
+    @Test func latestStatusOutsideAStoreIgnoresOtherRecords() {
+        let p = Project(key: "TMP", name: "임시", createdAt: t0)
+        let status = Event(type: .projectStatus, at: t0, payload: EventValue.encode(["summary": "지금"]))
+        let later = Event(type: .note, at: t0 + 60, payload: EventValue.encode(["summary": "메모"]))
+        p.events = [status, later]
+        #expect(ProjectStatus.latest(for: p)?.text == "지금")
+    }
 }
 
 /// 실제 저장소 **사본**으로 상황판 집계 시간을 잰다. `WAYPOINT_REAL_STORE_COPY`(사본 `.store` 경로)가 있을 때만 돈다.

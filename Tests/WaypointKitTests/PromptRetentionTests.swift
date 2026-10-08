@@ -87,4 +87,30 @@ import Testing
         let group = try #require(ProjectActivity.days(events: [cleared], projectID: project.id).first?.groups.first)
         #expect(group.title == SessionFormat.label(for: session))
     }
+
+    // 딱 30일 된 요청 문장은 지운다. 요청이 없던 끝난 세션은 바꾼 수에 넣지 않는다.
+    @Test func clearsAtExactBoundaryAndCountsOnlySessionsThatHadAPrompt() throws {
+        let (container, ctx) = try makeContext()
+        _ = container
+        let project = makeProject(ctx)
+        let session = makeSession(ctx, project, id: "s")
+        let edge = Event.record(.note, in: ctx, project: project, session: session, at: t0,
+                                payload: ["kind": "user.prompt", "text": "딱 30일 된 요청"])
+        makeSession(ctx, project, id: "silent").endedAt = t0
+
+        let result = PromptRetention.apply(in: ctx, now: t0 + 30 * day)
+        #expect(result.events == 1 && edge.payloadValues["text"] == nil)
+        #expect(result.sessions == 0)
+    }
+
+    // 요청 표시가 붙어 있어도 메모가 아닌 기록의 글은 지우지 않는다.
+    @Test func leavesNonNoteRecordsAlone() throws {
+        let (container, ctx) = try makeContext()
+        _ = container
+        let project = makeProject(ctx)
+        let commit = Event.record(.commit, in: ctx, project: project, at: t0,
+                                  payload: ["kind": "user.prompt", "text": "커밋 글"])
+        #expect(PromptRetention.apply(in: ctx, now: t0 + 31 * day).events == 0)
+        #expect(commit.payloadValues["text"] == "커밋 글")
+    }
 }

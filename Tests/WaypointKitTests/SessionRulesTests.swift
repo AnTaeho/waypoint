@@ -77,3 +77,19 @@ import Testing
         #expect(Card(number: 3, title: "x").displayID == "?-3")
     }
 }
+
+@Suite struct UnassignedWorkTests {
+    // 완료한 카드에서 떨어진 바로 그 시각의 요청은 새 요청으로 치지 않는다. 그 뒤의 요청부터 다시 줄이 된다.
+    @Test func promptAtDetachTimeDoesNotReviveCardlessRow() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let s = makeSession(ctx, p, id: "s")
+        let card = p.makeCard(in: ctx, title: "a", status: .next, at: t0)
+        CardLifecycle.attach(card, s, at: t0, in: ctx)
+        try CardLifecycle.move(card, to: .done, at: t0 + 60, in: ctx)
+        s.lastPromptAt = t0 + 60
+        #expect(!SessionRules.hasUnassignedWork(s, now: t0 + 60))
+        s.lastPromptAt = t0 + 61
+        #expect(SessionRules.hasUnassignedWork(s, now: t0 + 61))
+    }
+}

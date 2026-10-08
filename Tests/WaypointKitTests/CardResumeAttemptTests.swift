@@ -67,4 +67,18 @@ import Testing
         let other = h.project.makeCard(in: h.context, title: "other", status: .next, at: t0)
         #expect(attempt.state(for: other) == .unavailable("작업 대상 변경됨"))
     }
+
+    // 연결 시각은 지금 열려 있는 새 연결의 것이다. 먼저 붙었다 떨어진 새 세션은 세지 않는다.
+    @Test func connectedAtUsesOpenLinkNotEarlierDetachedOne() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "resume", status: .next, at: t0)
+        let attempt = CardResumeAttempt(card: card, provider: .claude, at: t0)
+        let left = makeSession(h.context, h.project, id: "left")
+        CardLifecycle.attach(card, left, at: t0 + 1, in: h.context)
+        CardLifecycle.detach(card, left, at: t0 + 2, in: h.context)
+        #expect(attempt.connectedAt(for: card) == nil)
+        CardLifecycle.attach(card, makeSession(h.context, h.project, id: "stays"), at: t0 + 5, in: h.context)
+        #expect(attempt.state(for: card) == .connected)
+        #expect(attempt.connectedAt(for: card) == t0 + 5)
+    }
 }

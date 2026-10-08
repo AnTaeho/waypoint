@@ -45,6 +45,33 @@ import Testing
         #expect(card.status == .next)
         #expect(card.doneAt == nil)
     }
+
+    // 조건을 통째로 바꾸면 체크가 달라진 조건과 체크된 채 새로 생긴 조건만 기록한다.
+    @Test func replacingCriteriaRecordsOnlyCheckChanges() throws {
+        let (container, ctx) = try makeContext(); _ = container
+        let p = makeProject(ctx)
+        let old = [Criterion("kept", isDone: true), Criterion("unchecked", isDone: true), Criterion("checked")]
+        let card = p.makeCard(in: ctx, title: "a", status: .next, criteria: [
+            Criterion("kept", isDone: true), Criterion("unchecked"), Criterion("checked", isDone: true),
+            Criterion("new done", isDone: true), Criterion("new open"),
+        ], at: t0)
+        CardEditing.recordCriteriaChanges(card, from: old, at: t0 + 60, in: ctx)
+        let notes = events(card, .note)
+        #expect(notes.allSatisfy { $0.payloadValues["kind"]?.stringValue == CardEditing.criterionNoteKind && $0.at == t0 + 60 })
+        let changes = Dictionary(uniqueKeysWithValues: notes.map {
+            ($0.payloadValues["text"]?.stringValue ?? "", $0.payloadValues["isDone"]?.boolValue)
+        })
+        #expect(changes == ["unchecked": false, "checked": true, "new done": true])
+    }
+
+    // 완료 버튼은 카드를 완료로 옮겨 저장하고 성공을 알린다.
+    @Test func completeAndSaveMovesToDoneAndReportsSuccess() throws {
+        let (container, ctx) = try makeContext(); _ = container
+        let p = makeProject(ctx)
+        let card = p.makeCard(in: ctx, title: "a", status: .next, at: t0)
+        #expect(CardEditing.completeAndSave(card, at: t0 + 60, in: ctx))
+        #expect(card.status == .done && card.doneAt == t0 + 60 && !ctx.hasChanges)
+    }
 }
 
 @Suite struct CardHistoryFormatTests {

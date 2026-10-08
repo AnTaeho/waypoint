@@ -51,4 +51,16 @@ import Testing
         #expect(CardResumeSummary.firstLine("- [ ] 목록 첫 줄") == "[ ] 목록 첫 줄")
         #expect(CardResumeSummary.firstLine("> 인용") == "인용")
     }
+
+    // 남은 조건 목록은 근거가 실패여도 실패 표시를 달지 않는다(실패 표시는 미검증 목록의 몫).
+    @Test func remainingItemsCarryNoFailureMark() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "failing", status: .next, at: t0)
+        card.criteria = [Criterion("still open")]
+        CardEvidence.record(CheckRecord(at: t0, command: "swift test", outcome: .fail, source: .agent,
+                                        criterion: 0, criterionText: "still open"), card: card, session: nil, in: h.context)
+        let summary = CardResumeSummary(card: card)
+        #expect(summary.remaining.map(\.isFailure) == [false])
+        #expect(summary.unverified.map(\.isFailure) == [true])
+    }
 }
