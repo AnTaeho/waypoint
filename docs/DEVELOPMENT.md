@@ -210,3 +210,19 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 - sshd 컨테이너를 원격으로 삼고 `ssh -N -R 47822:127.0.0.1:47822`로 터널을 연다. 실측 폴더(`~/workspace/projects/waypoint/waypoint-probe`)에 origin이 없으면 임시 bare 저장소를 origin으로 붙이고, 컨테이너 안 클론의 origin을 같은 문자열로 맞춘다(끝나면 실측 폴더의 origin을 지운다).
 - 훅 스크립트 단위 확인: `bash integration/hooks/test-waypoint-hook.sh`(8번 묶음이 `WAYPOINT_URL`·원격 정보·replay).
 
+## 뮤테이션 테스트 (TRK-69)
+
+테스트가 실제로 버그를 잡는지 잰다. 코드를 한 군데씩 일부러 틀리게 바꾸고(`==`→`!=`, `&&`→`||`, `>`→`>=`, `true`→`false`, `!` 제거, `+`→`-`) 테스트가 실패하는지 본다.
+
+```sh
+scripts/mutation-test.py Shared/Rules/HandoffFreshness.swift      # 파일 하나
+scripts/mutation-test.py Shared/Rules Shared/Hooks --jobs 3       # 폴더, 사본 셋으로 병렬
+scripts/mutation-test.py Shared/Rules --list                      # 변형 목록만
+```
+
+- 결과: 죽음(테스트가 잡음) · 생존(테스트가 못 잡음) · 무효(컴파일 안 됨, 점수에서 뺌) · 시간 초과(죽음으로 셈). 점수는 죽음 ÷ (죽음 + 생존).
+- 원본 작업 트리는 건드리지 않는다. 사본은 `.build/mutation/w<i>/`, 보고서는 `.build/mutation/report.json`(`--out`으로 바꿈). 중간에 끊어도 같은 명령으로 이어 간다.
+- 변형 하나에 10~25초. 고친 파일만 돌린다. `Shared/Rules`+`Shared/Hooks` 전체는 세 시간쯤.
+- 실제 홈 폴더를 읽는 `GuidanceRealFileTests`·`RealInstallStateTests`는 변형 실행에서 뺀다.
+- 생존을 보면 그 줄의 동작을 확인하는 테스트를 더한다. 어떤 입력으로도 결과가 달라지지 않는 변형(동등 변형)은 `scripts/mutation-equivalents.txt`에 이유와 함께 적어 다음 실행에서 건너뛴다.
+- 기성 도구 Muter 16은 Swift 6.4에서 변형 코드가 컴파일되지 않아 쓰지 않는다.
