@@ -51,6 +51,9 @@ public enum ActivityEntryFormat {
         case .sessionFiled:
             let card = p["cardId"]?.stringValue
             text = card == nil ? "정리 안 된 작업 넘김" : "정리 안 된 작업 연결"; detail = card ?? ""
+        case .githubIssue, .githubPR:
+            guard let item = GitHubLog.item(event) else { return nil }
+            text = "\(item.label) 열림"; detail = item.title
         case .cardCreated: text = "카드 생성"
         case .cardAttached: text = "세션 연결"
         case .cardDetached: text = CardHistoryFormat.line(for: event)?.text ?? "세션 연결 끝"

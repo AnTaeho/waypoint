@@ -22,6 +22,8 @@ final class AppServices {
     let loginItem = LoginItemController.forCurrentApp()
     /// 자동 업데이트(TRK-56). 피드 주소가 없는 빌드(평소용·Dev 기본)는 nil
     let updater = AppUpdater.forCurrentApp()
+    /// 이슈·PR 열기와 상태 확인(TRK-68)
+    let github = GitHubModel()
     /// 수신 지연·재개 시간·실패·복구 지표(TRK-11)
     let reliability = ReliabilityMonitor()
     /// 이번이나 지난 실행에서 백업으로 저장소를 되돌린 기록(TRK-46). 사람이 확인하면 지운다.
@@ -141,6 +143,7 @@ final class AppServices {
             // 흡수와 서버가 열리는 사이에 스크립트가 outbox로 보낸 것까지 받는다.
             if state == .ready { self.drainOutbox() }
         }
+        deferGitHub(on: server, mcp: mcp)
         self.server = server
         server.start()
 

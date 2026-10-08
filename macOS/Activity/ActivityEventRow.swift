@@ -42,6 +42,8 @@ struct ActivityEventRow: View {
         case .check: return "checkmark.seal"
         case .projectStatus: return "flag"
         case .sessionFiled: return "tray.and.arrow.down"
+        case .githubIssue: return "smallcircle.filled.circle"
+        case .githubPR: return "arrow.triangle.pull"
         default: return "circle"
         }
     }

@@ -5,6 +5,8 @@ import WaypointKit
 struct SituationTile: View {
     let tile: ProjectSituation
     let now: Date
+    /// 이 프로젝트에서 연 이슈·PR(확인한 상태를 입힌 것)
+    var github: [GitHubItem] = []
     let select: (Project) -> Void
 
     var body: some View {
@@ -61,7 +63,8 @@ struct SituationTile: View {
     }
 
     @ViewBuilder private var footer: some View {
-        if tile.unfiledCount > 0 || tile.ideaCount > 0 {
+        let open = GitHubLog.openSummary(github)
+        if tile.unfiledCount > 0 || tile.ideaCount > 0 || open != nil {
             HStack(spacing: Theme.Spacing.m) {
                 if tile.unfiledCount > 0 {
                     Text("정리 안 된 작업 \(tile.unfiledCount)")
@@ -69,6 +72,9 @@ struct SituationTile: View {
                 }
                 if tile.ideaCount > 0 {
                     Text("아이디어 \(tile.ideaCount)").font(Theme.Situation.meta).foregroundStyle(Theme.textMuted)
+                }
+                if let open {
+                    Label(open, systemImage: Theme.GitHub.prIcon).font(Theme.Situation.meta).foregroundStyle(Theme.textMuted)
                 }
             }
             .monospacedDigit()

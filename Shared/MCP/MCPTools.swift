@@ -20,6 +20,8 @@ public final class MCPTools {
     let fileManager = FileManager.default
     /// 등록 프로젝트 폴더 → 로컬 git 작업 트리·origin(`project_resolve`의 `remote`, TRK-53). 테스트에서 바꾼다.
     public var localOrigin: (String) -> LocalOrigin? = { LocalOriginCache.shared.origin(for: $0) }
+    /// GitHub 호출(`github_issue_create`·`github_pr_create`). 테스트에서 바꾼다.
+    public var github: GitHubCLI
     /// `card_get`에 싣는 최근 기록 수
     public static let recentEventLimit = 20
     /// 응답 `overlaps`로 이미 알린 파일(`<내 세션 ID>|<상대 단위 메인 세션 ID>` → 파일). 메모리에만 둔다(TRK-17).
@@ -33,6 +35,7 @@ public final class MCPTools {
         self.home = home
         self.drafts = drafts
         self.now = now
+        self.github = GitHubCLI.system(home: home)
     }
 
     public func call(_ name: String, _ args: JSONValue) throws -> JSONValue {
@@ -50,6 +53,7 @@ public final class MCPTools {
         case "card_evidence": return withOverlaps(try cardEvidence(args), sessions: try overlapSessions(name, args))
         case "project_status": return withOverlaps(try projectStatus(args), sessions: try overlapSessions(name, args))
         case "work_file": return try workFile(args)
+        case _ where Self.deferredTools.contains(name): throw MCPToolError("\(name)은 배치로 부를 수 없음. 단독 요청으로 보낸다")
         default: throw MCPToolError("알 수 없는 도구: \(name)")
         }
     }

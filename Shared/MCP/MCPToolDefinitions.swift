@@ -154,6 +154,33 @@ extension MCPTools {
                 "cardId": cardIdProperty.merging(["description": "이을 카드 ID(같은 프로젝트). 넘기려면 뺀다"]),
             ], required: ["sessionId"])
         ),
+        MCPToolDefinition(
+            name: "github_issue_create",
+            description: "프로젝트의 GitHub 저장소(origin)에 이슈를 연다. 연 이슈는 Waypoint 카드에 보인다. 작업 카드가 있으면 cardId로 잇는다. 배치 요청으로는 부를 수 없다.",
+            inputSchema: schema([
+                "project": projectProperty,
+                "title": string("이슈 제목"),
+                "body": string("본문(markdown). 그대로 올라간다"),
+                "labels": ["type": "array", "items": ["type": "string"], "description": "저장소에 있는 라벨 이름"],
+                "cardId": cardIdProperty.merging(["description": "이을 카드 ID(같은 프로젝트)"]),
+                "sessionId": string("주입된 sessionId. cardId가 없으면 이 세션의 작업중 카드가 하나일 때 그 카드에 잇는다"),
+            ], required: ["project", "title"])
+        ),
+        MCPToolDefinition(
+            name: "github_pr_create",
+            description: "프로젝트의 GitHub 저장소(origin)에 PR을 연다. push하지 않으므로 브랜치를 먼저 push한다. 연 PR은 Waypoint 카드에 보인다. 배치 요청으로는 부를 수 없다.",
+            inputSchema: schema([
+                "project": projectProperty,
+                "title": string("PR 제목"),
+                "body": string("본문(markdown). 그대로 올라간다"),
+                "base": string("합칠 브랜치. 기본은 저장소 기본 브랜치"),
+                "head": string("올릴 브랜치. 기본은 cwd 작업 트리의 현재 브랜치"),
+                "draft": ["type": "boolean", "description": "초안으로 열기. 기본 false"],
+                "cwd": string("작업 트리 절대 경로(worktree일 때). 기본은 프로젝트 폴더"),
+                "cardId": cardIdProperty.merging(["description": "이을 카드 ID(같은 프로젝트)"]),
+                "sessionId": string("주입된 sessionId. cardId가 없으면 이 세션의 작업중 카드가 하나일 때 그 카드에 잇는다"),
+            ], required: ["project", "title"])
+        ),
     ]
 
     static let projectProperty: JSONValue = [

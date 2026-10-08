@@ -86,22 +86,7 @@ public struct LocalOrigin: Equatable, Sendable {
               let checkout = GitInfo.checkoutRoot(for: (rootPath as NSString).appendingPathComponent(".waypoint-probe"),
                                                   fileManager: fileManager)
         else { return nil }
-        let dotGit = (checkout as NSString).appendingPathComponent(".git")
-        var isDir: ObjCBool = false
-        guard fileManager.fileExists(atPath: dotGit, isDirectory: &isDir) else { return nil }
-        var gitDir = dotGit
-        if !isDir.boolValue {
-            guard let text = try? String(contentsOfFile: dotGit, encoding: .utf8),
-                  let line = text.split(separator: "\n").first(where: { $0.hasPrefix("gitdir:") })
-            else { return nil }
-            let raw = line.dropFirst("gitdir:".count).trimmingCharacters(in: .whitespaces)
-            gitDir = raw.hasPrefix("/") ? raw : (checkout as NSString).appendingPathComponent(raw)
-        }
-        var common = gitDir
-        if let text = try? String(contentsOfFile: (gitDir as NSString).appendingPathComponent("commondir"), encoding: .utf8) {
-            let raw = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !raw.isEmpty { common = raw.hasPrefix("/") ? raw : (gitDir as NSString).appendingPathComponent(raw) }
-        }
+        guard let common = GitInfo.commonDirectory(checkout: checkout, fileManager: fileManager) else { return nil }
         guard let config = try? String(contentsOfFile: (common as NSString).appendingPathComponent("config"), encoding: .utf8),
               let origin = originURL(config: config), let url = GitRemoteURL.normalize(origin)
         else { return nil }

@@ -57,6 +57,7 @@ import Testing
             if count > 0 { found[String(url.path.dropFirst(shared.path.count + 1))] = count }
         }
         #expect(found == [
+            "GitHub/GitHubLog.swift": 1,
             "Guide/GuideLibrary.swift": 1,
             "Init/ProjectRegistry.swift": 1,
             "MCP/MCPTools.swift": 3,
@@ -154,10 +155,22 @@ import Testing
         try GuideLibrary.register("CLAUDE.md", in: project, at: t0, context: guides)
         try collect(guides)
 
+        // GitHub 이슈·PR
+        let (githubContainer, github) = try makeContext()
+        _ = githubContainer
+        let gp = makeProject(github)
+        let gs = makeSession(github, gp, id: "cccccccc-0003", startedAt: t0)
+        for kind in GitHubKind.allCases {
+            GitHubLog.record(GitHubCreated(kind: kind, repo: "me/app", number: 1, url: "https://github.com/me/app/x/1",
+                                           title: "제목", state: .open, branch: kind == .pr ? "feat" : nil),
+                             project: gp, card: nil, session: gs, at: t0, in: github)
+        }
+        try collect(github)
+
         #expect(unknown.sorted() == [], "표에 없는 payload 키")
         // 대표 키가 실제로 지나갔는지(생성 지점을 놓치지 않았는지)
         for type in [EventType.sessionStart, .sessionEnd, .cardCreated, .cardStatus, .cardAttached, .cardDetached,
-                     .fileChanged, .commit, .check, .note, .guideSynced, .projectStatus, .sessionFiled] {
+                     .fileChanged, .commit, .check, .note, .guideSynced, .projectStatus, .sessionFiled, .githubIssue, .githubPR] {
             #expect(seen.contains { $0.type == type }, "생성되지 않은 종류: \(type.rawValue)")
         }
         for kind in [MCPTools.handoffNoteKind, CardEditing.criterionNoteKind, PromptRetention.promptKind,
