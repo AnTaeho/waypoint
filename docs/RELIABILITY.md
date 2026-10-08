@@ -249,6 +249,21 @@
 
 replay로 들어온 줄은 앱의 outbox 흡수 지표(`recordAbsorb`)에 함께 센다. 실시간 수신 지연 지표에는 들지 않는다.
 
+## GitHub 이슈·PR 열기 (TRK-68)
+
+2026-10-08, gh 2.96.0(`AnTaeho` 로그인), Waypoint Dev Debug(브랜치 `trk-68-github`, 47822, `WAYPOINT_SUPPORT_DIR`=임시 폴더, `WAYPOINT_CLOUDKIT=0`, `open -g -j`). 비공개 실측 저장소 `AnTaeho/waypoint-gh-probe`를 스크래치에 클론해 `-WaypointOnboarding project -WaypointOnboardingFolder <클론>`으로 등록(WGP)하고 MCP를 `curl`로 직접 불렀다. 실제 `claude -p`는 쓰지 않았다.
+
+- 이슈: `github_issue_create(project: WGP, cardId: WGP-1)` → `{number: 1, state: open, url: …/issues/1, cardId: WGP-1}`, 1.28초. GitHub의 본문은 보낸 글 그대로.
+- 대기 중 다른 요청: 위 호출이 도는 동안 보낸 `ping` 0.004초, `card_list` 정상 응답(이슈 응답보다 먼저 끝남).
+- push 전 PR: `브랜치가 원격에 없음 — 먼저 push: probe/trk-68`(0.008초, `gh`를 부르지 않음).
+- push 뒤 PR: `github_pr_create(draft: true)` → `{number: 2, state: draft, url: …/pull/2}`, 2.40초. GitHub에서 `isDraft: true`, base `main`, head `probe/trk-68`.
+- 기록: `card_get(WGP-1)`의 최근 기록에 `github.issue`·`github.pr`(payload `number`·`url`·`title`·`state`·`repo`·`branch`).
+- 화면(창 하나 캡처): 카드 인스펙터 「GitHub」 구역(#2 초안, #1 열림, 버튼 둘), 카드 기록 「PR #2 열림 · …」「이슈 #1 열림 · …」, 보드 머리 「이슈 1 · PR 1」, 상황판 타일 아래 줄 「이슈 1 · PR 1」, 열기 시트(이슈·PR, 브랜치 `probe/trk-68`, 합칠 곳 자리 글 `main`). 보드 머리 목록은 숨긴 채 띄운 앱에서 팝오버가 뜨지 않아 같은 목록을 시트로 찍었다 — 팝오버 자체는 사람이 눌러 확인할 것.
+- 상태 갱신: `gh issue close 1`·`gh pr close 2` 뒤, 마지막 확인에서 5분이 지나기 전에 연 인스펙터는 그대로(캐시 `checkedAt` 변화 없음), 5분 뒤에 열자 `github-cache.json`(0600)이 둘 다 `closed`로 바뀌고 알약이 「닫힘」, 보드 머리 「이슈 0 · PR 0」. 카드 상태(`next`)와 이벤트 payload는 그대로.
+- 훅 지연(`scripts/measure-latency.py`, 500건, 세션 6, 실측 저장소라 기록이 적다): 대시보드가 보이는 상태에서 앱 수신→저장 p50 56 / p95 88 ms, 왕복 p50 57 / p95 89 ms. 같은 날 main과 번갈아 재지는 않았다.
+- 실측하지 않은 것: 시트의 「열기」 버튼(사람 조작이 필요하다 — 시트는 도구와 같은 `GitHubPlanner`·`GitHubJob`·`GitHubLog`를 쓴다), 줄을 눌러 브라우저로 열기, 병합된 PR의 「병합됨」 알약(단위 테스트만).
+- 끝난 뒤: 이슈 #1·PR #2는 닫힌 채, 저장소는 남겨 둠.
+
 ## 알려진 한계
 
 - 큰 기록 저장소에서 replay 처리는 초당 3~4줄이다(위 표). 수백 줄이면 몇 분 걸리고, 그동안 원격 세션의 블록이 필요 없는 훅은 그 뒤에 서서 늦게 보인다.

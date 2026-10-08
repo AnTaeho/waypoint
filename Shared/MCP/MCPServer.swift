@@ -9,6 +9,10 @@ public final class MCPServer {
     public static let serverVersion = "0.7.0"
     /// 도구 호출 뒤 저장. 테스트가 저장 실패를 흉내 낼 때 바꾼다.
     var saveContext: (ModelContext) throws -> Void = { try $0.save() }
+    /// 미룬 도구의 바깥 호출을 돌리는 곳. 테스트에서 바꾼다.
+    public var background: (@escaping @Sendable () -> Void) -> Void = { DispatchQueue.global(qos: .userInitiated).async(execute: $0) }
+    /// 미룬 도구가 끝난 뒤 돌아오는 곳(context의 액터 = 앱에서는 메인 큐). 테스트에서 바꾼다.
+    public var resume: @Sendable (@escaping @Sendable () -> Void) -> Void = { DispatchQueue.main.async(execute: $0) }
 
     public init(
         context: ModelContext, home: String = NSHomeDirectory(), drafts: ProjectDraftQueue? = nil,
@@ -54,6 +58,50 @@ public final class MCPServer {
         }
     }
 
+    /// 오래 걸리는 도구(GitHub) 호출이면 맡고 true. 호출은 `background`에서 돌고, 끝나면 `resume`(context의 액터)에서
+    /// 기록한 뒤 `completion`을 부른다. 그사이 다른 요청은 평소대로 처리된다. 맡지 않으면 false(`handle`로 보낸다).
+    public func handleDeferred(_ message: JSONValue, completion: @escaping (JSONValue) -> Void) -> Bool {
+        guard message["jsonrpc"] == "2.0", message["method"] == "tools/call", let id = message["id"],
+              id.stringValue != nil || id.numberValue != nil,
+              let name = message["params"]?["name"]?.stringValue, MCPTools.deferredTools.contains(name),
+              let arguments = message["params"]?["arguments"], arguments.objectValue != nil
+        else { return false }
+        let plan: MCPTools.GitHubPlan
+        do {
+            plan = try tools.githubPlan(name, arguments)
+        } catch {
+            completion(Self.toolReply(id: id, .failure(error)))
+            return true
+        }
+        let finish = UncheckedSendable { [self] (result: Result<GitHubCreated, GitHubError>) in
+            completion(Self.toolReply(id: id, Result {
+                let created = try result.mapError { MCPToolError($0) }.get()
+                return try ContextReload.commit(context, save: saveContext) { try tools.githubFinish(plan, created) }
+            }))
+        }
+        let cli = tools.github, resume = resume
+        background {
+            let result = plan.job.run(cli)
+            resume { finish.value(result) }
+        }
+        return true
+    }
+
+    static func toolReply(id: JSONValue, _ result: Result<JSONValue, Error>) -> JSONValue {
+        let content: JSONValue
+        var isError = false
+        switch result {
+        case .success(let value): content = value
+        case .failure(let error):
+            content = ["error": .string((error as? MCPToolError)?.message ?? String(describing: error))]
+            isError = true
+        }
+        return JSONRPC.result(id: id, [
+            "content": [["type": "text", "text": .string(content.serializedString)]],
+            "isError": .bool(isError),
+        ])
+    }
+
     func initialize(_ params: JSONValue) -> JSONValue {
         let requested = params["protocolVersion"]?.stringValue ?? ""
         let version = MCPRouter.supportedVersions.contains(requested) ? requested : MCPRouter.latestVersion
@@ -73,20 +121,9 @@ public final class MCPServer {
         guard arguments.objectValue != nil else {
             return JSONRPC.error(id: id, code: JSONRPC.invalidParams, message: "arguments must be an object")
         }
-        let content: JSONValue
-        let isError: Bool
-        do {
-            // 도구가 바꾸다 실패하거나 저장에 실패하면 rollback 뒤 저장소 값으로 다시 읽는다(`ContextReload.commit`).
-            content = try ContextReload.commit(context, save: saveContext) { try tools.call(name, arguments) }
-            isError = false
-        } catch {
-            let message = (error as? MCPToolError)?.message ?? String(describing: error)
-            content = ["error": .string(message)]
-            isError = true
-        }
-        return JSONRPC.result(id: id, [
-            "content": [["type": "text", "text": .string(content.serializedString)]],
-            "isError": .bool(isError),
-        ])
+        // 도구가 바꾸다 실패하거나 저장에 실패하면 rollback 뒤 저장소 값으로 다시 읽는다(`ContextReload.commit`).
+        return Self.toolReply(id: id, Result {
+            try ContextReload.commit(context, save: saveContext) { try tools.call(name, arguments) }
+        })
     }
 }

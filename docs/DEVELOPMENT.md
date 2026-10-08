@@ -152,8 +152,8 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 ## 실측 폴더
 
 ```sh
-scripts/dev-probe-setup.sh ~/workspace/waypoint-probe          # 잇기
-scripts/dev-probe-setup.sh --remove ~/workspace/waypoint-probe # 되돌리기
+scripts/dev-probe-setup.sh ~/workspace/projects/waypoint/waypoint-probe          # 잇기
+scripts/dev-probe-setup.sh --remove ~/workspace/projects/waypoint/waypoint-probe # 되돌리기
 ```
 
 폴더 안에만 두 파일을 쓴다.
@@ -207,6 +207,6 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 
 - 설치기 명령행: `swift build --product waypoint-integration` → `.build/debug/waypoint-integration <plan|install|remove> --home <임시 홈> --command-home <원격 $HOME> [--provider claude|codex] [--instance stable|dev] [--backup-root <폴더>]`. 앱 설치기와 같은 코드다. MCP 등록 명령은 돌리지 않고 `command …` 줄로 보인다.
 - `scripts/remote-setup.sh --dev <대상> -- <ssh 옵션>`: Dev(47822)로 잇는다. 사용자 `~/.ssh`를 쓰지 않도록 `-F /dev/null -i <임시 키> -o UserKnownHostsFile=<임시 파일>`을 넘긴다.
-- sshd 컨테이너를 원격으로 삼고 `ssh -N -R 47822:127.0.0.1:47822`로 터널을 연다. 실측 폴더(`~/workspace/waypoint-probe`)에 origin이 없으면 임시 bare 저장소를 origin으로 붙이고, 컨테이너 안 클론의 origin을 같은 문자열로 맞춘다(끝나면 실측 폴더의 origin을 지운다).
+- sshd 컨테이너를 원격으로 삼고 `ssh -N -R 47822:127.0.0.1:47822`로 터널을 연다. 실측 폴더(`~/workspace/projects/waypoint/waypoint-probe`)에 origin이 없으면 임시 bare 저장소를 origin으로 붙이고, 컨테이너 안 클론의 origin을 같은 문자열로 맞춘다(끝나면 실측 폴더의 origin을 지운다).
 - 훅 스크립트 단위 확인: `bash integration/hooks/test-waypoint-hook.sh`(8번 묶음이 `WAYPOINT_URL`·원격 정보·replay).
 

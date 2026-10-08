@@ -104,6 +104,7 @@ struct RootView: View {
         }
         .onDisappear { services?.mainWindowCount -= 1 }
         .guideLaunch(selection: $selection, projectMode: $projectMode)
+        .projectLaunch(selection: $selection)
         .onboardingSheet(services)
         .settingsLaunch()
         .windowSizeLaunch()

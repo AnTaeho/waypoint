@@ -7,10 +7,14 @@ struct SituationBoard: View {
     let width: CGFloat
     let now: Date
     let select: (Project) -> Void
+    @Environment(\.modelContext) private var context
+    @Environment(AppServices.self) private var services: AppServices?
 
     static let scrollID = "situation-board"
 
     var body: some View {
+        let recorded = GitHubLog.items(in: context)
+        let github = Dictionary(grouping: services?.github.shown(recorded) ?? recorded, by: \.projectID)
         VStack(alignment: .leading, spacing: Theme.Spacing.l) {
             Divider()
             HStack(spacing: Theme.Spacing.s) {
@@ -20,11 +24,12 @@ struct SituationBoard: View {
             if tiles.isEmpty { DashboardEmpty(message: "표시할 프로젝트가 없습니다.") }
             LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Spacing.l) {
                 ForEach(tiles) { tile in
-                    SituationTile(tile: tile, now: now, select: select)
+                    SituationTile(tile: tile, now: now, github: github[tile.project.id] ?? [], select: select)
                 }
             }
         }
         .id(Self.scrollID)
+        .task { services?.github.refreshIfStale(recorded) }
     }
 
     private var columns: [GridItem] {

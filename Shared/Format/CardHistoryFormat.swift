@@ -85,6 +85,9 @@ public enum CardHistoryFormat {
         case .sessionFiled:
             let files = p["files"]?.intValue ?? 0
             return make(.neutral, files > 0 ? "이전 세션 작업 연결 · 파일 \(files)개" : "이전 세션 작업 연결")
+        case .githubIssue, .githubPR:
+            guard let item = GitHubLog.item(event) else { return nil }
+            return make(.neutral, "\(item.label) 열림 · \(item.title)")
         case .sessionStart, .sessionEnd, .guideSynced, .projectStatus:
             return nil
         }

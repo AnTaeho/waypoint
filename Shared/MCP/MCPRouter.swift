@@ -57,6 +57,16 @@ public enum MCPRouter {
         return .json(body.serialized(), headers: headers)
     }
 
+    /// 응답을 미루는 도구 호출(`MCPTools.deferredTools`) 하나면 그 메시지. 배치·다른 메서드·거절할 요청은 nil(`respond`로).
+    public static func deferredCall(_ request: HTTPRequest) -> JSONValue? {
+        guard matches(request.path), isAllowedOrigin(request.headers["origin"]), request.method == "POST",
+              request.headers["mcp-protocol-version"].map(supportedVersions.contains) ?? true,
+              let message = JSONValue.parse(request.body), message["method"] == "tools/call",
+              let name = message["params"]?["name"]?.stringValue, MCPTools.deferredTools.contains(name)
+        else { return nil }
+        return message
+    }
+
     private static func initializeSucceeded(_ message: JSONValue, _ replies: [JSONValue]) -> Bool {
         let requests = message.arrayValue ?? [message]
         let ids = requests.filter { $0["method"]?.stringValue == "initialize" }.compactMap { $0["id"] }

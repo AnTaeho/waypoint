@@ -23,6 +23,9 @@ public final class LocalServer {
         didSet { onStateChange?(state) }
     }
     public var onStateChange: ((State) -> Void)?
+    /// 응답을 나중에 보내는 요청(오래 걸리는 도구). 맡으면 true를 돌려주고 끝났을 때 메인 액터에서 `send`를 한 번 부른다.
+    /// 그사이 메인 액터는 다른 요청을 처리한다. 맡지 않으면 false(`handler`로 간다).
+    public var deferredHandler: ((HTTPRequest, _ send: @escaping (HTTPResponse) -> Void) -> Bool)?
 
     public typealias FastHandler = @Sendable (HTTPRequest) -> HTTPResponse?
     private let handler: (HTTPRequest) -> HTTPResponse
@@ -55,6 +58,7 @@ public final class LocalServer {
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
                         guard let self else { connection.cancel(); return }
+                        if self.deferredHandler?(request, { Self.send($0, on: connection) }) == true { return }
                         Self.send(self.handler(request), on: connection)
                     }
                 }

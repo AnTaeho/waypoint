@@ -28,7 +28,7 @@ public enum RecordScope {
 
     /// 「남기는 것」 한 줄. 순서가 화면 순서다.
     public enum Item: String, CaseIterable, Sendable {
-        case projects, cards, sessions, prompts, files, commits, checks, notes, guides
+        case projects, cards, sessions, prompts, files, commits, checks, github, notes, guides
 
         public var title: String {
             switch self {
@@ -39,6 +39,7 @@ public enum RecordScope {
             case .files: "바뀐 파일"
             case .commits: "커밋"
             case .checks: "검증 기록"
+            case .github: "이슈 · PR"
             case .notes: "메모"
             case .guides: "지침 문서"
             }
@@ -53,6 +54,7 @@ public enum RecordScope {
             case .files: "경로 · 저장소 폴더 · 늘고 준 줄 수"
             case .commits: "해시 · 메시지 첫 줄"
             case .checks: "명령 · 결과 · 짧은 설명"
+            case .github: "번호 · 제목 · 주소 · 저장소 · 브랜치"
             case .notes: "카드 메모 · 다음 세션 메모 · 프로젝트 지금 상황"
             case .guides: "등록한 문서의 내용과 이전 판"
             }
@@ -130,7 +132,7 @@ public enum RecordScope {
     }
 
     /// 이벤트 종류별 payload 키. 생성 지점은 `HookProcessor`·`MCPTools`(`+Status` 포함)·`CardLifecycle`·`CardEditing`·
-    /// `CardEvidence`·`SessionProjectBinding`·`GuideLibrary`·`ProjectRegistry`.
+    /// `CardEvidence`·`SessionProjectBinding`·`GuideLibrary`·`ProjectRegistry`·`GitHubLog`.
     public static let payloadKeys: [PayloadKey] =
         keys(.sessionStart, .sessions, ["source", "agentName"])
         + keys(.sessionEnd, .sessions, ["reason"])
@@ -145,6 +147,8 @@ public enum RecordScope {
         + keys(.guideSynced, .guides, ["relPath", "source"])
         + keys(.projectStatus, .notes, ["summary", "provider", "sessionId"])
         + keys(.sessionFiled, .cards, ["sessionId", "outcome", "cardId", "files", "moved"])
+        + keys(.githubIssue, .github, ["number", "url", "title", "state", "repo", "provider"])
+        + keys(.githubPR, .github, ["number", "url", "title", "state", "repo", "branch", "provider"])
         + keys(.note, .notes, ["text"])
         + keys(.note, kind: MCPTools.handoffNoteKind, .notes, ["kind", "text"])
         + keys(.note, kind: CardEditing.criterionNoteKind, .cards, ["kind", "text", "isDone"])
@@ -175,6 +179,7 @@ public enum RecordScope {
         LocalItem(title: "앱이 꺼진 동안 온 기록", detail: "앱이 켜지면 옮기고 비움", paths: [Outbox.fileName]),
         LocalItem(title: "연결 상태와 지표", detail: "시각과 숫자", paths: ["integration-health.json", "metrics.json"]),
         LocalItem(title: "사용량", detail: "마지막으로 읽은 한도", paths: [UsageSnapshot.fileName]),
+        LocalItem(title: "이슈 · PR 상태", detail: "마지막으로 확인한 상태", paths: [GitHubStatusCache.fileName]),
     ]
 
     /// 「어디에」의 저장소 줄. iCloud를 끈 실행(확인용 저장 폴더 등)은 이 Mac에만 있다.

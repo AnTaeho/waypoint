@@ -52,6 +52,9 @@ public enum EventType: String, Codable, Sendable, CaseIterable {
     case projectStatus = "project.status"
     /// 정리 안 된 작업 처리(TRK-62, `work_file`). payload `sessionId`·`outcome`(filed·dismissed)·`cardId`·`moved`.
     case sessionFiled = "session.filed"
+    /// Waypoint에서 연 GitHub 이슈·PR(TRK-68). payload `number`·`url`·`title`·`state`·`repo`·`branch`(PR)·`provider`.
+    case githubIssue = "github.issue"
+    case githubPR = "github.pr"
 }
 
 public enum GuideSource: String, Codable, Sendable, CaseIterable {

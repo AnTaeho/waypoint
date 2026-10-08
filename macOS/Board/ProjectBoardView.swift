@@ -80,6 +80,8 @@ private struct BoardHeader: View {
                         RoundedRectangle(cornerRadius: Theme.Radius.badge)
                             .strokeBorder(Theme.border, lineWidth: Theme.Size.cardBorder)
                     }
+                Spacer(minLength: Theme.Spacing.m)
+                GitHubBoardButton(project: project)
             }
             if !project.summary.isEmpty {
                 Text(project.summary)

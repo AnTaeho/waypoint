@@ -68,6 +68,27 @@ public enum GitInfo {
         return nil
     }
 
+    /// 작업 트리 최상위의 공용 git 폴더(config·refs가 있는 곳). worktree·하위 모듈은 `gitdir:`·`commondir`를 따라간다.
+    public static func commonDirectory(checkout: String, fileManager: FileManager = .default) -> String? {
+        let dotGit = (checkout as NSString).appendingPathComponent(".git")
+        var isDir: ObjCBool = false
+        guard fileManager.fileExists(atPath: dotGit, isDirectory: &isDir) else { return nil }
+        var gitDir = dotGit
+        if !isDir.boolValue {
+            guard let text = try? String(contentsOfFile: dotGit, encoding: .utf8),
+                  let line = text.split(separator: "\n").first(where: { $0.hasPrefix("gitdir:") })
+            else { return nil }
+            let raw = line.dropFirst("gitdir:".count).trimmingCharacters(in: .whitespaces)
+            gitDir = raw.hasPrefix("/") ? raw : (checkout as NSString).appendingPathComponent(raw)
+        }
+        var common = gitDir
+        if let text = try? String(contentsOfFile: (gitDir as NSString).appendingPathComponent("commondir"), encoding: .utf8) {
+            let raw = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !raw.isEmpty { common = raw.hasPrefix("/") ? raw : (gitDir as NSString).appendingPathComponent(raw) }
+        }
+        return common
+    }
+
     /// `cwd`에서 위로 올라가며 `.git`을 찾는다. `.git`이 파일(worktree)이면 `gitdir:`을 따라간다.
     public static func branch(at cwd: String, fileManager: FileManager = .default) -> String? {
         guard !cwd.isEmpty else { return nil }

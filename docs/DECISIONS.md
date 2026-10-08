@@ -651,3 +651,26 @@ TRK-33에서 남긴 rollback 경로를 마저 막는다.
 | 패키지를 `.build/SourcePackages`에 받아 archive와 서명 도구가 같이 쓴다(내 판단) | `--resume-notarize`에는 DerivedData가 없고, 빌드마다 다시 받지 않는다 | DerivedData 안 도구 | `-clonedSourcePackagesDirPath` |
 
 검증: `swift test` 754개 통과(새 `UpdateFeedTests` 3개), macOS Debug·iOS 시뮬레이터 빌드(iOS 앱에 Sparkle 없음), `scripts/release-mac.sh --skip-notarize --allow-dirty --feed-url … --download-base …`(Sparkle 구성 요소 Developer ID, appcast·서명 생성), Dev 9001 → 9002 업데이트 실측. [RELEASE.md](RELEASE.md) 「자동 업데이트 > 실측」.
+
+## 2026-10-08 — GitHub 이슈·PR 열기 (TRK-68)
+
+| 결정 | 이유 | 대안 | 되돌리기 |
+|---|---|---|---|
+| GitHub 이슈·PR을 열고, 그렇게 연 것을 Waypoint에서 본다. 기능은 이 둘뿐. 사용자 요청 | 「외부 이슈 도구 연동은 하지 않는다」의 예외(`CLAUDE.md` 제품 방향에 적음). 에이전트가 채팅으로 열고 카드에 남는다 | 연동 없음 | 도구 두 개·`Shared/GitHub/`·`macOS/GitHub/` |
+| GitHub 호출은 사용자의 `gh` CLI(`Process`). 메인 세션 결정 | 앱이 토큰을 다루지 않고 외부 라이브러리가 없다 | REST 직접 호출 + 토큰 보관, OAuth 앱 | `GitHubCLI` 한 파일 |
+| 두 도구만 응답을 미룬다(메인 큐 → 백그라운드 `gh` → 메인 큐 기록). 메인 세션 결정 | `gh`가 몇 초 걸려 그동안 훅 응답(1초 규칙)이 밀린다. 다른 도구·훅 길은 그대로 | MCP 전체를 비동기로, 메인 큐에서 기다리기 | `LocalServer.deferredHandler`·`MCPServer.handleDeferred` |
+| 제한 시간 20초. 메인 세션 결정 | `claude mcp` 실행과 같은 값. 넘으면 멈추고 오류 | 더 길게 | `GitHubCLI.defaultTimeout` |
+| 도구는 push하지 않는다. 브랜치가 원격에 없으면 오류. 메인 세션 결정 | 원격을 바꾸는 일은 에이전트·사람이 본 뒤에 | 도구가 push | `GitHubPlanner.job` |
+| 본문에 Waypoint 표시 문구를 붙이지 않는다. 메인 세션 결정 | 사용자 글 그대로 | 꼬리말 | — |
+| 기록은 이벤트 `github.issue`·`github.pr`, 모델 속성은 그대로. 카드는 `cardId` → 세션의 작업중 카드 하나 → 프로젝트만. 메인 세션 결정 | 새 `EventType` 값은 저장 형식 변경이 아니다(TRK-63) | 새 모델 | `GitHubLog` |
+| 상태는 열 때 5분보다 오래됐으면 뒤에서 갱신하고 로컬 파일 `github-cache.json`(0600)에만 둔다. 카드 상태는 건드리지 않는다. 메인 세션 결정 | 자동 done 금지. 상태는 이 Mac이 다시 읽을 수 있는 값이라 iCloud에 넣지 않는다 | 이벤트를 고쳐 쓰기, 주기 폴링 | `GitHubStatusCache` |
+| 앱에서 여는 곳은 인스펙터 「GitHub」 구역의 버튼 둘. 메인 세션이 준 두 자리 중 고름(내 판단) | 연 것이 바로 그 구역에 나타난다. 머리에는 「완료로 옮기기」만 두어 한 줄이 넘치지 않는다 | 카드 상세 머리 메뉴 | `GitHubSection` |
+| 브랜치가 원격에 있는지는 `.git`의 `refs/remotes/origin`·packed-refs로 본다(내 판단) | 네트워크·git 실행 없이 바로 답하고, 시트의 브랜치 목록과 같은 기준이다. 낡은 경우(원격에서 지운 브랜치)는 `gh` 오류로 드러난다 | `gh api …/branches/<이름>`(호출 한 번 더), `git ls-remote` | `GitHubPlanner.job`의 확인 한 곳 |
+| 여러 항목의 상태는 `gh api graphql` 한 번(별칭)으로 읽는다(내 판단) | 저장소·종류가 섞여도 호출 하나. 일부가 지워져 오류가 섞여도 읽힌 것은 쓴다 | `gh issue list`·`gh pr list` 저장소마다 두 번 | `GitHubStatusQuery` |
+| 확인한 적 없는 항목은 연 시각을 확인 시각으로 본다(내 판단) | 방금 연 것을 바로 다시 읽지 않는다 | 열 때 캐시에 쓰기(도구 길이 캐시를 알아야 한다) | `GitHubStatusCache.stale` |
+| payload `provider`는 세션이 있을 때 그 세션의 도구. 앱 시트로 연 것은 뺀다(내 판단) | 이 저장소에서 `provider`는 늘 Claude·Codex다. 도구 인자를 늘리지 않았다 | `provider` 인자 추가, 「app」 값 | `GitHubLog.record` |
+| 화면 문구와 도구 응답의 해결 명령을 나눴다(`GitHubError.message`·`hint`)(내 판단) | 화면에는 만든 쪽 용어를 쓰지 않는다. 에이전트에게는 `gh auth login`이 필요하다 | 한 문구 | `MCPToolError(GitHubError)` |
+| 기록 탭 저장 범위 표에 항목 「이슈 · PR」과 이 Mac 파일 「이슈 · PR 상태」를 더했다(내 판단) | 표가 모든 payload 키·로컬 파일을 분류해야 한다(`RecordScopeTests`) | 「카드」에 넣기 | `RecordScope` |
+| 배치 요청에 섞인 두 도구는 오류로 답한다(내 판단) | 배치는 동기 길이라 미룰 수 없다. Claude Code·Codex는 배치를 쓰지 않는다 | 배치도 미루기 | `MCPTools.call` 한 줄 |
+| `.git` 공용 폴더 찾기를 `GitInfo.commonDirectory`로 뽑아 `LocalOrigin.read`와 같이 쓴다(내 판단) | 브랜치 목록도 worktree의 `commondir`를 따라가야 한다 | 같은 코드를 두 번 | 함수 하나 |
+| Debug 실행 인자 `-WaypointProject`·`-WaypointGitHub`를 더했다. 목록은 시트로 보인다(내 판단) | 화면을 손 없이 캡처해야 하는데 숨긴 채 띄운 앱은 팝오버가 뜨지 않았다(실측) | 화면 캡처 없이 넘기기 | `GitHubLaunch` |
