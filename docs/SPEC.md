@@ -456,6 +456,8 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `card_handoff` | **`id`**, **`nextSessionNote`** | `nextSessionNote` 저장 + `note` 기록 `{kind: "handoff", text}` |
 | `project_status` | **`project`**, `text`, `sessionId`, `provider` | `text`가 있으면 지금 상황을 새로 쓴다: 줄마다 앞뒤 공백을 다듬고 빈 줄을 뺀 뒤 600자·8줄을 넘거나 비면 오류(자르지 않는다 — 에이전트가 줄여 다시 보내게). `project.status` 기록(`provider`는 세션이 있으면 세션의 도구). `text`가 없으면 읽기. 결과 `{project, status: {text, at, provider?, sessionId?, stale} \| null}` |
 | `work_file` | **`sessionId`**, `cardId` | 정리 안 된 작업 하나를 처리(4장). `sessionId`는 전체 ID 또는 앞부분 8자 이상(메인 세션 중 하나만 맞아야 함). 끝나지 않은 세션·카드에 붙은 적 있는 세션·이미 이은 세션·이미 넘긴 세션을 다시 넘김·다른 프로젝트·보관된 카드는 오류(넘긴 세션은 나중에 카드에 이을 수 있다). `cardId`가 있으면 기록을 카드로 옮기고 `session.filed`(`filed`), 없으면 `session.filed`(`dismissed`). 카드 상태는 바꾸지 않는다. 결과 `{sessionId, outcome, cardId?, files?, moved?}` |
+| `github_issue_create` | **`project`**, **`title`**, `body`, `labels`, `cardId`, `sessionId` | 프로젝트 폴더 `origin`의 GitHub 저장소에 이슈를 연다(「GitHub 이슈·PR 열기」 절). 결과 `{number, url, title, state, cardId?}` |
+| `github_pr_create` | **`project`**, **`title`**, `body`, `base`, `head`, `draft`, `cwd`, `cardId`, `sessionId` | 같은 저장소에 PR을 연다. push하지 않는다. `head` 기본은 `cwd`(없으면 프로젝트 폴더) 작업 트리의 현재 브랜치, `base` 기본은 저장소 기본 브랜치. 결과는 위와 같고 `state`는 `open`·`draft` |
 | `card_evidence` | **`id`**, `criterion`, **`command`**, **`outcome`**, `detail`, `sessionId` | 에이전트 보고 근거 `check`(`source: agent`). `criterion`은 **1부터**(card_get `criteria` 순서, 저장은 0부터 + 조건 글), 빼면 카드 수준. 범위 밖·조건 없는 카드에 번호·정수 아님은 오류. `outcome`은 `pass`·`fail`·`skipped`(일부러 건너뛴 경우만). `detail` 200자. 결과 `{id, outcome, source, criterion?, state?, confirmed?}`(`confirmed`: 훅 기록과 짝지어져 「확인됨」인지) |
 
 `criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
@@ -898,3 +900,63 @@ UTF-8 JSON, 들여쓰고 키 정렬, 날짜는 ISO 8601 UTC 밀리초(`2026-10-0
 `-WaypointSettingsTab records`(설정 창을 기록 탭으로 연다), `-WaypointSettingsScroll bottom`, `-WaypointExport <경로>`(+`-WaypointExportProject <키>`), `-WaypointBackupNow 1`, `-WaypointRestore <백업 폴더 이름|latest>`, `-WaypointWipe 1`. 버튼과 같은 `RecordsModel` 길을 대화상자 없이 탄다. 절차는 docs/DEVELOPMENT.md 「기록 탭 실측」.
 
 검증: `RecordScopeTests`(스키마 속성 ↔ 표 양방향, 생성 지점 payload 키, `Event.record(` 호출 목록, 30일 항목은 요청 문장뿐, 지침 문서 내용·판), `RecordExportTests`(전체 왕복 디코드·재인코드 바이트 같음, 프로젝트 하나에 다른 프로젝트 것 없음, 작동 상태 값 제외, 임시 저장소 지우기 → 7종 0개 + `beforeDelete` 백업이 먼저 생기고 지우기 전 내용을 담음, 백업 실패·진행 중이면 안 지움, 지금 백업과 daily의 겹침, 문구, 다시 시작 명령의 환경 변수 전달과 따옴표).
+
+## GitHub 이슈·PR 열기 (2026-10-08, TRK-68)
+
+외부 이슈 도구 연동은 하지 않는다는 방향의 예외다(사용자 요청). 하는 일은 둘뿐이다: 이슈·PR을 열고, 그렇게 연 것을 Waypoint에서 본다. 다른 곳에서 연 이슈·PR을 가져오지 않고, 댓글·리뷰·병합·닫기도 하지 않는다.
+
+### 호출
+
+- GitHub은 사용자의 `gh` CLI로 부른다(`Shared/GitHub/GitHubCLI`, `Process`). 앱은 토큰을 다루지 않는다. 실행 파일은 흔한 설치 폴더와 앱 PATH에서 찾고(`ToolLaunch.searchDirectories`), `GH_PROMPT_DISABLED=1`·stdin 없음으로 돌린다.
+- 저장소는 프로젝트 `rootPath`가 든 작업 트리의 `origin`이다(`.git/config`를 읽는 TRK-53 코드, `GitRemoteURL.normalize`). `github.com/<owner>/<name>` 꼴만 받는다.
+- 이슈: `gh issue create --repo <owner/name> --title … --body … [--label …]`. PR: `gh pr create --repo … --title … --body … --head <브랜치> [--base …] [--draft]`. 본문은 받은 글 그대로 올린다(표시 문구를 붙이지 않는다). 결과는 출력의 마지막 주소 줄에서 번호를 읽는다.
+- PR은 push하지 않는다. 브랜치가 그 작업 트리의 `refs/remotes/origin/`(packed-refs 포함)에 없으면 호출 전에 오류로 답한다. `owner:branch` 꼴은 확인하지 않고 넘긴다.
+- 제한 시간 20초. 넘으면 프로세스를 멈추고 오류.
+
+### 응답을 미루는 길
+
+`gh`는 몇 초 걸린다. MCP 요청은 메인 큐에서 처리하므로 그대로 기다리면 훅 응답(1초 규칙)이 밀린다. 이 두 도구만 세 토막으로 나눈다.
+
+1. 메인 큐: 인자 확인, 프로젝트·카드 찾기, 저장소·브랜치 읽기(`MCPTools.githubPlan`). 여기서 난 오류는 바로 답한다.
+2. 백그라운드: `gh` 실행(`GitHubJob.run`). 모델 객체는 넘기지 않는다(키·ID만).
+3. 메인 큐: 기록하고 저장한 뒤 응답을 보낸다(`MCPTools.githubFinish`).
+
+`LocalServer.deferredHandler`가 요청을 맡으면 연결을 열어 둔 채 끝났을 때 응답을 쓴다. 맡는 것은 `MCPRouter.deferredCall`이 고른 단독 `tools/call`(두 도구)뿐이고, 다른 도구·훅·배치는 지금까지의 동기 길 그대로다. 배치에 섞어 보내면 오류로 답한다.
+
+### 기록
+
+성공하면 이벤트 `github.issue`·`github.pr`를 남긴다. payload `number`·`url`·`title`·`state`(`open`·`draft`)·`repo`·`branch`(PR만)·`provider`(세션이 있을 때 그 세션의 도구). 저장 형식(모델 속성)은 바뀌지 않는다. 옛 앱은 모르는 종류를 `note`로 읽으므로 `text` 키를 두지 않는다.
+
+잇는 곳: `cardId`가 있으면 그 카드(같은 프로젝트여야 한다) → 없으면 `sessionId` 세션의 작업중 카드가 하나일 때 그 카드 → 아니면 프로젝트에만. 카드 상태는 건드리지 않는다.
+
+### 보기 (macOS)
+
+- 카드 인스펙터 「GitHub」 구역: 그 카드의 이슈·PR(번호·제목·상태 알약 열림/닫힘/병합됨/초안). 누르면 브라우저로 연다. 프로젝트 폴더가 GitHub 저장소에 이어져 있으면 「이슈 열기…」「PR 열기…」 버튼.
+- 프로젝트 보드 머리 「이슈 N · PR N」(열린 수, 초안 포함): 누르면 이 프로젝트에서 연 것 전부(열린 것 먼저, 이어진 카드 ID). 연 것이 없으면 버튼이 없다.
+- 상황판 타일 아래 줄에 같은 열린 수(열린 것이 있을 때만).
+- 활동 탭 「이슈 #12 열림」, 카드 기록 「이슈 #12 열림 · 제목」.
+- 열기 시트: 제목(카드 제목), 본문(카드 본문 + 완료 조건 체크리스트), 저장소. PR은 브랜치(원격에 있는 로컬 브랜치, 기본은 현재 브랜치)·합칠 곳(비우면 저장소 기본)·초안. 도구와 같은 `GitHubPlanner`·`GitHubJob`·`GitHubLog`를 쓴다. 실패하면 시트 안에 원인이 보인다.
+
+### 상태 갱신
+
+목록(상황판·보드 머리 목록)이나 카드 인스펙터를 열 때, 마지막 확인(없으면 연 시각)에서 5분이 지난 항목이 있으면 뒤에서 `gh api graphql` 한 번으로 보이는 항목 전부의 `state`·`title`·`isDraft`를 읽는다(`GitHubStatusQuery`). 결과는 `<저장 폴더>/github-cache.json`(0600, 이 Mac에만, `RecordScope.localItems`)에 두고 화면은 이벤트 값 위에 덮어 보인다. 이벤트와 카드 상태는 바꾸지 않는다(자동 done 금지). 실패하면 1분 동안 다시 시도하지 않고 마지막으로 아는 상태를 보인다.
+
+### 실패
+
+| 원인 | 문구 |
+|---|---|
+| `gh`가 없음 | 「이 Mac에 GitHub 도구가 없음 — 설치한 뒤 로그인」 |
+| 로그인 안 됨(종료 코드 4, 「gh auth login」) | 「GitHub에 로그인되어 있지 않음」 |
+| `origin`이 없음 / GitHub 주소가 아님 | 「이 프로젝트 폴더에 원격 저장소가 없음」 / 「원격 저장소가 GitHub 주소가 아님: …」 |
+| 현재 브랜치를 모름(분리된 HEAD) | 「지금 브랜치를 알 수 없음 — 브랜치를 골라야 함」 |
+| 브랜치가 원격에 없음 | 「브랜치가 원격에 없음 — 먼저 push: <브랜치>」 |
+| 20초 초과 | 「20초 안에 끝나지 않음」 |
+| 그 밖 | `gh` 오류 출력 첫 줄 |
+
+화면에는 위 문구만 보이고, 도구 응답에는 해결 명령이 괄호로 붙는다(예: 「(터미널에서 gh auth login)」). 실패하면 아무것도 기록하지 않는다.
+
+### Debug 실행 인자
+
+`-WaypointProject <키>`(그 프로젝트 보드에서 시작), `-WaypointGitHub list`(보드 머리 목록을 시트로 — 숨긴 채 띄운 앱은 팝오버가 뜨지 않는다), `-WaypointGitHub issue|pr`(카드 인스펙터에서 열기 시트, `-WaypointOpenCard`와 함께).
+
+검증: `GitHubTests`(가짜 `gh` 실행 파일, 네트워크 없음 — 인자 조립, 결과 해석, 실패 일곱 가지, 카드 연결 규칙, 이벤트·저장 범위 표, 상태 캐시 만료·0600, 미룬 응답 동안 다른 요청이 밀리지 않음). 실측은 [RELIABILITY.md](RELIABILITY.md) 「GitHub 이슈·PR 열기」.
