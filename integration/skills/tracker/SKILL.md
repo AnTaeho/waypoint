@@ -57,6 +57,8 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 | `card_evidence(id, criterion?, command, outcome, detail?, sessionId?)` | 완료 조건을 확인하려고 실행한 명령과 결과. criterion은 1부터, outcome은 pass·fail·skipped |
 | `project_status(project, text?, sessionId?)` | 프로젝트 지금 상황 갱신(600자·8줄 이내, 전체를 새로 쓴다). text를 빼면 읽기 |
 | `work_file(sessionId, cardId?)` | 정리 안 된 작업 정리. 블록의 짧은 ID 그대로. cardId를 빼면 넘김 |
+| `github_issue_create(project, title, body?, labels?, cardId?, sessionId?)` | 사용자가 GitHub 이슈를 열어 달라고 할 때. 작업 카드가 있으면 `cardId`로 잇는다 |
+| `github_pr_create(project, title, body?, base?, head?, draft?, cwd?, cardId?, sessionId?)` | 사용자가 PR을 열어 달라고 할 때. push하지 않으므로 브랜치를 먼저 push한 뒤 부른다. `cardId`로 잇는다 |
 | `project_resolve(cwd, remote?)` | 폴더 → 프로젝트(주입 블록이 없을 때 확인용). 원격·컨테이너 폴더는 git origin 주소를 `remote`로 |
 | `project_init(cwd, name, key?, summary?, stack?, guideFiles?, seedCards?)` | `/tracker init`에서만. 앱에 등록 확인 창을 띄운다 |
 
@@ -76,6 +78,7 @@ MCP 서버 `waypoint`. Claude Code·Codex에서 제공된 Waypoint 도구를 쓴
 - 주제가 바뀌면 새 카드로 `card_start`한다. 이 세션에 붙어 있던 이전 카드는 서버가 연결을 풀고 원래 상태(next·idea 등)로 돌린다. 이전 카드를 done으로 만들지 않는다.
 - 사용자가 "나중에", "언젠가", "다음엔", "이것도 있으면 좋겠다"처럼 **지금 하지 않을 일**을 말하면 `card_create(kind: idea, status: idea, sessionId)`로 남기고 한 줄로 알린다: `PRB-5 아이디어로 남겼어요.` 지금 하던 작업은 계속한다. 당장 할 게 확실한 후속 작업은 `status: next`.
 - 완료 조건을 확인하려고 명령(테스트·빌드 등)을 실행했으면 `card_evidence(id, criterion, command, outcome, sessionId)`로 조건 번호(1부터, `card_get`의 criteria 순서)와 결과를 남긴다. `command`는 실행한 명령 그대로, 실패면 `fail`. 실행하지 않은 조건은 남기지 않는다. `skipped`는 일부러 건너뛴 조건에만 쓴다. 특정 조건이 아닌 검증은 `criterion`을 뺀다. 앱은 실행을 직접 본 기록과 맞춰 보고, 근거 뒤에 파일이 바뀌면 다시 미검증으로 보인다.
+- 사용자가 이슈·PR을 열어 달라고 하면 `github_issue_create`·`github_pr_create`를 쓰고 작업 카드에 잇는다(`cardId`). PR은 브랜치를 push한 뒤에 연다. 결과의 `url`을 한 줄로 알린다.
 - `status: active`는 `card_update`로 줄 수 없다. 작업중은 `card_start`로만.
 - 도구 응답에 `overlaps`가 있으면 다른 세션(`sessionId`·`cards`·`provider`)이 같은 작업 트리의 그 `files`를 최근 1시간 안에 바꿨다. 그 파일을 고치기 전에 사용자에게 한 줄로 알리고(`note.txt를 PRB-3 세션도 고치고 있어요.`), 같은 파일을 계속 만질지 확인한다. 같은 겹침은 한 번만 온다.
 
