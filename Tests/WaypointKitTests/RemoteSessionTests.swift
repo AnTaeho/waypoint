@@ -128,6 +128,57 @@ import Testing
         #expect(reads == 2)
     }
 
+    // worktree는 `commondir`가 가리키는 공용 git 폴더의 config에서 원격 주소를 읽는다.
+    @Test func readsOriginThroughWorktreeCommonDir() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-worktree-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let gitDir = root.appendingPathComponent("main/.git/worktrees/wt")
+        let worktree = root.appendingPathComponent("wt")
+        try FileManager.default.createDirectory(at: gitDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: worktree, withIntermediateDirectories: true)
+        try "[remote \"origin\"]\n\turl = git@github.com:me/ledger.git\n"
+            .write(to: root.appendingPathComponent("main/.git/config"), atomically: true, encoding: .utf8)
+        try "../..\n".write(to: gitDir.appendingPathComponent("commondir"), atomically: true, encoding: .utf8)
+        try "gitdir: \(gitDir.path)\n".write(to: worktree.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+        let found = try #require(LocalOrigin.read(rootPath: worktree.path))
+        #expect(found.url == "github.com/me/ledger")
+        #expect(found.checkout == worktree.path)
+    }
+
+    // 어느 구역에도 들지 않은 url 줄은 origin 주소로 읽지 않는다.
+    @Test func urlOutsideOriginSectionIsIgnored() {
+        #expect(LocalOrigin.originURL(config: "\turl = https://github.com/stray/repo\n[core]\n\tbare = false") == nil)
+    }
+
+    // 기억한 원격 주소는 5분이 되는 순간부터 다시 읽는다.
+    @Test func cacheRereadsAtLifetime() {
+        var reads = 0
+        var now = t0
+        let cache = LocalOriginCache(reader: { _ in reads += 1; return nil }, now: { now })
+        _ = cache.origin(for: "/a")
+        now = t0 + LocalOriginCache.lifetime - 1
+        _ = cache.origin(for: "/a")
+        #expect(reads == 1)
+        now = t0 + LocalOriginCache.lifetime
+        _ = cache.origin(for: "/a")
+        #expect(reads == 2)
+    }
+
+    // 원격 작업 트리가 `/`여도 그 아래 경로를 로컬 작업 트리 아래로 옮긴다.
+    @Test func mapsPathsUnderRootSlash() {
+        #expect(RemoteMatcher.map("/src/A.swift", from: "/", to: "/Users/me/dev/ledger") == "/Users/me/dev/ledger/src/A.swift")
+        #expect(RemoteMatcher.map("/home/dev/ledger/src/A.swift", from: "/home/dev/ledger", to: "/Users/me/dev/ledger")
+                == "/Users/me/dev/ledger/src/A.swift")
+    }
+
+    // 같은 원격 주소의 보관된 프로젝트가 다른 작업 트리에 있어도 보관 안 된 쪽에 잇는다.
+    @Test func archivedCloneDoesNotBlockLinking() throws {
+        let h = try Harness(origins: ["/Users/me/dev/ledger": Self.origin, "/Users/me/old/ledger": Self.origin])
+        _ = try h.add("OLD", "/Users/me/old/ledger", archived: true)
+        h.processor.handle(event: "SessionStart", json: Self.payload("SessionStart"), at: t0)
+        #expect(try h.session()?.project === h.project)
+    }
+
     // MARK: - 잇기
 
     /// 원격 작업 트리의 세션이 같은 원격 주소의 등록 프로젝트에 이어진다. 세션 폴더·브랜치는 원격 값, 파일은 작업 트리 기준 상대 경로.

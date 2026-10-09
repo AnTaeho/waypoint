@@ -277,4 +277,16 @@ import Testing
         #expect(!HookRouter.isContextID(""))
         #expect(!HookRouter.isContextID("%header{x-waypoint-context-id}"))
     }
+
+    // 확인을 꺼낸 뒤에도 꽉 찬 받은 함은 가장 오래된 것부터 버린다.
+    @Test func inboxEvictsOldestAfterTake() {
+        let inbox = ContextAckInbox()
+        for i in 0..<ContextAckInbox.capacity { inbox.insert("id-\(i)") }
+        #expect(inbox.take("id-0"))
+        inbox.insert("new-1")
+        inbox.insert("new-2")
+        #expect(inbox.count == ContextAckInbox.capacity)
+        #expect(!inbox.take("id-1"))
+        #expect(inbox.take("id-2") && inbox.take("new-2"))
+    }
 }

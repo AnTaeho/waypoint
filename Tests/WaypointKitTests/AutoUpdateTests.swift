@@ -61,6 +61,20 @@ private func send(_ h: HookHarness, _ name: String, session: String, at date: Da
         ])
     }
 
+    // 정리 안 된 작업이 딱 세 개면 「외 N개」 줄을 붙이지 않는다.
+    @Test func exactlyThreeHasNoMoreLine() throws {
+        let (c, ctx) = try makeContext(); _ = c
+        let p = makeProject(ctx)
+        let now = t0 + 20 * day
+        for (i, id) in ["aaaaaaaa-1", "bbbbbbbb-2", "cccccccc-3"].enumerated() {
+            endedSession(ctx, p, id: id, at: now - Double(i + 1) * day)
+        }
+        let current = makeSession(ctx, p, id: "current", startedAt: now, lastSeenAt: now)
+        let lines = SessionContext.text(project: p, session: current, now: now).components(separatedBy: "\n")
+        #expect(lines.filter { $0.hasPrefix("- ") }.count == UnfiledWork.blockLimit)
+        #expect(!lines.contains { $0.hasPrefix("- 외") })
+    }
+
     /// 경계: 14일 밖, 파일 0개, 카드 연결 있음(풀렸어도·서브에이전트), 이미 처리함, 끝나지 않음, 다른 프로젝트 파일.
     @Test func excludesOutsideConditions() throws {
         let (c, ctx) = try makeContext(); _ = c

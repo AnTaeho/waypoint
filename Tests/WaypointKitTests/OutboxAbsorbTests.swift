@@ -120,6 +120,17 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
     }
 
+    // 세션 ID가 없는 줄은 저장 실패로 보지 않고 넘긴다(남겨서 다시 하지 않는다).
+    @Test func lineWithoutSessionIDIsConsumedNotRetried() throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let (h, _) = try harness()
+        try (#"{"event":"Stop","receivedAt":1,"payload":{"cwd":"/Users/me/dev/ledger"}}"# + "\n").write(
+            to: dir.appendingPathComponent(Outbox.fileName), atomically: true, encoding: .utf8)
+        #expect(h.processor.absorbOutbox(directory: dir) == Outbox.DrainResult(processed: 1))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
+    }
+
     /// 메인 context에 저장 안 된 변경이 있으면 먼저 저장한다. 저장하지 못하면 흡수를 미룬다(줄은 그대로).
     @Test func unsavedMainChangesAreSavedFirstOrAbsorbWaits() throws {
         let dir = try tempDir()

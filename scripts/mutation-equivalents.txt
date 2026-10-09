@@ -49,3 +49,14 @@ Shared/Rules/WorkOverlap.swift	> → >=	return Array(last.sorted { $0.value != $
 Shared/Rules/WorkOverlap.swift	< → <=	return Array(last.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }	경로는 사전의 키라 같은 값끼리 비교하지 않는다
 Shared/Rules/WorkOverlap.swift	&& → ||	&& SessionRules.state(of: unit, now: now, stallTimeout: stallTimeout) != .ended	SessionRules.state가 ended인 것은 endedAt이 있을 때뿐이라 두 조건이 늘 같은 값이다
 Shared/Rules/WorkOverlap.swift	< → <=	.sorted { $0.number < $1.number }	앞에서 같은 카드를 걸러 내고 카드 번호는 프로젝트 안에서 겹치지 않아 같은 값끼리 비교하지 않는다
+Shared/Hooks/CodexHookAdapter.swift	true → false	let absolute = path.hasPrefix("/") ? path : URL(fileURLWithPath: input.cwd, isDirectory: true)	cwd가 폴더든 파일이든 appendingPathComponent가 `/`를 끼워 넣어 표준화한 경로가 같다
+Shared/Hooks/HookProcessor+Context.swift	false → true	func lateContext(_ input: HookInput, at date: Date, acknowledges: Bool = false) -> String? {	유일한 호출자 process가 acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor+Events.swift	false → true	func sessionStart(_ input: HookInput, at date: Date, delivers: Bool, acknowledges: Bool = false) -> String {	유일한 호출자 process가 acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor.swift	== → !=	let target = input.event == "SubagentStart" ? subagentSession(input) : (subagentSession(input) ?? main)	바로 다음 줄이 `target ?? main`으로 받아 어느 가지든 하위 세션이 있으면 그것, 없으면 메인 세션이 된다
+Shared/Hooks/HookProcessor.swift	true → false	func process(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {	유일한 호출자 handle이 delivers·acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor.swift	false → true	func process(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {	유일한 호출자 handle이 delivers·acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor.swift	> → >=	if date > session.lastSeenAt { session.lastSeenAt = date }	두 시각이 같을 때 같은 값을 다시 넣을 뿐이다
+Shared/Hooks/ProjectMatcher.swift	false → true	var isDir: ObjCBool = false	fileExists가 파일이 있으면 값을 덮어쓰고, 없으면 이 값을 읽지 않는다
+Shared/Hooks/ProjectMatcher.swift	true → false	var dir = URL(fileURLWithPath: cwd, isDirectory: true).standardizedFileURL	표준화한 경로와 그 뒤의 `.git` 붙이기·상위 폴더 올라가기가 폴더 표시와 상관없이 같다
+Shared/Hooks/RemoteReplay.swift	true → false	support.appendingPathComponent(folderName, isDirectory: true)	경로 문자열은 같고 쓰는 쪽은 `.path`와 appendingPathComponent만 쓴다
+Shared/Hooks/SessionContext.swift	< → <=	let next = cards.filter { $0.status == .next }.sorted { $0.number < $1.number }.prefix(nextLimit)	카드 번호가 프로젝트 안에서 겹치지 않아 같은 번호끼리 비교하지 않는다
