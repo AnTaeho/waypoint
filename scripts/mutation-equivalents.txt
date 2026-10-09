@@ -1,0 +1,62 @@
+# 뮤테이션 테스트가 건너뛸 동등 변형(바꿔도 동작이 같은 것).
+# 형식: 경로<TAB>연산자<TAB>원래 줄(양끝 공백 제거)<TAB>이유
+# 연산자 이름은 `scripts/mutation-test.py --list`가 [ ] 안에 찍는 글자 그대로.
+Shared/Rules/BoardQuery.swift	> → >=	.sorted { $0.key > $1.key }.map(\.card)	카드 번호가 프로젝트 안에서 겹치지 않아 정렬 키가 같은 두 카드가 없다
+Shared/Rules/BoardQuery.swift	< → <=	.sorted { $0.key < $1.key }.map(\.card)	카드 번호가 프로젝트 안에서 겹치지 않아 정렬 키가 같은 두 카드가 없다
+Shared/Rules/BoardQuery.swift	< → <=	let sorted = cards.sorted { (attachedAt($0), $0.number) < (attachedAt($1), $1.number) }	카드 번호가 프로젝트 안에서 겹치지 않아 정렬 키가 같은 두 카드가 없다
+Shared/Rules/CardEvidence.swift	false → true	command: report.command, isStale: false)	decide가 돌려준 isStale은 유일한 호출자 evaluate가 버리고 다시 계산한다
+Shared/Rules/CardEvidence.swift	false → true	command: latest.command, isStale: false)	decide가 돌려준 isStale은 유일한 호출자 evaluate가 버리고 다시 계산한다
+Shared/Rules/CardResumeContext.swift	< → <=	.sorted { $0.at == $1.at ? $0.id.uuidString < $1.id.uuidString : $0.at > $1.at }	at이 같은 두 이벤트의 UUID는 서로 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/CardResumeContext.swift	> → >=	.sorted { $0.at == $1.at ? $0.id.uuidString < $1.id.uuidString : $0.at > $1.at }	삼항식의 이쪽 가지는 at이 다를 때만 계산된다
+Shared/Rules/CardResumeSummary.swift	< → <=	guard index < evidence.count, Self.needsVerification(evidence[index]) else { return nil }	evidence는 card.criteria를 하나씩 바꿔 만든 배열이라 길이가 같고 index는 늘 그보다 작다
+Shared/Rules/DashboardOverview.swift	> → >=	if $0.updatedAt != $1.updatedAt { return $0.updatedAt > $1.updatedAt }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/DashboardOverview.swift	< → <=	return $0.displayID < $1.displayID	displayID(프로젝트 키-카드 번호)는 카드마다 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/DashboardQuery.swift	< → <=	return a.project.key < b.project.key	프로젝트 키는 프로젝트마다 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/DashboardQuery.swift	< → <=	if a.session.startedAt != b.session.startedAt { return a.session.startedAt < b.session.startedAt }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/DashboardQuery.swift	< → <=	if a.attachedAt != b.attachedAt { return a.attachedAt < b.attachedAt }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/DashboardQuery.swift	< → <=	if an != bn { return an < bn }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/DashboardQuery.swift	< → <=	return a.session.id < b.session.id	여기까지 오는 두 줄은 카드 번호까지 같으니 세션이 다르고, 세션 ID는 세션마다 다르다
+Shared/Rules/IdeaInbox.swift	> → >=	if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/IdeaInbox.swift	< → <=	return a.displayID < b.displayID	displayID(프로젝트 키-카드 번호)는 카드마다 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/ProjectActivity.swift	< → <=	let ordered = values.sorted { $0.at == $1.at ? $0.id.uuidString < $1.id.uuidString : $0.at > $1.at }	at이 같은 두 이벤트의 UUID는 서로 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/ProjectActivity.swift	> → >=	let ordered = values.sorted { $0.at == $1.at ? $0.id.uuidString < $1.id.uuidString : $0.at > $1.at }	삼항식의 이쪽 가지는 at이 다를 때만 계산된다
+Shared/Rules/ProjectActivity.swift	< → <=	}.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at > $1.at }	묶음 ID(날짜|세션 키)는 하루 안에서 묶음마다 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/ProjectActivity.swift	> → >=	}.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at > $1.at }	삼항식의 이쪽 가지는 at이 다를 때만 계산된다
+Shared/Rules/ProjectSituation.swift	> → >=	if at != bt { return at > bt }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/ProjectSituation.swift	< → <=	return a.project.key < b.project.key	프로젝트 키는 프로젝트마다 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/ProjectStatus.swift	false → true	let lines = raw.split(separator: "\n", omittingEmptySubsequences: false)	빈 줄을 남겨도 바로 뒤 filter { !$0.isEmpty }가 뺀다
+Shared/Rules/SessionProjectBinding.swift	> → >=	if date > session.lastSeenAt { session.lastSeenAt = date }	date가 lastSeenAt과 같을 때만 달라지는데 그때 넣는 값이 이미 든 값과 같다
+Shared/Rules/SessionSweep.swift	> → >=	guard ended > 0 else { return 0 }	끝낸 세션이 0이면 돌려주는 값은 어느 쪽이든 0이고, 다른 점은 sweep이 바꾼 것 없는 context를 한 번 저장하는 것뿐이다
+Shared/Rules/SessionSweep.swift	<= → <	guard pid > 1, pid <= Int(Int32.max) else { return nil }	PID가 Int32.max인 프로세스는 없어 sysctl이 빈 결과를 주고 다음 guard에서 nil이 된다
+Shared/Rules/SessionSweep.swift	> → >=	guard sysctl(&mib, u_int(mib.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }	size가 0이면 info가 0으로 채워진 채라 다음 guard의 p_pid 비교(pid는 2 이상)에서 nil이 된다
+Shared/Rules/VerificationCommand.swift	false → true	public var background = false	Parsed를 만드는 곳은 parse 하나뿐이고 만들자마자 background를 split 결과로 덮어쓴다
+Shared/Rules/VerificationCommand.swift	false → true	guard let first = verifying.first else { return false }	parse는 검증 조각이 없으면 nil을 돌려줘 verifying이 빈 Parsed는 만들어지지 않는다
+Shared/Rules/VerificationCommand.swift	+ → -	i = skipValue(chars, from: j + 1)	j-1부터 훑어도 이름 글자와 = 는 값의 끝·따옴표·$ 어느 것도 아니라 그대로 지나가 같은 자리에서 끝난다
+Shared/Rules/UnfiledWork.swift	> → >=	$0.lastSeenAt != $1.lastSeenAt ? $0.lastSeenAt > $1.lastSeenAt : $0.id < $1.id	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/UnfiledWork.swift	< → <=	$0.lastSeenAt != $1.lastSeenAt ? $0.lastSeenAt > $1.lastSeenAt : $0.id < $1.id	세션 ID는 세션마다 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/UnfiledWork.swift	> → >=	&& ((session.cardSessions?.contains { $0.attachedAt > past } ?? false)	attachedAt은 실제 연결 시각이라 distantPast와 같은 값이 없다(연결이 하나라도 있는지 묻는 질의다)
+Shared/Rules/UnfiledWork.swift	> → >=	child.cardSessions?.contains { $0.attachedAt > past } ?? false	attachedAt은 실제 연결 시각이라 distantPast와 같은 값이 없다(연결이 하나라도 있는지 묻는 질의다)
+Shared/Rules/UnfiledWork.swift	> → >=	a.value.count != b.value.count ? a.value.count > b.value.count	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/UnfiledWork.swift	> → >=	: a.value.last != b.value.last ? a.value.last > b.value.last : a.key < b.key	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/UnfiledWork.swift	< → <=	: a.value.last != b.value.last ? a.value.last > b.value.last : a.key < b.key	경로는 사전의 키라 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	> → >=	for (key, units) in byFile where units.count > 1 {	단위가 하나뿐인 파일은 안쪽 반복이 자기 자신을 건너뛰어 짝을 만들지 않는다
+Shared/Rules/WorkOverlap.swift	> → >=	$0.value != $1.value ? $0.value > $1.value : $0.key < $1.key	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/WorkOverlap.swift	< → <=	$0.value != $1.value ? $0.value > $1.value : $0.key < $1.key	경로는 사전의 키라 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	< → <=	if $0.unit != $1.unit { return $0.unit < $1.unit }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	> → >=	if $0.files.count != $1.files.count { return $0.files.count > $1.files.count }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	< → <=	return $0.other < $1.other	여기까지 오는 두 짝은 단위가 같고, (단위, 상대)는 사전의 키라 상대가 서로 다르다
+Shared/Rules/WorkOverlap.swift	> → >=	return Array(last.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/WorkOverlap.swift	< → <=	return Array(last.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }	경로는 사전의 키라 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	&& → ||	&& SessionRules.state(of: unit, now: now, stallTimeout: stallTimeout) != .ended	SessionRules.state가 ended인 것은 endedAt이 있을 때뿐이라 두 조건이 늘 같은 값이다
+Shared/Rules/WorkOverlap.swift	< → <=	.sorted { $0.number < $1.number }	앞에서 같은 카드를 걸러 내고 카드 번호는 프로젝트 안에서 겹치지 않아 같은 값끼리 비교하지 않는다
+Shared/Hooks/CodexHookAdapter.swift	true → false	let absolute = path.hasPrefix("/") ? path : URL(fileURLWithPath: input.cwd, isDirectory: true)	cwd가 폴더든 파일이든 appendingPathComponent가 `/`를 끼워 넣어 표준화한 경로가 같다
+Shared/Hooks/HookProcessor+Context.swift	false → true	func lateContext(_ input: HookInput, at date: Date, acknowledges: Bool = false) -> String? {	유일한 호출자 process가 acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor+Events.swift	false → true	func sessionStart(_ input: HookInput, at date: Date, delivers: Bool, acknowledges: Bool = false) -> String {	유일한 호출자 process가 acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor.swift	== → !=	let target = input.event == "SubagentStart" ? subagentSession(input) : (subagentSession(input) ?? main)	바로 다음 줄이 `target ?? main`으로 받아 어느 가지든 하위 세션이 있으면 그것, 없으면 메인 세션이 된다
+Shared/Hooks/HookProcessor.swift	true → false	func process(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {	유일한 호출자 handle이 delivers·acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor.swift	false → true	func process(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {	유일한 호출자 handle이 delivers·acknowledges를 늘 넘겨 기본값이 쓰이지 않는다
+Shared/Hooks/HookProcessor.swift	> → >=	if date > session.lastSeenAt { session.lastSeenAt = date }	두 시각이 같을 때 같은 값을 다시 넣을 뿐이다
+Shared/Hooks/ProjectMatcher.swift	false → true	var isDir: ObjCBool = false	fileExists가 파일이 있으면 값을 덮어쓰고, 없으면 이 값을 읽지 않는다
+Shared/Hooks/ProjectMatcher.swift	true → false	var dir = URL(fileURLWithPath: cwd, isDirectory: true).standardizedFileURL	표준화한 경로와 그 뒤의 `.git` 붙이기·상위 폴더 올라가기가 폴더 표시와 상관없이 같다
+Shared/Hooks/RemoteReplay.swift	true → false	support.appendingPathComponent(folderName, isDirectory: true)	경로 문자열은 같고 쓰는 쪽은 `.path`와 appendingPathComponent만 쓴다
+Shared/Hooks/SessionContext.swift	< → <=	let next = cards.filter { $0.status == .next }.sorted { $0.number < $1.number }.prefix(nextLimit)	카드 번호가 프로젝트 안에서 겹치지 않아 같은 번호끼리 비교하지 않는다

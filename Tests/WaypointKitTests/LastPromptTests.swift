@@ -180,6 +180,79 @@ import Testing
         h.processor.handle(entry)
         #expect(try h.session()?.lastPrompt == "LDG-14 이어서 하자")
     }
+
+    // MARK: - 요청 기록 (`user.prompt` 메모)
+
+    /// 그 세션의 요청 기록, 시각 순.
+    func promptNotes(_ h: HookHarness) throws -> [Event] {
+        (try #require(try h.session()).events ?? [])
+            .filter { $0.type == .note && $0.payloadValues["kind"]?.stringValue == "user.prompt" }
+            .sorted { $0.at < $1.at }
+    }
+
+    // 마지막 활동과 같은 시각에 온 요청은 새것으로 보고 마지막 요청을 바꾼다.
+    @Test func promptAtSameInstantReplacesLastPrompt() throws {
+        let h = try HookHarness()
+        try send(h, at: t0 + 60, override: ["prompt": "첫 요청"])
+        try send(h, at: t0 + 60, override: ["prompt": "같은 초의 둘째 요청"])
+        #expect(try h.session()?.lastPrompt == "같은 초의 둘째 요청")
+    }
+
+    // 요청 기록은 그 시각에 세션이 잡고 있던 카드 하나에 붙는다. 붙인 시각은 넣고 뗀 시각은 뺀다.
+    @Test func promptNoteGoesToCardHeldAtThatInstant() throws {
+        let h = try HookHarness()
+        let before = h.project.makeCard(in: h.context, title: "먼저 한 일", status: .next, at: t0)
+        let held = h.project.makeCard(in: h.context, title: "지금 하는 일", status: .next, at: t0)
+        try send(h, "doc-SessionStart", at: t0)
+        let main = try #require(try h.session())
+        CardLifecycle.attach(before, main, at: t0 + 10, in: h.context)
+        CardLifecycle.detach(before, main, at: t0 + 20, in: h.context)
+        CardLifecycle.attach(held, main, at: t0 + 60, in: h.context)
+        try send(h, at: t0 + 60, override: ["prompt": "붙인 순간의 요청"])
+        CardLifecycle.detach(held, main, at: t0 + 90, in: h.context)
+        try send(h, at: t0 + 90, override: ["prompt": "뗀 순간의 요청"])
+        let notes = try promptNotes(h)
+        #expect(notes.count == 2)
+        #expect(notes.first?.card === held)
+        #expect(notes.last?.card == nil)
+    }
+
+    // 요청 기록의 프로젝트는 그 시각까지의 세션 시작 기록을 따른다(같은 시각 포함, 훅의 폴더보다 먼저).
+    @Test func promptNoteFollowsSessionStartOfSameInstant() throws {
+        let h = try HookHarness()
+        let web = Project(key: "WEB", name: "웹", rootPath: "~/dev/web", createdAt: t0)
+        h.context.insert(web)
+        try h.context.save()
+        try send(h, "doc-SessionStart", at: t0)
+        try send(h, at: t0, override: ["cwd": "/Users/me/dev/web"])
+        let notes = try promptNotes(h)
+        #expect(notes.count == 1)
+        #expect(notes.first?.project === h.project)
+    }
+
+    // 같은 요청 ID는 10분 끝에 다시 받아도 한 번만 남긴다.
+    @Test func promptWithSameIDAtWindowEdgeIsRecordedOnce() throws {
+        let h = try HookHarness()
+        try send(h, at: t0, override: ["prompt_id": "p-1"])
+        try send(h, at: t0 + HookProcessor.redeliveryWindow, delivers: false, override: ["prompt_id": "p-1"])
+        #expect(try promptNotes(h).count == 1)
+    }
+
+    // 요청 ID가 없으면 같은 문장을 10초 끝에 다시 받은 것까지 같은 요청으로 본다.
+    @Test func samePromptTextAtToleranceEdgeIsRecordedOnce() throws {
+        let h = try HookHarness()
+        try send(h, at: t0)
+        try send(h, at: t0 + HookProcessor.promptRedeliveryTolerance, delivers: false)
+        #expect(try promptNotes(h).count == 1)
+    }
+
+    // 10분보다 오래전 요청이 있어도 새 요청은 따로 남긴다.
+    @Test func promptLongAfterEarlierOneIsRecorded() throws {
+        let h = try HookHarness()
+        try send(h, at: t0, override: ["prompt": "첫 요청"])
+        try send(h, at: t0 + HookProcessor.redeliveryWindow + 1, override: ["prompt": "한참 뒤 요청"])
+        #expect(try promptNotes(h).map { $0.payloadValues["text"]?.stringValue } == ["첫 요청", "한참 뒤 요청"])
+    }
 }
 
 /// 작업중 줄·타일 경과(`SessionFormat.rowElapsed`).

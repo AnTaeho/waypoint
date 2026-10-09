@@ -162,6 +162,36 @@ import Testing
                                                            response: nil, error: "Exit code 1"), at: t0 + 110)
         #expect(CardEvidence.records(for: card).map(\.outcome) == [.fail, .pass])
     }
+
+    // 실패 훅에 중단 여부가 없으면 중단이 아닌 것으로 보고 종료 코드를 읽는다.
+    @Test func failureWithoutInterruptFlagReadsExitCode() throws {
+        let input = try Self.input([
+            "session_id": "s", "cwd": Self.cwd, "hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+            "tool_input": ["command": "swift test"], "error": "Exit code 1\n테스트 실패",
+        ])
+        #expect(!input.isInterrupt)
+        let check = try #require(HookParsing.check(input))
+        #expect(check.exitCode == 1 && check.outcome == .fail)
+    }
+
+    // 실패 설명의 첫 줄이 비어 있으면 뒤에 `Exit code N`이 있어도 결과 모름.
+    @Test func exitCodeMustBeOnFirstLineOfError() throws {
+        let data = try Self.bash("swift test", event: "PostToolUseFailure", response: nil, error: "\nExit code 1")
+        let check = try #require(HookParsing.check(try Self.parsed(data)))
+        #expect(check.exitCode == nil && check.outcome == .unknown)
+    }
+
+    // 카드 없는 서브에이전트 안에서 검증이 실패해도 부모 세션의 카드에 근거를 남긴다.
+    @Test func failedCheckInCardlessSubagentUsesParentCard() throws {
+        let h = try HookHarness()
+        let (card, _) = try started(h)
+        try h.send("doc-SubagentStart", at: t0 + 7)
+        h.processor.handle(event: nil, json: try Self.bash("pytest", event: "PostToolUseFailure", toolUseID: "toolu_f",
+                                                           response: nil, error: "Exit code 2", agentID: HookHarness.agentID),
+                           at: t0 + 8)
+        let record = try #require(CardEvidence.records(for: card).first)
+        #expect(record.command == "pytest" && record.outcome == .fail && record.exitCode == 2)
+    }
 }
 
 extension HookProcessor {

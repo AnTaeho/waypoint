@@ -126,4 +126,11 @@ import Testing
         #expect(env.card.status == .active)
         #expect(CardResumeStatus.of(env.card, attempt: attempt) == .copied(.claude))
     }
+
+    // 연결됨 단계만 연결된 것으로 본다.
+    @Test func onlyConnectedStageIsConnected() {
+        #expect(CardResumeStatus.connected(.claude).isConnected)
+        let others: [CardResumeStatus] = [.ready, .copied(.claude), .disconnected(.codex), .unavailable("완료한 카드")]
+        #expect(others.allSatisfy { !$0.isConnected })
+    }
 }

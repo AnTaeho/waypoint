@@ -159,6 +159,65 @@ import Testing
         #expect(files[0].added == 1 && files[0].removed == 1)
     }
 
+    // 패치 결과의 종료 코드가 0이 아니면 파일을 남기지 않고, 패치 끝 표시 뒤의 줄은 세지 않는다.
+    @Test func patchHonorsTopLevelExitCodeAndStopsAtEndPatch() throws {
+        func files(exitCode: Int) throws -> [(path: String, added: Int, removed: Int)] {
+            let object: [String: Any] = [
+                "session_id": "s", "cwd": "/tmp/project", "hook_event_name": "PostToolUse", "tool_name": "apply_patch",
+                "tool_input": "*** Begin Patch\n*** Update File: a.swift\n@@\n-old\n+new\n*** End Patch\n+stray\n-stray",
+                "tool_response": ["output": "Success. Updated the following files:\nM a.swift\n", "exit_code": exitCode],
+            ]
+            return HookParsing.changedFiles(try #require(HookInput(event: nil, object: object, provider: .codex)))
+        }
+        let done = try files(exitCode: 0)
+        #expect(done.map(\.path) == ["/tmp/project/a.swift"])
+        #expect(done.first?.added == 1 && done.first?.removed == 1)
+        #expect(try files(exitCode: 1).isEmpty)
+    }
+
+    /// 픽스처 없이 Codex 훅 한 건을 보낸다(세션 `same-id`, LDG 폴더).
+    func codex(_ fields: [String: Any], to h: HookHarness, at date: Date, pid: Int? = nil) throws {
+        var object: [String: Any] = ["session_id": "same-id", "cwd": "/Users/me/dev/ledger"]
+        object.merge(fields) { $1 }
+        h.processor.handle(event: nil, json: try JSONSerialization.data(withJSONObject: object), at: date,
+                           provider: .codex, processPid: pid)
+    }
+
+    // 종류를 안 준 spawn_agent 호출은 종류 없이 시작한 Codex 하위 세션과 짝지어 카드를 잇는다.
+    @Test func untypedSpawnAgentPairsWithUntypedSubagent() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "하위", status: .next, at: t0)
+        try send("SessionStart", to: h, at: t0)
+        try codex(["hook_event_name": "PreToolUse", "tool_name": "spawn_agent", "tool_use_id": "call-9",
+                   "tool_input": ["message": "[LDG-\(card.number)] 파서 테스트"]], to: h, at: t0 + 10)
+        try codex(["hook_event_name": "SubagentStart", "agent_id": "agent-9"], to: h, at: t0 + 20)
+        let child = try #require(try h.session("codex:agent-9"))
+        #expect(card.openCardSessions.first?.session === child)
+    }
+
+    // 서브에이전트를 띄우지 않는 도구 호출은 대기 목록에 올리지 않는다(Claude 쪽의 spawn_agent도).
+    @Test func onlySubagentToolCallsAreQueued() throws {
+        let h = try HookHarness()
+        try send("SessionStart", to: h, at: t0)
+        try codex(["hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_use_id": "call-1",
+                   "tool_input": ["command": "ls"]], to: h, at: t0 + 10)
+        #expect((h.processor.pendingSpawns["codex:same-id"] ?? []).isEmpty)
+        try h.send("doc-SessionStart", at: t0)
+        h.processor.handle(event: "PreToolUse", object: [
+            "session_id": HookHarness.sessionID, "cwd": "/Users/me/dev/ledger", "tool_name": "spawn_agent",
+            "tool_use_id": "toolu_x", "tool_input": ["message": "[LDG-1] 테스트"],
+        ], at: t0 + 10)
+        #expect((h.processor.pendingSpawns[HookHarness.sessionID] ?? []).isEmpty)
+    }
+
+    // 마지막 활동과 같은 시각에 온 Codex 훅의 PID는 새것으로 보고 바꾼다.
+    @Test func hookAtSameInstantReplacesProcessPid() throws {
+        let h = try HookHarness()
+        try send("SessionStart", to: h, at: t0, pid: 9000)
+        try send("Stop", to: h, at: t0, pid: 9001)
+        #expect(try h.session("codex:same-id")?.processPid == 9001)
+    }
+
     @Test func bashCommitsUseTextResponse() throws {
         let h = try HookHarness()
         try send("SessionStart", to: h, at: t0)

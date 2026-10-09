@@ -209,3 +209,182 @@ import Testing
         #expect(s.lastSeenAt == t0 + 120)
     }
 }
+
+/// 경계·재수신·기본값: 같은 시각에 온 훅, 시간 폭의 끝, 다시 받은 훅.
+@Suite struct HookProcessorBoundaryTests {
+    /// 픽스처 본문의 필드를 바꿔 보낸다. 값이 `NSNull`이면 그 필드를 뺀다.
+    @discardableResult
+    func send(_ h: HookHarness, _ name: String, at date: Date, pid: Int? = nil,
+              override: [String: Any] = [:]) throws -> String? {
+        var object = try #require(try JSONSerialization.jsonObject(with: try fixture(name)) as? [String: Any])
+        for (key, value) in override { object[key] = value is NSNull ? nil : value }
+        return h.processor.handle(event: nil, json: try JSONSerialization.data(withJSONObject: object), at: date,
+                                  claudePid: pid)
+    }
+
+    // 종류를 안 준 Agent 호출은 종류 없이 시작한 서브에이전트와 짝지어 카드를 잇는다.
+    @Test func untypedAgentCallPairsWithUntypedSubagent() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "파서 테스트", status: .next, at: t0)
+        try h.send("doc-SessionStart", at: t0)
+        try send(h, "doc-PreToolUse-Agent", at: t0 + 10,
+                 override: ["tool_input": ["prompt": "[LDG-\(card.number)] 테스트를 써 줘"]])
+        try send(h, "doc-SubagentStart", at: t0 + 11, override: ["agent_type": NSNull()])
+        let sub = try #require(try h.session(HookHarness.agentID))
+        #expect(card.openCardSessions.first?.session === sub)
+    }
+
+    // 대기 시간(10분)의 끝에 딱 맞춰 시작한 서브에이전트까지는 짝짓는다.
+    @Test func subagentStartingAtLifetimeEdgeStillPairs() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "파서 테스트", status: .next, at: t0)
+        try h.send("doc-SessionStart", at: t0)
+        try send(h, "doc-PreToolUse-Agent", at: t0, override: [
+            "tool_input": ["prompt": "[LDG-\(card.number)] 테스트", "subagent_type": "test-writer"],
+        ])
+        try h.send("doc-SubagentStart", at: t0 + HookProcessor.pendingLifetime)
+        #expect(card.status == .active)
+    }
+
+    // 같은 Agent 호출을 10분 끝에 다시 받아도 대기 목록에 두 번 올리지 않는다.
+    @Test func agentCallRedeliveredAtLifetimeEdgeIsQueuedOnce() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-PreToolUse-Agent", at: t0)
+        try h.send("doc-PreToolUse-Agent", at: t0 + HookProcessor.pendingLifetime)
+        #expect(h.processor.pendingSpawns[HookHarness.sessionID]?.count == 1)
+    }
+
+    // 세션 시작 훅을 못 받았어도 서브에이전트 시작이 부모 세션까지 만든다.
+    @Test func subagentStartCreatesMissingParent() throws {
+        let h = try HookHarness()
+        try h.send("doc-SubagentStart", at: t0)
+        let main = try #require(try h.session())
+        let sub = try #require(try h.session(HookHarness.agentID))
+        #expect(main.kind == .main && main.project === h.project)
+        #expect(sub.parent === main)
+    }
+
+    // 끝난 서브에이전트가 같은 ID로 다시 시작하면 다시 연다.
+    @Test func restartedSubagentIsReopened() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-SubagentStart", at: t0 + 1)
+        try h.send("doc-SubagentStop", at: t0 + 10)
+        let sub = try #require(try h.session(HookHarness.agentID))
+        #expect(sub.endedAt == t0 + 10)
+        try h.send("doc-SubagentStart", at: t0 + 20)
+        #expect(sub.endedAt == nil)
+        #expect(sub.cachedState == .live)
+        #expect(sub.lastSeenAt == t0 + 20)
+        #expect(try h.context.fetchCount(FetchDescriptor<Session>()) == 2)
+    }
+
+    // 도구 실패 훅이 그 세션의 첫 훅이어도 세션을 만든다.
+    @Test func toolFailureCreatesMissingSession() throws {
+        let h = try HookHarness()
+        h.processor.handle(event: nil, json: try HookCheckTests.bash("ls", event: "PostToolUseFailure", response: nil,
+                                                                     error: "Exit code 1"), at: t0)
+        let main = try #require(try h.session())
+        #expect(main.project === h.project && main.startedAt == t0)
+    }
+
+    // 메인 세션이 끝난 뒤 늦게 온 서브에이전트 종료는 메인 세션을 되살리지 않는다.
+    @Test func lateSubagentStopDoesNotReviveEndedMain() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-SubagentStart", at: t0 + 1)
+        try h.send("doc-SessionEnd", at: t0 + 60)
+        try h.send("doc-SubagentStop", at: t0 + 90)
+        let main = try #require(try h.session())
+        #expect(main.endedAt == t0 + 60)
+        #expect((main.events ?? []).filter { $0.type == .sessionStart }.count == 1)
+    }
+
+    // 끝난 시각과 같은 시각의 훅은 세션을 되살리지 않는다(그 뒤 시각만).
+    @Test func hookAtEndInstantDoesNotRevive() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-SessionEnd", at: t0 + 60)
+        try h.send("doc-Stop", at: t0 + 60)
+        #expect(try h.session()?.endedAt == t0 + 60)
+    }
+
+    // 같은 도구 호출의 커밋 훅을 다시 받으면 커밋을 한 번만 남긴다.
+    @Test func redeliveredCommitIsRecordedOnce() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-PostToolUse-Bash-commit", at: t0 + 20)
+        try h.send("doc-PostToolUse-Bash-commit", at: t0 + 25)
+        #expect((h.project.events ?? []).filter { $0.type == .commit }.count == 1)
+    }
+
+    // 같은 도구 호출의 파일 변경은 10분 끝에 다시 받아도 한 번만 남긴다.
+    @Test func editRedeliveredAtWindowEdgeIsRecordedOnce() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-PostToolUse-Edit", at: t0 + 10)
+        try h.send("doc-PostToolUse-Edit", at: t0 + 10 + HookProcessor.redeliveryWindow)
+        #expect((h.project.events ?? []).filter { $0.type == .fileChanged }.count == 1)
+    }
+
+    // 마지막 활동과 같은 시각에 온 훅의 PID는 새것으로 보고 바꾼다.
+    @Test func hookAtSameInstantReplacesPid() throws {
+        let h = try HookHarness()
+        try send(h, "doc-SessionStart", at: t0, pid: 4100)
+        try send(h, "doc-Stop", at: t0, pid: 4200)
+        #expect(try h.session()?.claudePid == 4200)
+    }
+
+    // 서브에이전트 안에서 난 훅도 부모 세션의 캐시 상태를 live로 돌린다.
+    @Test func subagentHookMarksParentLive() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-SubagentStart", at: t0 + 1)
+        let main = try #require(try h.session())
+        main.cachedState = .stalled
+        try h.send("doc-PostToolUse-Write-subagent", at: t0 + 20)
+        #expect(main.cachedState == .live)
+    }
+
+    // 종료 훅은 그 세션의 마지막 활동 시각도 옮긴다(메인·서브에이전트 모두).
+    @Test func endHooksMoveLastSeen() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-SubagentStart", at: t0 + 1)
+        try h.send("doc-SubagentStop", at: t0 + 30)
+        #expect(try h.session(HookHarness.agentID)?.lastSeenAt == t0 + 30)
+        try h.send("doc-SessionEnd", at: t0 + 60)
+        #expect(try h.session()?.lastSeenAt == t0 + 60)
+    }
+
+    // 세션이 끝나면 그 세션의 Agent 호출 기억만 지우고 다른 세션 것은 둔다.
+    @Test func endedSessionForgetsOnlyItsOwnAgentCalls() throws {
+        let h = try HookHarness()
+        let other = "0ther-session-0001"
+        try h.send("doc-SessionStart", at: t0)
+        try send(h, "doc-SessionStart", at: t0, override: ["session_id": other])
+        try h.send("doc-PreToolUse-Agent", at: t0 + 10)
+        try send(h, "doc-PreToolUse-Agent", at: t0 + 10, override: ["session_id": other])
+        #expect(h.processor.seenSpawns.count == 2)
+        try h.send("doc-SessionEnd", at: t0 + 20)
+        #expect(Array(h.processor.seenSpawns.keys) == ["\(other)|toolu_01ABC123"])
+        #expect(h.processor.pendingSpawns[HookHarness.sessionID] == nil)
+        #expect(h.processor.pendingSpawns[other]?.count == 1)
+    }
+
+    // 새 처리기와 읽지 못한 본문은 저장 실패로 치지 않는다.
+    @Test func unreadableBodyIsNotASaveFailure() throws {
+        let h = try HookHarness()
+        #expect(!h.processor.lastSaveFailed)
+        h.processor.handle(event: "Stop", json: Data("not json".utf8), at: t0)
+        #expect(!h.processor.lastSaveFailed)
+    }
+
+    // 훅 입력을 바로 넘기면 따로 말하지 않아도 블록을 돌려준다.
+    @Test func parsedInputDeliversBlockByDefault() throws {
+        let h = try HookHarness()
+        let text = h.processor.handle(try fixtureInput("doc-SessionStart"), at: t0)
+        #expect(text?.hasPrefix("Waypoint: LDG") == true)
+    }
+}

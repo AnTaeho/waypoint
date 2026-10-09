@@ -187,4 +187,69 @@ import Testing
         CardLifecycle.attach(p.makeCard(in: ctx, title: "x", status: .next, at: t0), a, at: now, in: ctx)
         #expect(DashboardQuery.summary(for: p, now: now).liveCount == 2)
     }
+
+    // 같은 상태의 프로젝트는 이름순, 이름까지 같으면 키순.
+    @Test func groupsOrderByNameThenKey() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let projects = [("AAA", "하 프로젝트"), ("ZZZ", "가 프로젝트"), ("MMM", "나 프로젝트"), ("BBB", "나 프로젝트")].map {
+            makeProject(ctx, key: $0.0, name: $0.1)
+        }
+        for project in projects { _ = makeSession(ctx, project, id: "s-\(project.key)") }
+        #expect(DashboardQuery.groups(for: projects, now: t0).map(\.project.key) == ["ZZZ", "BBB", "MMM", "AAA"])
+    }
+
+    // 같은 세션의 줄은 카드에 붙은 순서다. 시작·연결 시각이 모두 같으면 카드 번호순(세션 ID순보다 먼저).
+    @Test func rowsOrderByAttachTimeThenCardNumber() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let s = makeSession(ctx, p, id: "s")
+        let first = p.makeCard(in: ctx, title: "first", status: .next, at: t0)
+        let second = p.makeCard(in: ctx, title: "second", status: .next, at: t0)
+        CardLifecycle.attach(second, s, at: t0 + 1, in: ctx)
+        CardLifecycle.attach(first, s, at: t0 + 2, in: ctx)
+        #expect(DashboardQuery.rows(for: p, now: t0 + 2).map(\.card?.title) == ["second", "first"])
+
+        let q = makeProject(ctx, key: "QQQ", name: "다른")
+        let low = q.makeCard(in: ctx, title: "low", status: .next, at: t0)
+        let high = q.makeCard(in: ctx, title: "high", status: .next, at: t0)
+        CardLifecycle.attach(low, makeSession(ctx, q, id: "b"), at: t0, in: ctx)
+        CardLifecycle.attach(high, makeSession(ctx, q, id: "a"), at: t0, in: ctx)
+        #expect(DashboardQuery.rows(for: q, now: t0).map(\.session.id) == ["b", "a"])
+    }
+
+    // 줄을 만들 세션은 이 프로젝트의 끝나지 않은 것만 읽는다.
+    @Test func openSessionsSkipEndedAndOtherProjects() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let other = makeProject(ctx, key: "OTH", name: "다른")
+        _ = makeSession(ctx, p, id: "open")
+        makeSession(ctx, p, id: "ended").endedAt = t0
+        _ = makeSession(ctx, other, id: "elsewhere")
+        try ctx.save()
+        #expect(DashboardQuery.openSessions(of: p).map(\.id) == ["open"])
+    }
+
+    // 저장소에 넣지 않은 프로젝트도 끝나지 않은 세션만 줄이 된다.
+    @Test func projectOutsideAStoreListsOnlyOpenSessions() {
+        let p = Project(key: "TMP", name: "임시", createdAt: t0)
+        let open = Session(id: "open", startedAt: t0, lastSeenAt: t0)
+        let ended = Session(id: "ended", startedAt: t0, lastSeenAt: t0)
+        ended.endedAt = t0
+        p.sessions = [open, ended]
+        #expect(DashboardQuery.openSessions(of: p).map(\.id) == ["open"])
+    }
+
+    // 가장 최근 세션들이 저장 전에 다른 프로젝트로 옮겨 가도 남은 세션의 활동 시각을 찾는다.
+    @Test func latestSessionActivitySkipsSessionsMovingOut() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let other = makeProject(ctx, key: "OTH", name: "다른")
+        let newest = makeSession(ctx, p, id: "newest", lastSeenAt: t0 + 300)
+        let newer = makeSession(ctx, p, id: "newer", lastSeenAt: t0 + 200)
+        _ = makeSession(ctx, p, id: "stays", lastSeenAt: t0 + 100)
+        try ctx.save()
+        newest.project = other
+        newer.project = other
+        #expect(DashboardQuery.latestSessionActivity(of: p) == t0 + 100)
+    }
 }

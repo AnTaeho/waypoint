@@ -107,4 +107,66 @@ import Testing
         #expect(result["sessions"]?.arrayValue?.first?["activity"] == "toolRunning")
         #expect(result["sessions"]?.arrayValue?.first?["activityLabel"]?.stringValue?.contains("Bash") == true)
     }
+
+    // 늦게 온 완료 기록은 그 호출만 닫는다. 같은 이름의 다른 호출은 남고, 기록과 같은 시각에 시작한 호출도 닫힌다.
+    @Test func latePostToolUseClosesOnlyItsOwnCall() throws {
+        let h = try HookHarness()
+        try send(h, "PreToolUse", at: t0, id: "a")
+        try send(h, "PreToolUse", at: t0 + 1, id: "b")
+        try send(h, "PreToolUse", at: t0 + 5, id: "c")
+        let s = try #require(try h.session())
+        try send(h, "PostToolUse", at: t0 + 2, id: "a")
+        #expect(Set(SessionActivityRules.tools(s).keys) == ["b", "c"])
+        try send(h, "PostToolUse", at: t0 + 1, id: "b")
+        #expect(Set(SessionActivityRules.tools(s).keys) == ["c"])
+        #expect(SessionActivityRules.activity(s, now: t0 + 5) == .toolRunning)
+    }
+
+    // 늦게 온 완료 기록이 마지막 도구를 닫아도 승인 대기는 풀리지 않는다.
+    @Test func latePostToolUseKeepsApprovalWaiting() throws {
+        let h = try HookHarness()
+        try send(h, "PreToolUse", at: t0, id: "a")
+        try send(h, "PermissionRequest", at: t0 + 5)
+        let s = try #require(try h.session())
+        try send(h, "PostToolUse", at: t0 + 2, id: "a")
+        #expect(SessionActivityRules.tools(s).isEmpty)
+        #expect(SessionActivityRules.activity(s, now: t0 + 5) == .approval)
+    }
+
+    // 호출 ID가 없는 완료 기록은 도구 이름으로 닫는다(늦게 와도, 제때 와도).
+    @Test func postToolUseWithoutCallIDClosesByToolName() throws {
+        let h = try HookHarness()
+        try send(h, "PreToolUse", at: t0, tool: "Bash")
+        try send(h, "PreToolUse", at: t0 + 1, tool: "Read")
+        try send(h, "PreToolUse", at: t0 + 5, id: "g", tool: "Grep")
+        let s = try #require(try h.session())
+        try send(h, "PostToolUse", at: t0 + 2, tool: "Bash")
+        #expect(SessionActivityRules.tools(s).values.sorted() == ["Grep", "Read"])
+        try send(h, "PostToolUse", at: t0 + 6, tool: "Read")
+        #expect(SessionActivityRules.tools(s).values.sorted() == ["Grep"])
+    }
+
+    // 마지막 활동에서 딱 멈춤 시간만큼 지난 순간은 아직 활동 없음이 아니다.
+    @Test func exactlyAtTimeoutIsNotYetIdle() throws {
+        let h = try HookHarness()
+        try send(h, "UserPromptSubmit", at: t0)
+        let s = try #require(try h.session())
+        #expect(SessionActivityRules.activity(s, now: t0 + SessionRules.defaultStallTimeout) == .working)
+        #expect(SessionActivityRules.activity(s, now: t0 + SessionRules.defaultStallTimeout + 1) == .idle)
+    }
+
+    // 끝난 까닭 칸이 빈 세션은 종료 기록의 이유로 추적 만료를 가린다. 다른 기록의 이유는 보지 않는다.
+    @Test func endedSessionWithoutReasonFieldReadsItFromEndEvent() throws {
+        let h = try HookHarness()
+        let expired = makeSession(h.context, h.project, id: "expired")
+        expired.endedAt = t0 + 10
+        Event.record(.sessionEnd, in: h.context, session: expired, at: t0 + 10, payload: ["reason": .string(SessionSweep.reasonInactive)])
+        Event.record(.cardDetached, in: h.context, session: expired, at: t0 + 20, payload: ["reason": "logout"])
+        #expect(SessionActivityRules.activity(expired, now: t0 + 30) == .expired)
+        let closed = makeSession(h.context, h.project, id: "closed")
+        closed.endedAt = t0 + 10
+        Event.record(.sessionEnd, in: h.context, session: closed, at: t0 + 10, payload: ["reason": "logout"])
+        Event.record(.cardDetached, in: h.context, session: closed, at: t0 + 20, payload: ["reason": .string(SessionSweep.reasonInactive)])
+        #expect(SessionActivityRules.activity(closed, now: t0 + 30) == .ended)
+    }
 }

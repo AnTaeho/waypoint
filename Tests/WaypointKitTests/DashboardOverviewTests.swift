@@ -62,4 +62,38 @@ import Testing
         #expect(result.liveCount == 0 && result.stalledCount == 0 && result.nextCount == 0)
         #expect(result.doneTodayCount == 0 && result.liveProjectCount == 0)
     }
+
+    // 다음 할 일 수는 next 카드만 센다.
+    @Test func nextCountCountsOnlyNextCards() throws {
+        let (container, ctx) = try makeContext(); _ = container
+        let p = makeProject(ctx)
+        for status in [CardStatus.next, .next, .idea] { _ = p.makeCard(in: ctx, title: "card", status: status, at: t0) }
+        #expect(DashboardOverview(projects: [p], now: t0).nextCount == 2)
+    }
+
+    // 오늘 끝낸 수는 지금 이 순간 끝낸 카드까지 넣고, 끝낸 시각이 없는 카드와 되돌린 카드는 뺀다.
+    @Test func doneTodayIncludesNowAndSkipsCardsWithoutDoneTime() throws {
+        let (container, ctx) = try makeContext(); _ = container
+        let p = makeProject(ctx)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+        let midnight = calendar.startOfDay(for: t0)
+        _ = p.makeCard(in: ctx, title: "at midnight", status: .done, at: midnight)
+        _ = p.makeCard(in: ctx, title: "right now", status: .done, at: t0)
+        let untimed = p.makeCard(in: ctx, title: "no done time", status: .done, at: t0)
+        untimed.doneAt = nil
+        let reopened = p.makeCard(in: ctx, title: "reopened", status: .next, at: t0)
+        reopened.doneAt = midnight
+        #expect(DashboardOverview(projects: [p], now: t0, calendar: calendar).doneTodayCount == 2)
+    }
+
+    // 메모가 아예 없는 카드는 이어 할 카드에 넣지 않는다.
+    @Test func resumeCardsSkipCardsWithoutAnyNote() throws {
+        let (container, ctx) = try makeContext(); _ = container
+        let p = makeProject(ctx)
+        let noted = p.makeCard(in: ctx, title: "noted", status: .next, at: t0)
+        noted.nextSessionNote = "continue"
+        _ = p.makeCard(in: ctx, title: "bare", status: .next, at: t0)
+        #expect(DashboardOverview(projects: [p], now: t0).resumeCards.map(\.title) == ["noted"])
+    }
 }

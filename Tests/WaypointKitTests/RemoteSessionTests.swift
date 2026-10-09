@@ -128,6 +128,57 @@ import Testing
         #expect(reads == 2)
     }
 
+    // worktree는 `commondir`가 가리키는 공용 git 폴더의 config에서 원격 주소를 읽는다.
+    @Test func readsOriginThroughWorktreeCommonDir() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-worktree-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let gitDir = root.appendingPathComponent("main/.git/worktrees/wt")
+        let worktree = root.appendingPathComponent("wt")
+        try FileManager.default.createDirectory(at: gitDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: worktree, withIntermediateDirectories: true)
+        try "[remote \"origin\"]\n\turl = git@github.com:me/ledger.git\n"
+            .write(to: root.appendingPathComponent("main/.git/config"), atomically: true, encoding: .utf8)
+        try "../..\n".write(to: gitDir.appendingPathComponent("commondir"), atomically: true, encoding: .utf8)
+        try "gitdir: \(gitDir.path)\n".write(to: worktree.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+        let found = try #require(LocalOrigin.read(rootPath: worktree.path))
+        #expect(found.url == "github.com/me/ledger")
+        #expect(found.checkout == worktree.path)
+    }
+
+    // 어느 구역에도 들지 않은 url 줄은 origin 주소로 읽지 않는다.
+    @Test func urlOutsideOriginSectionIsIgnored() {
+        #expect(LocalOrigin.originURL(config: "\turl = https://github.com/stray/repo\n[core]\n\tbare = false") == nil)
+    }
+
+    // 기억한 원격 주소는 5분이 되는 순간부터 다시 읽는다.
+    @Test func cacheRereadsAtLifetime() {
+        var reads = 0
+        var now = t0
+        let cache = LocalOriginCache(reader: { _ in reads += 1; return nil }, now: { now })
+        _ = cache.origin(for: "/a")
+        now = t0 + LocalOriginCache.lifetime - 1
+        _ = cache.origin(for: "/a")
+        #expect(reads == 1)
+        now = t0 + LocalOriginCache.lifetime
+        _ = cache.origin(for: "/a")
+        #expect(reads == 2)
+    }
+
+    // 원격 작업 트리가 `/`여도 그 아래 경로를 로컬 작업 트리 아래로 옮긴다.
+    @Test func mapsPathsUnderRootSlash() {
+        #expect(RemoteMatcher.map("/src/A.swift", from: "/", to: "/Users/me/dev/ledger") == "/Users/me/dev/ledger/src/A.swift")
+        #expect(RemoteMatcher.map("/home/dev/ledger/src/A.swift", from: "/home/dev/ledger", to: "/Users/me/dev/ledger")
+                == "/Users/me/dev/ledger/src/A.swift")
+    }
+
+    // 같은 원격 주소의 보관된 프로젝트가 다른 작업 트리에 있어도 보관 안 된 쪽에 잇는다.
+    @Test func archivedCloneDoesNotBlockLinking() throws {
+        let h = try Harness(origins: ["/Users/me/dev/ledger": Self.origin, "/Users/me/old/ledger": Self.origin])
+        _ = try h.add("OLD", "/Users/me/old/ledger", archived: true)
+        h.processor.handle(event: "SessionStart", json: Self.payload("SessionStart"), at: t0)
+        #expect(try h.session()?.project === h.project)
+    }
+
     // MARK: - 잇기
 
     /// 원격 작업 트리의 세션이 같은 원격 주소의 등록 프로젝트에 이어진다. 세션 폴더·브랜치는 원격 값, 파일은 작업 트리 기준 상대 경로.
@@ -287,6 +338,24 @@ import Testing
         let rest = Outbox.drain(directory: dir, handle: record)
         #expect(rest.processed == 4 && !rest.more)
         #expect(seen == ["s0", "s1", "s2", "s3", "s4", "late"])
+    }
+
+    /// 남아 있던 처리 중 파일의 밀리초가 지금 시각 이상이어도 새로 온 줄은 그 뒤에 선다.
+    @Test func drainKeepsLeftoverBeforeNewlyClaimedLines() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-order-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let leftover = dir.appendingPathComponent("\(Outbox.processingPrefix)9000000000000-\(UUID().uuidString).jsonl")
+        try (#"{"event":"Stop","receivedAt":1,"payload":{"session_id":"early"}}"# + "\n")
+            .write(to: leftover, atomically: true, encoding: .utf8)
+        _ = try Outbox.append(Data(#"{"event":"Stop","receivedAt":9,"payload":{"session_id":"late"}}"#.utf8), directory: dir)
+        var seen: [String] = []
+        let result = Outbox.drain(directory: dir) { entry in
+            let object = try JSONSerialization.jsonObject(with: entry.payload) as? [String: Any]
+            seen.append(object?["session_id"] as? String ?? "?")
+        }
+        #expect(result.processed == 2 && !result.more && !result.retryPending)
+        #expect(seen == ["early", "late"])
     }
 
     /// 흡수가 남은 동안 outbox 뒤에 세우는 실시간 훅: 블록이 필요 없는 이벤트만, 흡수가 읽는 한 줄 꼴로.

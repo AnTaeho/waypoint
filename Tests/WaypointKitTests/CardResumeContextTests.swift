@@ -127,4 +127,39 @@ import Testing
             #expect(old.openCardSessions.isEmpty)
         }
     }
+
+    // Codex에는 waypoint-tracker, Claude에는 tracker 스킬을 안내한다.
+    @Test func namesTheSkillOfTheChosenTool() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "skill", status: .next, at: t0)
+        let codex = try #require(CardResumeContext.text(card: card, provider: .codex))
+        let claude = try #require(CardResumeContext.text(card: card, provider: .claude))
+        #expect(codex.contains("먼저 waypoint-tracker 스킬을"))
+        #expect(claude.contains("먼저 tracker 스킬을") && !claude.contains("waypoint-tracker"))
+    }
+
+    // 딱 한도만큼이면 「외 0개」나 생략 표시를 붙이지 않는다.
+    @Test func exactLimitsAddNoOverflowLines() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "limits", status: .next, at: t0)
+        card.body = String(repeating: "가", count: 6000)
+        card.criteria = (1...20).map { Criterion("item\($0)") }
+        for index in 1...10 {
+            Event.record(.fileChanged, in: h.context, card: card, at: t0 + Double(index), payload: ["path": .string("file\(index).swift")])
+        }
+        let text = try #require(CardResumeContext.text(card: card, provider: .claude))
+        #expect(text.contains("- item20") && text.contains("조건 20 [미체크] item20") && text.contains("- file1.swift"))
+        #expect(!text.contains("외 0개"))
+        #expect(!text.contains("일부 생략"))
+    }
+
+    // 다른 프로젝트 이름으로 남은 이 카드의 기록은 재개 문맥에 넣지 않는다.
+    @Test func recordsFiledUnderAnotherProjectAreLeftOut() throws {
+        let h = try HookHarness()
+        let card = h.project.makeCard(in: h.context, title: "scoped", status: .next, at: t0)
+        let other = makeProject(h.context, key: "OTH")
+        Event.record(.fileChanged, in: h.context, project: other, card: card, at: t0, payload: ["path": "elsewhere.swift"])
+        Event.record(.fileChanged, in: h.context, card: card, at: t0 + 1, payload: ["path": "here.swift"])
+        #expect(CardResumeContext.recentFiles(card) == ["here.swift"])
+    }
 }

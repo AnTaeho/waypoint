@@ -267,6 +267,20 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
     }
 
+    // 읽지 못해 격리한 줄도 시간 예산에서는 처리한 줄로 센다.
+    @Test func quarantinedLineCountsTowardDeadline() throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let lines = ["깨진 줄"] + (0..<2).map { #"{"event":"Stop","receivedAt":\#($0),"payload":{"session_id":"s\#($0)"}}"# }
+        try (lines.joined(separator: "\n") + "\n").write(
+            to: dir.appendingPathComponent(Outbox.fileName), atomically: true, encoding: .utf8)
+        var handled = 0
+        let paused = Outbox.drain(directory: dir, deadline: .distantPast) { _ in handled += 1 }
+        #expect(paused == Outbox.DrainResult(processed: 0, skipped: 1, retryPending: false, more: true))
+        #expect(handled == 0)
+        #expect(Outbox.drain(directory: dir) { _ in handled += 1 } == Outbox.DrainResult(processed: 2))
+    }
+
     @Test func missingDirectoryIsNoop() {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-none-\(UUID().uuidString)")
         #expect(Outbox.drain(directory: dir) { _ in } == Outbox.DrainResult())

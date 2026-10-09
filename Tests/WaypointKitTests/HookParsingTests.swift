@@ -63,6 +63,58 @@ import Testing
         #expect(HookParsing.commit(bash("git commit -m x", "nothing to commit")) == nil)
     }
 
+    // PID는 32비트 최댓값까지 받고 그보다 크면 버린다.
+    @Test func pidAcceptsUpToInt32Max() {
+        let top = Int(Int32.max)
+        #expect(HookParsing.pid(top) == top)
+        #expect(HookParsing.pid("\(top)") == top)
+        #expect(HookParsing.pid(top + 1) == nil)
+        #expect(HookParsing.pid(2) == 2)
+        #expect(HookParsing.pid(1) == nil)
+    }
+
+    // MultiEdit는 조각마다의 줄 수를 더한다.
+    @Test func multiEditSumsLinesAcrossEdits() {
+        let input = HookInput(event: "PostToolUse", object: [
+            "session_id": "s", "cwd": "/x", "tool_name": "MultiEdit",
+            "tool_input": ["file_path": "/x/f.swift", "edits": [
+                ["old_string": "a\nb", "new_string": "c"],
+                ["old_string": "d", "new_string": "e\nf\ng"],
+            ]],
+        ])!
+        let files = HookParsing.changedFiles(input)
+        #expect(files.map { $0.path } == ["/x/f.swift"])
+        #expect(files.first?.added == 4 && files.first?.removed == 3)
+    }
+
+    // 커밋 결과의 긴 해시와 출력 줄의 짧은 해시가 앞부분만 같아도 그 줄의 메시지를 쓴다.
+    @Test func commitMessageMatchesAbbreviatedHash() {
+        func commit(sha: String, stdout: String) -> (branch: String?, hash: String, message: String)? {
+            HookParsing.commit(HookInput(event: "PostToolUse", object: [
+                "session_id": "s", "cwd": "/x", "tool_name": "Bash", "tool_input": ["command": "git commit -m x"],
+                "tool_response": ["stdout": stdout, "gitOperation": ["commit": ["sha": sha, "branch": "main"]]],
+            ])!)
+        }
+        let long = commit(sha: "abc1234def5678900000", stdout: "[main abc1234] 합계 규칙\n")
+        #expect(long?.hash == "abc1234def5678900000" && long?.message == "합계 규칙")
+        let short = commit(sha: "abc1234", stdout: "[main abc1234def56] 합계 규칙\n")
+        #expect(short?.message == "합계 규칙")
+        #expect(commit(sha: "fff0000", stdout: "[main abc1234] 다른 커밋\n")?.message == "")
+    }
+
+    // `git -c …` 뒤에 commit이 올 때만 커밋으로 본다.
+    @Test func gitConfigFlagAloneIsNotACommit() {
+        func bash(_ command: String) -> HookInput {
+            HookInput(event: "PostToolUse", object: [
+                "session_id": "s", "cwd": "/x", "tool_name": "Bash",
+                "tool_input": ["command": command], "tool_response": ["stdout": "[main abc1234] x\n"],
+            ])!
+        }
+        #expect(HookParsing.commit(bash("git -c user.name=me commit -m x"))?.hash == "abc1234")
+        #expect(HookParsing.commit(bash("git -c color.ui=never log -1")) == nil)
+        #expect(HookParsing.commit(bash("echo 'ready to commit'")) == nil)
+    }
+
     @Test func bashEditDiffFiles() {
         let input = HookInput(event: "PostToolUse", object: [
             "session_id": "s", "cwd": "/x", "tool_name": "Bash",
@@ -98,6 +150,30 @@ import Testing
         ctx.insert(p)
         #expect(ProjectMatcher.relativePath("/Users/me/dev/ledger/Ledger/A.swift", in: p, home: home) == "Ledger/A.swift")
         #expect(ProjectMatcher.relativePath("/tmp/B.swift", in: p, home: home) == "/tmp/B.swift")
+    }
+
+    // 최상위 폴더(`/`)는 그대로 두고, `/`에 등록한 프로젝트는 그 아래 모든 경로를 받는다.
+    @Test func rootFolderIsKeptAsSlash() throws {
+        #expect(ProjectMatcher.normalize("/") == "/")
+        let (_c, ctx) = try makeContext(); _ = _c
+        let whole = Project(key: "ALL", name: "전체", rootPath: "/")
+        ctx.insert(whole)
+        #expect(ProjectMatcher.nearest(for: "/srv/app", in: [whole], home: home) === whole)
+    }
+
+    // 빈 최상위 경로는 어떤 경로도 품지 않는다.
+    @Test func emptyRootContainsNothing() {
+        #expect(!ProjectMatcher.isInside("/Users/me/dev", root: ""))
+        #expect(!ProjectMatcher.isInside("", root: ""))
+    }
+
+    // 파일 시스템 최상위가 git 작업 트리면 `/`를 돌려준다.
+    @Test func checkoutAtFilesystemRootIsSlash() {
+        final class RootRepository: FileManager {
+            override func fileExists(atPath path: String) -> Bool { path == "/.git" }
+        }
+        #expect(GitInfo.checkoutRoot(for: "/notes.txt", fileManager: RootRepository()) == "/")
+        #expect(GitInfo.checkoutRoot(for: "/srv/app/notes.txt", fileManager: RootRepository()) == "/")
     }
 
     @Test func gitBranchFromHead() throws {
