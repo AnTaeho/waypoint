@@ -29,3 +29,23 @@ Shared/Rules/SessionProjectBinding.swift	> → >=	if date > session.lastSeenAt {
 Shared/Rules/SessionSweep.swift	> → >=	guard ended > 0 else { return 0 }	끝낸 세션이 0이면 돌려주는 값은 어느 쪽이든 0이고, 다른 점은 sweep이 바꾼 것 없는 context를 한 번 저장하는 것뿐이다
 Shared/Rules/SessionSweep.swift	<= → <	guard pid > 1, pid <= Int(Int32.max) else { return nil }	PID가 Int32.max인 프로세스는 없어 sysctl이 빈 결과를 주고 다음 guard에서 nil이 된다
 Shared/Rules/SessionSweep.swift	> → >=	guard sysctl(&mib, u_int(mib.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }	size가 0이면 info가 0으로 채워진 채라 다음 guard의 p_pid 비교(pid는 2 이상)에서 nil이 된다
+Shared/Rules/VerificationCommand.swift	false → true	public var background = false	Parsed를 만드는 곳은 parse 하나뿐이고 만들자마자 background를 split 결과로 덮어쓴다
+Shared/Rules/VerificationCommand.swift	false → true	guard let first = verifying.first else { return false }	parse는 검증 조각이 없으면 nil을 돌려줘 verifying이 빈 Parsed는 만들어지지 않는다
+Shared/Rules/VerificationCommand.swift	+ → -	i = skipValue(chars, from: j + 1)	j-1부터 훑어도 이름 글자와 = 는 값의 끝·따옴표·$ 어느 것도 아니라 그대로 지나가 같은 자리에서 끝난다
+Shared/Rules/UnfiledWork.swift	> → >=	$0.lastSeenAt != $1.lastSeenAt ? $0.lastSeenAt > $1.lastSeenAt : $0.id < $1.id	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/UnfiledWork.swift	< → <=	$0.lastSeenAt != $1.lastSeenAt ? $0.lastSeenAt > $1.lastSeenAt : $0.id < $1.id	세션 ID는 세션마다 달라 같은 값끼리 비교하지 않는다
+Shared/Rules/UnfiledWork.swift	> → >=	&& ((session.cardSessions?.contains { $0.attachedAt > past } ?? false)	attachedAt은 실제 연결 시각이라 distantPast와 같은 값이 없다(연결이 하나라도 있는지 묻는 질의다)
+Shared/Rules/UnfiledWork.swift	> → >=	child.cardSessions?.contains { $0.attachedAt > past } ?? false	attachedAt은 실제 연결 시각이라 distantPast와 같은 값이 없다(연결이 하나라도 있는지 묻는 질의다)
+Shared/Rules/UnfiledWork.swift	> → >=	a.value.count != b.value.count ? a.value.count > b.value.count	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/UnfiledWork.swift	> → >=	: a.value.last != b.value.last ? a.value.last > b.value.last : a.key < b.key	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/UnfiledWork.swift	< → <=	: a.value.last != b.value.last ? a.value.last > b.value.last : a.key < b.key	경로는 사전의 키라 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	> → >=	for (key, units) in byFile where units.count > 1 {	단위가 하나뿐인 파일은 안쪽 반복이 자기 자신을 건너뛰어 짝을 만들지 않는다
+Shared/Rules/WorkOverlap.swift	> → >=	$0.value != $1.value ? $0.value > $1.value : $0.key < $1.key	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/WorkOverlap.swift	< → <=	$0.value != $1.value ? $0.value > $1.value : $0.key < $1.key	경로는 사전의 키라 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	< → <=	if $0.unit != $1.unit { return $0.unit < $1.unit }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	> → >=	if $0.files.count != $1.files.count { return $0.files.count > $1.files.count }	바로 앞 조건이 두 값이 다를 때만 이 비교로 오게 해 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	< → <=	return $0.other < $1.other	여기까지 오는 두 짝은 단위가 같고, (단위, 상대)는 사전의 키라 상대가 서로 다르다
+Shared/Rules/WorkOverlap.swift	> → >=	return Array(last.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }	삼항식의 이쪽 가지는 두 값이 다를 때만 계산된다
+Shared/Rules/WorkOverlap.swift	< → <=	return Array(last.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }	경로는 사전의 키라 같은 값끼리 비교하지 않는다
+Shared/Rules/WorkOverlap.swift	&& → ||	&& SessionRules.state(of: unit, now: now, stallTimeout: stallTimeout) != .ended	SessionRules.state가 ended인 것은 endedAt이 있을 때뿐이라 두 조건이 늘 같은 값이다
+Shared/Rules/WorkOverlap.swift	< → <=	.sorted { $0.number < $1.number }	앞에서 같은 카드를 걸러 내고 카드 번호는 프로젝트 안에서 겹치지 않아 같은 값끼리 비교하지 않는다

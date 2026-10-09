@@ -57,6 +57,79 @@ import Testing
         #expect(VerificationCommand.matchesPattern("swift test"))
         #expect(!VerificationCommand.matchesPattern("swiftlint"))
     }
+
+    // 딱 300자인 명령은 줄이지 않는다.
+    @Test func displayKeepsCommandExactlyAtLimit() {
+        let exact = String(repeating: "a", count: VerificationCommand.commandLimit)
+        #expect(VerificationCommand.display(exact) == exact)
+    }
+
+    // 큰따옴표 안의 `\"`는 따옴표를 닫지 않고, 작은따옴표 안의 역슬래시는 그냥 글자다.
+    @Test func displayKeepsQuotedTextAcrossEscapedQuote() {
+        #expect(VerificationCommand.display(#"echo "a\" B=1" X=2"#) == #"echo "a\" B=1" X=…"#)
+        #expect(VerificationCommand.display(#"echo 'a\' X=2"#) == #"echo 'a\' X=…"#)
+    }
+
+    // 따옴표 밖의 `\"`는 따옴표를 열지 않아 뒤의 대입 값을 가린다.
+    @Test func displayDoesNotOpenQuoteOnEscapedQuote() {
+        #expect(VerificationCommand.display(#"echo \" A=1"#) == #"echo \" A=…"#)
+    }
+
+    // 역슬래시로 끝나는 명령도 그대로 보인다(닫히지 않은 따옴표 안이든 밖이든).
+    @Test func displayKeepsTrailingBackslash() {
+        #expect(VerificationCommand.display(#"echo "abc\"#) == #"echo "abc\"#)
+        #expect(VerificationCommand.display(#"swift test \"#) == #"swift test \"#)
+    }
+
+    // 대입 값이 명령 끝까지 이어지면 끝까지 가린다(`$`로 끝나도).
+    @Test func displayMasksValueRunningToTheEnd() {
+        #expect(VerificationCommand.display("FOO=bar") == "FOO=…")
+        #expect(VerificationCommand.display("A=$") == "A=…")
+    }
+
+    // 값 안의 `\"`와 `$(…)`는 한 덩어리로 가리고, `$이름`은 공백에서 끝난다.
+    @Test func displayMasksEscapedQuoteAndCommandSubstitutionAsOneValue() {
+        #expect(VerificationCommand.display(#"KEY="a\" b" swift test"#) == "KEY=… swift test")
+        #expect(VerificationCommand.display("X=$(echo a b) swift test") == "X=… swift test")
+        #expect(VerificationCommand.display("A=$HOME swift test") == "A=… swift test")
+    }
+
+    // 따옴표 안 글만 `_`로 바꾼다. 역슬래시 다음 글자는 따옴표를 여닫지 않는다.
+    @Test func maskingQuotesHidesOnlyQuotedText() {
+        #expect(VerificationCommand.maskingQuotes(#""a" b"#) == #""_" b"#)
+        #expect(VerificationCommand.maskingQuotes(#"a\b "c\"d" e"#) == #"a\b "_\__" e"#)
+        #expect(VerificationCommand.maskingQuotes(#"'a\' b"#) == #"'__' b"#)
+    }
+
+    // 따옴표로 시작하는 명령도 따옴표 안의 `;`에서 나누지 않는다.
+    @Test func leadingQuoteIsNotSplitInside() throws {
+        let parsed = try #require(VerificationCommand.parse(#""a; b" && swift test"#))
+        #expect(parsed.segments == [#""a; b""#, "swift test"])
+        #expect(parsed.connectors == ["&&"])
+    }
+
+    // `\;`는 나누지 않고 그 뒤의 `;`는 나눈다. 작은따옴표 안의 역슬래시는 따옴표를 붙잡지 않는다.
+    @Test func escapedSeparatorDoesNotSplit() {
+        #expect(VerificationCommand.parse(#"echo a\;b; swift test"#)?.segments == [#"echo a\;b"#, "swift test"])
+        #expect(VerificationCommand.parse(#"echo 'a\'; swift test"#)?.segments == [#"echo 'a\'"#, "swift test"])
+    }
+
+    // `&>`·`<&` 리다이렉션의 `&`는 명령을 나누지 않는다.
+    @Test func redirectionAmpersandDoesNotSplit() {
+        #expect(outcome("swift test &> out.log", 0) == .pass)
+        #expect(outcome("swift test 0<&3", 0) == .pass)
+    }
+
+    // 검증 명령 앞의 `|`·`|&`는 결과를 가리지 않는다.
+    @Test func pipeBeforeVerificationStillDecides() {
+        #expect(outcome("echo y | swift test", 0) == .pass)
+        #expect(outcome("echo y |& swift test", 1) == .fail)
+    }
+
+    // `;`로 끝난 명령은 뒤에서 도는 명령이 아니다.
+    @Test func trailingSemicolonIsNotBackground() {
+        #expect(outcome("swift test;", 0) == .pass)
+    }
 }
 
 /// 완료 조건별 근거 상태(SPEC 4장).

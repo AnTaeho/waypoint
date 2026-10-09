@@ -304,6 +304,65 @@ import Testing
         let tile = ProjectSituation.make(for: s.project, now: now, status: nil, unfiledCount: 0)
         #expect(tile.inProgress.map(\.overlapFileCount) == [1, 1])
     }
+
+    // 겹친 파일이 많은 상대가 먼저 나온다(상대 ID가 뒤여도).
+    @Test func otherWithMoreSharedFilesComesFirst() {
+        let pairs = WorkOverlap.pairs([
+            touch("a", "1.swift"), touch("a", "2.swift"), touch("a", "3.swift"),
+            touch("b", "1.swift"),
+            touch("c", "2.swift"), touch("c", "3.swift"),
+        ], live: ["a", "b", "c"], now: now)
+        #expect(pairs.filter { $0.unit == "a" }.map(\.other) == ["c", "b"])
+    }
+
+    // 메인 세션의 최근 파일은 서브에이전트 것까지, 서브에이전트는 자기 것만.
+    @Test func recentFilesCoverUnitForMainAndOwnForSubagent() throws {
+        let s = try Scene(now: now)
+        s.change(s.a, "Main.swift", at: now - 100)
+        s.change(s.sub, "Sub.swift", at: now - 50)
+        s.change(s.b, "Other.swift", at: now - 30)
+        let index = WorkOverlap.index(for: s.project, now: now)
+        #expect(index.recentFiles(of: s.a) == ["Sub.swift", "Main.swift"])
+        #expect(index.recentFiles(of: s.sub) == ["Sub.swift"])
+    }
+
+    // 최근 파일은 딱 60분 전 변경까지 넣고 그보다 오래된 것은 뺀다.
+    @Test func recentFilesKeepWindowEdgeAndDropOlder() throws {
+        let s = try Scene(now: now)
+        s.change(s.b, "Edge.swift", at: now - WorkOverlap.window)
+        s.change(s.b, "Ancient.swift", at: now - WorkOverlap.window - 1)
+        #expect(WorkOverlap.index(for: s.project, now: now).recentFiles(of: s.b) == ["Edge.swift"])
+    }
+
+    // 대시보드 줄마다 겹침을 싣고, 겹침 없는 줄은 싣지 않는다.
+    @Test func byRowKeepsOnlyRowsWithOverlap() throws {
+        let s = try Scene(now: now)
+        s.change(s.a, "A.swift", at: now - 100)
+        s.change(s.b, "A.swift", at: now - 50)
+        let rows = [s.a, s.b, s.sub].map {
+            DashboardRow(card: nil, session: $0, workState: .live, depth: $0 === s.sub ? 1 : 0, attachedAt: nil)
+        }
+        let found = WorkOverlap.byRow(rows, now: now)
+        #expect(Set(found.keys) == [rows[0].id, rows[1].id])
+        #expect(found[rows[0].id]?.map(\.other.id) == [s.b.id])
+        #expect(found[rows[1].id]?.map(\.other.id) == [s.a.id])
+    }
+
+    // 상대 단위의 카드는 끝나지 않은 서브에이전트가 붙은 것까지 보고, 끝난 서브에이전트 것은 뺀다.
+    @Test func otherUnitCardsIncludeLiveSubagentOnly() throws {
+        let s = try Scene(now: now)
+        let endedCard = s.project.makeCard(in: s.context, title: "끝난 쪽", at: t0)
+        let liveCard = s.project.makeCard(in: s.context, title: "도는 쪽", at: t0)
+        let ended = makeSession(s.context, s.project, id: "dddddddd-4444", startedAt: now - 300, lastSeenAt: now - 200,
+                                parent: s.a)
+        CardLifecycle.attach(endedCard, ended, at: now - 250, in: s.context)
+        ended.endedAt = now - 200
+        CardLifecycle.attach(liveCard, s.sub, at: now - 250, in: s.context)
+        s.change(s.a, "A.swift", at: now - 100)
+        s.change(s.b, "A.swift", at: now - 50)
+        let seenByB = WorkOverlap.index(for: s.project, now: now).overlaps(for: s.b)
+        #expect(seenByB.map { $0.cards.map(\.displayID) } == [[liveCard.displayID]])
+    }
 }
 
 /// 실제 저장소 **사본**으로 겹침 색인·시작 블록 시간을 잰다. `WAYPOINT_REAL_STORE_COPY`(사본 `.store` 경로)가 있을 때만 돈다.

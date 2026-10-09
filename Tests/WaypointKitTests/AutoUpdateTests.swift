@@ -136,6 +136,77 @@ private func send(_ h: HookHarness, _ name: String, session: String, at date: Da
         let again = try #require(try send(h, "doc-SessionStart", session: "99999999-2222-4333-8444-555555555555", at: t0 + 3800))
         #expect(!again.contains("정리 안 된 작업"))
     }
+
+    // 파일 목록은 앞의 limit개 세션 것만 읽는다.
+    @Test func filesAreReadOnlyForFirstLimitSessions() throws {
+        let (c, ctx) = try makeContext(); _ = c
+        let p = makeProject(ctx)
+        let now = t0 + 20 * day
+        endedSession(ctx, p, id: "newer", at: now - day, files: ["n.swift"])
+        endedSession(ctx, p, id: "older", at: now - 2 * day, files: ["o.swift"])
+        let items = UnfiledWork.items(for: p, now: now, limit: 1)
+        #expect(items.map(\.session.id) == ["newer", "older"])
+        #expect(items.map(\.files) == [["n.swift"], []])
+    }
+
+    // 서브에이전트만 파일을 바꿨어도 부모 세션이 나온다. 딱 14일 전 변경까지 센다.
+    @Test func subagentChangeAtWindowEdgeListsParent() throws {
+        let (c, ctx) = try makeContext(); _ = c
+        let p = makeProject(ctx)
+        let now = t0 + 30 * day
+        let parent = endedSession(ctx, p, id: "parent", at: now - day, files: [])
+        let sub = makeSession(ctx, p, id: "sub", startedAt: now - 14 * day, parent: parent)
+        Event.record(.fileChanged, in: ctx, project: p, session: sub, at: now - 14 * day, payload: ["path": "s.swift"])
+        let items = UnfiledWork.items(for: p, now: now)
+        #expect(items.map(\.session.id) == ["parent"])
+        #expect(items.first?.files == ["s.swift"])
+        #expect(UnfiledWork.count(for: p, now: now) == 1)
+    }
+
+    // 서브에이전트가 파일을 안 바꿨거나 카드에 남긴 변경뿐이면 부모는 나오지 않는다.
+    @Test func subagentWithoutUnfiledChangeDoesNotListParent() throws {
+        let (c, ctx) = try makeContext(); _ = c
+        let p = makeProject(ctx)
+        let now = t0 + 30 * day
+        let quiet = endedSession(ctx, p, id: "quiet-parent", at: now - day, files: [])
+        _ = makeSession(ctx, p, id: "quiet-sub", startedAt: now - day, parent: quiet)
+        let carded = endedSession(ctx, p, id: "carded-parent", at: now - day, files: [])
+        let sub = makeSession(ctx, p, id: "carded-sub", startedAt: now - day, parent: carded)
+        let card = p.makeCard(in: ctx, title: "카드", status: .next, at: t0)
+        Event.record(.fileChanged, in: ctx, project: p, card: card, session: sub, at: now - day, payload: ["path": "c.swift"])
+        #expect(UnfiledWork.items(for: p, now: now).isEmpty)
+        #expect(UnfiledWork.count(for: p, now: now) == 0)
+    }
+
+    // 세션 없이 남은 파일 변경은 어느 세션의 파일 목록에도 넣지 않는다.
+    @Test func sessionlessChangeIsNotListedUnderAnySession() throws {
+        let (c, ctx) = try makeContext(); _ = c
+        let p = makeProject(ctx)
+        let now = t0 + 20 * day
+        endedSession(ctx, p, id: "only", at: now - day, files: ["mine.swift"])
+        Event.record(.fileChanged, in: ctx, project: p, at: now - day, payload: ["path": "orphan.swift"])
+        #expect(UnfiledWork.items(for: p, now: now).map(\.files) == [["mine.swift"]])
+    }
+
+    // 파일이 딱 세 개면 「외 n」을 붙이지 않는다.
+    @Test func lineWithExactlyThreeFilesHasNoRest() {
+        let session = Session(id: "abcdef123456", startedAt: t0, lastSeenAt: t0)
+        let item = UnfiledWork.Item(session: session, files: ["a.swift", "b.swift", "c.swift"])
+        let now = t0 + 3600
+        #expect(UnfiledWork.line(item, now: now)
+                == "- \(TimeFormat.timestamp(t0, now: now)) · Claude Code · 파일 3개: a.swift, b.swift, c.swift · abcdef12")
+    }
+
+    // 저장소에 넣지 않은 프로젝트는 갖고 있는 기록에서 처리한 세션을 찾는다.
+    @Test func filedSessionIDsWithoutStoreReadsOwnEvents() {
+        let p = Project(key: "TMP", name: "tmp", createdAt: t0)
+        let filed = Event(type: .sessionFiled, at: t0, payload: EventValue.encode(["sessionId": "done"]))
+        let note = Event(type: .note, at: t0, payload: EventValue.encode(["sessionId": "noise"]))
+        filed.project = p
+        note.project = p
+        p.events = [filed, note]
+        #expect(UnfiledWork.filedSessionIDs(for: p) == ["done"])
+    }
 }
 
 @Suite struct ProjectStatusTests {
