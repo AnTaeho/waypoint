@@ -18,7 +18,7 @@ Waypoint로 다른 저장소의 세션을 늘 추적하면서 Waypoint 자체도
 - 인스턴스는 번들 ID로 가른다(`Shared/Instance/AppInstance.swift`, 끝이 `.dev`면 개발용). 번들 ID가 없는 명령행 도구·테스트는 평소용으로 본다.
 - 환경 변수 `WAYPOINT_PORT`·`WAYPOINT_SUPPORT_DIR`가 있으면 기본값보다 먼저다(훅 스크립트와 같은 이름).
 - 앱 메뉴 이름은 두 빌드 모두 「Waypoint」다(`PRODUCT_NAME`을 그대로 둬 빌드 경로가 같다). 가려 보는 것은 메뉴 막대 아이콘과 사이드바 「Dev」.
-- 사용량 게이지는 상태줄 중계가 평소용 폴더에만 `usage.json`을 쓰므로 Dev에서는 비어 있다.
+- 사용량 게이지와 세션 이름 · 컨텍스트 사용률은 상태줄 중계가 평소용 폴더에만 `usage.json`·`session-status.json`을 쓰므로 Dev에서는 비어 있다. 채워 보려면 중계를 Dev 저장 폴더로 직접 돌린다: `WAYPOINT_SUPPORT_DIR=<Dev 저장 폴더> bash integration/statusline/waypoint-statusline-tap.sh cat < 가짜입력.json`.
 
 ## 규칙
 

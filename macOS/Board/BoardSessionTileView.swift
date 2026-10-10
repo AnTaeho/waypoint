@@ -7,6 +7,7 @@ import WaypointKit
 struct BoardSessionTileView: View {
     let tile: BoardSessionTile
     let now: Date
+    @Environment(UsageMonitor.self) private var usage
 
     private var isLive: Bool { tile.workState == .live }
 
@@ -18,6 +19,7 @@ struct BoardSessionTileView: View {
                 HStack(spacing: Theme.Spacing.s) {
                     WorkStateDot(state: tile.workState)
                     sessionLabel
+                    SessionContextText(status: status)
                     Spacer(minLength: Theme.Spacing.s)
                     elapsed
                 }
@@ -26,7 +28,10 @@ struct BoardSessionTileView: View {
                         WorkStateDot(state: tile.workState)
                         elapsed
                     }
-                    sessionLabel
+                    HStack(spacing: Theme.Spacing.s) {
+                        sessionLabel
+                        SessionContextText(status: status)
+                    }
                 }
             }
             if hasDetail { detailBox }
@@ -56,12 +61,16 @@ struct BoardSessionTileView: View {
         }
     }
 
+    private var status: SessionStatusLine { usage.status(for: tile.session) }
+
+    /// 세션 이름(없으면 「sess·7f2a」). 긴 이름은 아래 줄에서 끝을 줄인다.
     private var sessionLabel: some View {
-        Text(SessionFormat.label(for: tile.session))
-            .font(Theme.monoCaption)
+        Text(status.label(fallback: SessionFormat.label(for: tile.session)))
+            .font(status.name == nil ? Theme.monoCaption : Theme.caption)
             .foregroundStyle(Theme.textSecondary)
             .lineLimit(1)
-            .fixedSize()
+            .fixedSize(horizontal: status.name == nil, vertical: false)
+            .help(status.name ?? "")
     }
 
     private var recentFile: String? { SessionFormat.recentFileName(session: tile.session) }

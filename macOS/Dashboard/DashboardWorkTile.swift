@@ -6,6 +6,7 @@ struct DashboardWorkTile: View {
     let row: DashboardRow
     let now: Date
     var overlaps: [WorkOverlap.Overlap] = []
+    @Environment(UsageMonitor.self) private var usage
 
     var body: some View {
         if let card = row.card {
@@ -66,12 +67,16 @@ struct DashboardWorkTile: View {
         }
     }
 
+    /// 「Claude Code 결제 고치기 컨텍스트 62%」. 이름이 없으면 「sess·7f2a」.
     private var session: some View {
-        HStack(spacing: Theme.Spacing.s) {
-            Text(row.session.provider.name).font(Theme.captionLargeMedium)
-            Text(SessionFormat.label(kind: row.session.kind, id: row.session.sourceID,
-                                     agentName: row.session.agentName))
-                .font(Theme.monoSmall).foregroundStyle(Theme.textMuted).lineLimit(1)
+        let status = usage.status(for: row.session)
+        return HStack(spacing: Theme.Spacing.s) {
+            Text(row.session.provider.name).font(Theme.captionLargeMedium).fixedSize()
+            Text(status.label(fallback: SessionFormat.label(kind: row.session.kind, id: row.session.sourceID,
+                                                            agentName: row.session.agentName)))
+                .font(status.name == nil ? Theme.monoSmall : Theme.caption)
+                .foregroundStyle(Theme.textMuted).lineLimit(1).help(status.name ?? "")
+            SessionContextText(status: status)
         }
     }
 

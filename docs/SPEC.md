@@ -538,8 +538,11 @@ Claude·Codex 사용량(한도별 사용 비율과 초기화 시각)을 사이�
 ### Claude
 
 
-- 출처: Claude Code가 상태줄 명령 stdin에 넘기는 JSON의 `rate_limits.five_hour` / `rate_limits.seven_day`(`used_percentage` 0–100, `resets_at` 유닉스 초). 사용자의 상태줄 명령 앞에 중계 스크립트 `integration/statusline/waypoint-statusline-tap.sh`를 끼운다. 스크립트는 입력에 `rate_limits` 객체가 있으면 저장 폴더에 `usage.json`을 원자적으로 쓰고(임시 파일 → `mv`, jq 필요), 같은 입력을 원래 명령에 넘겨 출력을 그대로 내보낸다. jq가 없거나 쓰기에 실패해도 상태줄 출력은 그대로 나온다. 추가 시간은 약 8 ms.
+- 출처: Claude Code가 상태줄 명령 stdin에 넘기는 JSON의 `rate_limits.five_hour` / `rate_limits.seven_day`(`used_percentage` 0–100, `resets_at` 유닉스 초). 사용자의 상태줄 명령 앞에 중계 스크립트 `integration/statusline/waypoint-statusline-tap.sh`를 끼운다. 스크립트는 입력에 `rate_limits` 객체가 있으면 저장 폴더에 `usage.json`을 원자적으로 쓰고(임시 파일 → `mv`, jq 필요), 같은 입력을 원래 명령에 넘겨 출력을 그대로 내보낸다. 같은 jq 호출에서 세션 이름·컨텍스트 사용률도 뽑아 `session-status.json`에 쓴다(아래). jq가 없거나 쓰기에 실패해도 상태줄 출력은 그대로 나온다. 추가 시간은 약 10 ms(jq 한 번 + 파일마다 `mv` 한 번).
 - 파일: `~/Library/Application Support/Waypoint/usage.json`(`WAYPOINT_SUPPORT_DIR`로 바꿀 수 있음), 한 줄 `{"capturedAt":<unix 초>,"rateLimits":<rate_limits 원본>}`.
+- 세션 이름 · 컨텍스트 사용률: 같은 입력의 `session_id`(훅의 `session_id` = `Session.id`), `session_name`(`--name`·`/rename`으로 붙인 이름이나 AI가 만든 제목. 없을 수 있다), `context_window.used_percentage`(0–100, 없거나 null일 수 있다)를 같은 폴더의 `session-status.json`에 쓴다. 한 줄 `{"<session_id>":{"at":<unix 초>,"name":"…","context":62.5},…}`. 스크립트는 자기 세션 항목만 바꾸고(`name`은 앞 200자, 입력에 없는 값은 키도 없다), `at`이 24시간 넘은 항목은 쓸 때 뺀다. `session_id`가 없으면 이 파일은 건드리지 않는다. 임시 파일 → `mv`라 여러 세션이 동시에 써도 깨진 파일은 남지 않고, 겹치면 나중에 쓴 쪽이 남는다(밀린 항목은 그 세션의 다음 갱신 때 다시 들어온다). 비용(`cost.*`)은 남기지 않는다.
+  - 읽기: `Shared/Usage/SessionStatusSnapshot.swift`가 파싱하고 `UsageMonitor`가 `usage.json`과 같이 30초마다 수정 시각을 보고 다시 읽는다. 저장소(SwiftData)에 넣지 않으므로 iCloud로 가지 않고 iPhone에는 보이지 않는다.
+  - 화면(macOS): 상황판 작업 타일·보드의 세션 타일·작업중 카드 안 세션 상자에서 세션 표시 자리(「sess·7f2a」)에 이름을 보인다(이름이 없으면 그대로 「sess·7f2a」, 요청 문장 자리는 그대로). 그 옆에 작은 글 「컨텍스트 62%」(반올림, 0–100), 80% 이상이면 `liveText`로 진하게. `at`이 3시간 넘은 사용률은 숨기고 이름은 계속 쓴다(`SessionStatusSnapshot.contextStaleAfter`). 값이 없으면 자리를 차지하지 않는다. MCP·훅 블록·iPhone의 세션 표시는 「sess·7f2a」 그대로다.
 - 설치: 앱 안 연동 설치기가 한다(아래 「앱 안 연동 설치기」 절). 손으로 할 때는 스크립트를 `~/.claude/waypoint/`에 복사하고 `chmod +x`, `~/.claude/settings.json`의 `statusLine.command`를 `bash ~/.claude/waypoint/waypoint-statusline-tap.sh <원래 명령>`으로 바꾼다(예: `bash ~/.claude/waypoint/waypoint-statusline-tap.sh bash ~/.claude/awesome-statusline.sh`). 원래 명령은 인자 대신 환경 변수 `WAYPOINT_STATUSLINE_NEXT`(셸 명령 문자열)로 줘도 된다. 되돌리려면 `statusLine.command`를 원래 명령으로 돌린다.
 - 앱(macOS): 30초마다 파일 수정 시각을 보고 바뀌었을 때만 다시 읽는다(`UsageMonitor`). 파서는 숫자·숫자 문자열, 초·밀리초·ISO 8601 시각, 한쪽 창만 있는 경우를 받는다.
 
@@ -874,7 +877,7 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 
 - 남기지 않는 것: AI 답변, 대화 전체, 명령 출력(끝 코드·커밋 줄만 뽑고 버린다), 지침 문서가 아닌 파일의 내용(편집 원문·읽은 파일은 저장하지 않는다. outbox에는 앱이 켜질 때까지 요청 600자·편집 크기·앱이 읽는 출력 줄(끝 코드·커밋 줄을 찾는 몫)이 잠시 머문다).
 - 내보내기에 넣지 않는 작동 상태 값(표의 `exported: false`): `Project.lastEventAt`, `Card.statusBeforeActive`, `Session`의 PID·블록 확인(`context*`)·상태 캐시·활동 상태·대기 중인 도구, `GuideDoc.contentHash`.
-- 어디에: 저장소 전부 = iCloud · 이 Mac과 iPhone(iCloud를 끈 실행은 「이 Mac」). 이 Mac에만: 기록 백업(`store-backups`), 지침 파일 백업(`guidance-backups`), 연결 설정 백업(`integration-backups`), 앱이 꺼진 동안 온 기록(`outbox.jsonl`), 연결 상태와 지표(`integration-health.json`·`metrics.json`), 사용량(`usage.json`).
+- 어디에: 저장소 전부 = iCloud · 이 Mac과 iPhone(iCloud를 끈 실행은 「이 Mac」). 이 Mac에만: 기록 백업(`store-backups`), 지침 파일 백업(`guidance-backups`), 연결 설정 백업(`integration-backups`), 앱이 꺼진 동안 온 기록(`outbox.jsonl`), 연결 상태와 지표(`integration-health.json`·`metrics.json`), 사용량(`usage.json`), 세션 이름 · 컨텍스트 사용률(`session-status.json`).
 
 ### 백업·복원
 
