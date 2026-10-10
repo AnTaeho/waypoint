@@ -1,7 +1,7 @@
 import SwiftUI
 import WaypointKit
 
-/// 카드 상세의 인스펙터: 카드 정보, 지금 연결된 세션, 변경된 파일, 연결된 카드, GitHub 이슈·PR, 다음 세션을 위한 메모.
+/// 카드 상세의 인스펙터: 카드 정보, GitHub 이슈·PR, 지금 연결된 세션, 변경된 파일, 연결된 카드, 다음 세션을 위한 메모.
 struct CardInspector: View {
     let card: Card
     /// 연결된 카드를 눌렀을 때 그 카드 상세를 연다.
@@ -24,6 +24,7 @@ struct CardInspector: View {
         let related = relatedCards
         return VStack(alignment: .leading, spacing: Theme.Spacing.xl + 4) {
             CardInfoGrid(card: card, now: now)
+            GitHubSection(card: card)
             if !sessions.isEmpty {
                 InspectorSection("지금 연결된 세션") {
                     ForEach(sessions, id: \.id) { session in
@@ -37,7 +38,6 @@ struct CardInspector: View {
             if !related.isEmpty {
                 InspectorSection("연결된 카드") { RelatedCardsList(items: related, open: open) }
             }
-            GitHubSection(card: card)
             if let note = card.nextSessionNote, !note.isEmpty {
                 NextSessionNote(text: note)
             }
