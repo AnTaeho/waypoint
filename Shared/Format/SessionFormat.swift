@@ -18,6 +18,29 @@ public enum SessionFormat {
         return activity.title
     }
 
+    /// 메뉴 막대 한 줄 「가계부 앱 · 도구 작업 중 2 · 승인 대기 1」. 보일 메인 세션이 없으면 nil.
+    /// 내 답을 기다리는 세션은 「승인 대기」「질문 대기」로 따로 세고 「입력 대기」에는 쉬는 세션만 남는다.
+    public static func menuLine(name: String, sessions: [Session], now: Date) -> String? {
+        var phases: [SessionActivity: Int] = [:]
+        var waiting = SessionWaiting()
+        for session in sessions {
+            guard session.openCardSessions.contains(where: { $0.card != nil })
+                    || SessionRules.hasUnassignedWork(session, now: now) else { continue }
+            switch SessionWaiting.shown(for: session, now: now)?.kind {
+            case .approval: waiting.approval += 1
+            case .question: waiting.question += 1
+            case nil: phases[SessionActivityRules.activity(session, now: now), default: 0] += 1
+            }
+        }
+        func part(_ title: String, _ count: Int) -> String? { count > 0 ? "\(title) \(count)" : nil }
+        func part(_ phase: SessionActivity) -> String? { part(phase.title, phases[phase] ?? 0) }
+        let parts = [part(.toolRunning), part(.working), part(.waiting),
+                     part(SessionWaiting.Kind.approval.title, waiting.approval),
+                     part(SessionWaiting.Kind.question.title, waiting.question),
+                     part(.idle), part(.recent)].compactMap { $0 }
+        return parts.isEmpty ? nil : ([name] + parts).joined(separator: " · ")
+    }
+
     /// main → 「sess·7f2a」, subagent → 「↳ test-writer」(이름이 없으면 main과 같은 꼴).
     public static func label(kind: SessionKind, id: String, agentName: String?) -> String {
         if kind == .subagent, let agentName, !agentName.isEmpty {

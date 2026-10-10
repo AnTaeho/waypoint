@@ -25,9 +25,10 @@ struct ConnectedSessionBox: View {
 
     var body: some View {
         let state = SessionRules.state(of: session, now: now)
+        let waiting = SessionWaiting.shown(for: session, now: now)
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
             HStack(spacing: Theme.Spacing.s) {
-                WorkStateDot(state: state == .live ? .live : .stalled)
+                WorkStateDot(state: state == .live && waiting == nil ? .live : .stalled)
                 Text(session.kind == .subagent ? "\(session.provider.name) · 서브에이전트" : session.provider.name)
                     .font(Theme.bodyStrong)
                 Text(identifier(session))
@@ -35,8 +36,7 @@ struct ConnectedSessionBox: View {
                     .foregroundStyle(Theme.textMuted)
                     .lineLimit(1)
             }
-            Text(SessionFormat.activityText(session, now: now))
-                .font(Theme.captionLarge).foregroundStyle(Theme.textMuted)
+            activity(waiting)
             OverlapBadge(overlaps: overlaps)
             ForEach(subagentLinks) { item in
                 Button { open(item.card) } label: {
@@ -65,6 +65,17 @@ struct ConnectedSessionBox: View {
         .overlay {
             RoundedRectangle(cornerRadius: Theme.Radius.card)
                 .strokeBorder(state == .live ? Theme.live : Theme.border, lineWidth: Theme.Size.liveBorder)
+        }
+    }
+
+    /// 내 답을 기다리면 「승인 대기 3분」을 강조색으로, 아니면 지금 하는 일.
+    @ViewBuilder private func activity(_ waiting: SessionWaiting.Shown?) -> some View {
+        if let waiting {
+            Text(waiting.text(now: now))
+                .font(Theme.captionLargeMedium).foregroundStyle(Theme.Situation.waitingText)
+        } else {
+            Text(SessionFormat.activityText(session, now: now))
+                .font(Theme.captionLarge).foregroundStyle(Theme.textMuted)
         }
     }
 

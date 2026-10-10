@@ -73,7 +73,11 @@ struct PhoneWorkCard: View {
 
     /// 카드 줄은 연결 시각부터, 카드 없는 줄은 마지막 요청 시각부터(없으면 비움).
     @ViewBuilder private var elapsed: some View {
-        if let text = SessionFormat.rowElapsed(
+        if let waiting = row.waiting {
+            Text(waiting.text(now: now))
+                .font(Theme.Phone.elapsed)
+                .foregroundStyle(Theme.Situation.waitingText)
+        } else if let text = SessionFormat.rowElapsed(
             state: row.workState, lastPromptAt: row.session.lastPromptAt, attachedAt: row.attachedAt,
             lastSeenAt: row.session.lastSeenAt, now: now, session: row.session
         ) {

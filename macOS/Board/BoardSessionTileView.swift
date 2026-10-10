@@ -106,9 +106,15 @@ struct BoardSessionTileView: View {
         .background { RoundedRectangle(cornerRadius: Theme.Radius.box).fill(Theme.bg) }
     }
 
-    /// 마지막 요청 시각부터(없으면 비움). 멈춤이면 「멈춤 N분」.
+    /// 마지막 요청 시각부터(없으면 비움). 멈춤이면 「멈춤 N분」. 내 답을 기다리면 「승인 대기 N분」.
     @ViewBuilder private var elapsed: some View {
-        if let text = SessionFormat.rowElapsed(
+        if let waiting = tile.waiting {
+            Text(waiting.text(now: now))
+                .font(Theme.captionLargeMedium)
+                .foregroundStyle(Theme.Situation.waitingText)
+                .lineLimit(1)
+                .fixedSize()
+        } else if let text = SessionFormat.rowElapsed(
             state: tile.workState, lastPromptAt: tile.session.lastPromptAt, attachedAt: nil,
             lastSeenAt: tile.session.lastSeenAt, now: now, session: tile.session
         ) {

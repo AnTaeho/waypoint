@@ -23,7 +23,9 @@ struct MenuBarContent: View {
         let byProject = Dictionary(grouping: openSessions.filter { $0.kind == .main }) {
             $0.project?.persistentModelID
         }
-        let lines = projects.compactMap { line(for: $0, sessions: byProject[$0.persistentModelID] ?? [], now: now) }
+        let lines = projects.compactMap {
+            SessionFormat.menuLine(name: $0.name, sessions: byProject[$0.persistentModelID] ?? [], now: now)
+        }
         if lines.isEmpty {
             Text("진행 중인 작업 없음")
         } else {
@@ -54,19 +56,5 @@ struct MenuBarContent: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
-    }
-
-    /// 「가계부 앱 · 작업 2 · 멈춤 1」. 끝나지 않은 메인 세션이 없으면 nil.
-    private func line(for project: Project, sessions: [Session], now: Date) -> String? {
-        let visible = sessions.filter {
-            $0.openCardSessions.contains { $0.card != nil } || SessionRules.hasUnassignedWork($0, now: now)
-        }
-        let grouped = Dictionary(grouping: visible) { SessionActivityRules.activity($0, now: now) }
-        let phases: [SessionActivity] = [.toolRunning, .working, .waiting, .approval, .idle, .recent]
-        let counts = phases.compactMap { phase -> String? in
-            guard let count = grouped[phase]?.count, count > 0 else { return nil }
-            return "\(phase.title) \(count)"
-        }
-        return counts.isEmpty ? nil : ([project.name] + counts).joined(separator: " · ")
     }
 }

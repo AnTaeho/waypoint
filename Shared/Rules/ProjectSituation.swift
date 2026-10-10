@@ -16,6 +16,8 @@ public struct ProjectSituation: Identifiable {
         public let providers: [AgentProvider]
         /// 붙은 세션이 다른 작업과 같이 만지는 파일 수(TRK-17, 합집합). 없으면 0
         public var overlapFileCount: Int = 0
+        /// 붙은 세션이 내 답(승인·질문)을 기다리면 그 기다림(줄 순서로 처음 것)
+        public var waiting: SessionWaiting.Shown?
 
         public var id: UUID { card.id }
     }
@@ -63,21 +65,23 @@ public struct ProjectSituation: Identifiable {
                                            now: now, stallTimeout: stallTimeout)
 
         var order: [UUID] = []
-        var grouped: [UUID: (card: Card, live: Bool, providers: [AgentProvider], overlaps: Set<String>)] = [:]
+        var grouped: [UUID: (card: Card, live: Bool, providers: [AgentProvider], overlaps: Set<String>,
+                             waiting: SessionWaiting.Shown?)] = [:]
         let overlaps = rows.contains { $0.card != nil }
             ? WorkOverlap.index(for: project, now: now, stallTimeout: stallTimeout) : .empty
         for row in rows {
             guard let card = row.card, keep(card) else { continue }
-            var entry = grouped[card.id] ?? (card, false, [], [])
+            var entry = grouped[card.id] ?? (card, false, [], [], nil)
             if grouped[card.id] == nil { order.append(card.id) }
             entry.live = entry.live || row.workState == .live
+            entry.waiting = entry.waiting ?? row.waiting
             if !entry.providers.contains(row.session.provider) { entry.providers.append(row.session.provider) }
             if !overlaps.isEmpty { entry.overlaps.formUnion(overlaps.overlaps(for: row.session).flatMap(\.files)) }
             grouped[card.id] = entry
         }
         let work = order.compactMap { grouped[$0] }.map {
             WorkItem(card: $0.card, workState: $0.live ? .live : .stalled, providers: $0.providers,
-                     overlapFileCount: $0.overlaps.count)
+                     overlapFileCount: $0.overlaps.count, waiting: $0.waiting)
         }
 
         let columns = BoardQuery.columns(for: project, now: now)

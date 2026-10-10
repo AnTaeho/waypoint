@@ -64,6 +64,9 @@ struct CardStatusBadge: View {
 
     private func label(_ work: CardWorkState) -> String {
         let name = CardFormat.statusName(card.status)
+        if card.status == .active, let waiting = SessionWaiting.shown(for: card, now: now) {
+            return "\(name) · \(waiting.text(now: now))"
+        }
         guard card.status == .active,
               let link = BoardQuery.primaryLink(of: card, now: now),
               let session = link.session,
