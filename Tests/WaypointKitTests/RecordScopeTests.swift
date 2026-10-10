@@ -23,15 +23,21 @@ import Testing
         #expect(entities == Set(RecordScope.attributes.map(\.entity)))
     }
 
-    @Test func onlyPromptTextExpires() {
-        let expiring = RecordScope.Item.allCases.filter { $0.retention != .kept }
-        #expect(expiring == [.prompts])
-        #expect(RecordScope.Item.prompts.retention.label == "\(PromptRetention.days)일")
-        // 30일 뒤 비우는 것: 요청 이벤트의 text, 세션의 lastPrompt(`PromptRetention.apply`)
-        #expect(RecordScope.item(type: .note, kind: PromptRetention.promptKind, key: "text") == .prompts)
+    @Test func retentionFollowsRecordRetention() {
+        let days = RecordRetention.days
+        let labels = Dictionary(uniqueKeysWithValues: RecordScope.Item.allCases.map { ($0, $0.retention.label) })
+        #expect(RecordScope.Item.allCases.filter { $0.retention == .kept } == [.projects, .cards, .github, .notes])
+        #expect(labels[.projects] == "계속")
+        #expect(labels[.prompts] == "\(days)일" && labels[.files] == "\(days)일")
+        for item in [RecordScope.Item.sessions, .commits, .checks] {
+            #expect(labels[item] == "\(days)일 · 카드에 이어진 것은 계속")
+        }
+        #expect(labels[.guides] == "\(days)일 · 최신 판은 계속")
+        // 요청 이벤트는 통째로 지우고, 끝난 세션의 lastPrompt는 비운다. 마지막 요청 시각은 세션에 남는다.
+        for key in ["kind", "promptId", "text"] {
+            #expect(RecordScope.item(type: .note, kind: PromptRetention.promptKind, key: key) == .prompts)
+        }
         #expect(RecordScope.attributes.first { $0.entity == "Session" && $0.name == "lastPrompt" }?.owner == .item(.prompts))
-        // 비우지 않는 것: 요청 시각·promptId
-        #expect(RecordScope.item(type: .note, kind: PromptRetention.promptKind, key: "promptId") == .sessions)
         #expect(RecordScope.attributes.first { $0.entity == "Session" && $0.name == "lastPromptAt" }?.owner == .item(.sessions))
     }
 

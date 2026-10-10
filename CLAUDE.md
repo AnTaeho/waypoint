@@ -26,7 +26,7 @@ Claude Code 세션을 프로젝트 단위로 추적하는 개인용 macOS + iOS 
 - 평소용 Waypoint(`/Applications/Waypoint.app`, 47821)는 개발 중 건드리지 않는다. 종료·교체·실측 금지, 새 버전은 `scripts/install-local.sh`로만.
 - 개발·실측은 Waypoint Dev(Debug 빌드, 47822, `Waypoint-Dev/` 저장소)와 `scripts/dev-probe-setup.sh`로 이은 실측 폴더에서만. 절차는 `docs/DEVELOPMENT.md`.
 - 스냅샷 테스트·훅 재생 도구 같은 추가 검증 인프라는 만들지 않는다. 일꾼 지시서마다 아래 화면 규칙을 넣는다.
-- 예외: 뮤테이션 테스트(`scripts/mutation-test.py`, 2026-10-08 사용자 요청). `Shared/Rules`·`Shared/Hooks`의 판정 로직을 고치면 그 파일로 돌려 살아남은 변형을 테스트로 메운다. 변형을 죽이려고 본 코드나 기존 테스트를 고치지 않는다. 절차는 `docs/DEVELOPMENT.md`.
+- 예외: 뮤테이션 테스트(`scripts/mutation-test.py`, 2026-10-08 사용자 요청). 사용자가 요청할 때만 돌린다(2026-10-10 사용자: 「이제 뮤테이션은 돌리지마」) — 일꾼 지시서에도 넣지 않는다. 변형을 죽이려고 본 코드나 기존 테스트를 고치지 않는다. 절차는 `docs/DEVELOPMENT.md`.
 - 검증 중 사용자 화면을 가져가지 않는다: 앱 활성화·마우스·키보드 자동 조작(cliclick, System Events)·전체 화면 캡처 금지. 앱은 `open -g -j`로 뒤에서 띄우고 DB·HTTP·로그로 확인한다. 사람이 봐야 하는 것은 작업 끝에 확인 목록으로 넘긴다. 실제 `claude -p` 실측은 마일스톤 완료 조건 확인 때만.
 
 ## 스택

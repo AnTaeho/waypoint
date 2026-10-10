@@ -393,19 +393,19 @@ private func send(_ h: HookHarness, _ name: String, session: String, at date: Da
         #expect(ldg.statusAgeDays == nil)
         #expect(coverage.rows.last?.statusAgeDays == 3)
         #expect(coverage.diagnosticLines() == [
-            "자동 갱신 (최근 30일)",
+            "자동 갱신 (최근 14일)",
             "전체: 카드 연결 3/4 · 메모 갱신 2/3",
             "LDG: 카드 연결 3/4 · 메모 갱신 2/3 · 상황 없음",
             "QRS: 카드 연결 0/0 · 메모 갱신 0/0 · 상황 3일 전",
         ])
         #expect(coverage.json["projects"]?.arrayValue?.first?["linkRate"]?.numberValue == 0.75)
         #expect(coverage.json["projects"]?.arrayValue?.last?["noteRate"] == .null)
-        #expect(coverage.panelLines() == ["최근 30일 · 카드 연결 3/4 · 메모 갱신 2/3", "지금 상황 · 7일 안에 갱신 1/2 프로젝트"])
+        #expect(coverage.panelLines() == ["최근 14일 · 카드 연결 3/4 · 메모 갱신 2/3", "지금 상황 · 7일 안에 갱신 1/2 프로젝트"])
         let diagnostic = IntegrationDiagnostic.text(
             version: "1", environment: "Dev", operatingSystem: "macOS", port: 47822, serverReady: true,
             history: IntegrationHistory(), installations: [:], queue: IntegrationQueue(),
             checkedAt: now, coverage: coverage)
-        #expect(diagnostic.contains("\n자동 갱신 (최근 30일)\n전체: 카드 연결 3/4 · 메모 갱신 2/3\nLDG: "))
+        #expect(diagnostic.contains("\n자동 갱신 (최근 14일)\n전체: 카드 연결 3/4 · 메모 갱신 2/3\nLDG: "))
         #expect(!diagnostic.contains("가계부 앱"))
     }
 
@@ -421,7 +421,7 @@ private func send(_ h: HookHarness, _ name: String, session: String, at date: Da
     }
 
     @Test func emptyDiagnostic() {
-        #expect(TrackingCoverage(rows: []).diagnosticLines() == ["자동 갱신 (최근 30일)", "기록 없음"])
+        #expect(TrackingCoverage(rows: []).diagnosticLines() == ["자동 갱신 (최근 14일)", "기록 없음"])
         #expect(TrackingCoverage(rows: []).panelLines().isEmpty)
     }
 }

@@ -56,6 +56,9 @@ final class AppServices {
     @ObservationIgnored private var importObserver: NSObjectProtocol?
     /// 마지막 요청 문장 정리 시각(`PromptRetention`). 시작 직후 첫 점검에서 한 번 돌고 하루마다 다시 돈다.
     @ObservationIgnored private var lastPromptRetention: Date?
+    /// 마지막 기록 정리 시각(`RecordRetention`). 다 못 지웠으면 곧 이어서 지운다.
+    @ObservationIgnored private var lastRecordRetention: Date?
+    @ObservationIgnored private var recordRetentionUnfinished = false
     /// 원격 replay 처리가 메인 큐에 예약돼 있다(`AppServices+Replay`)
     @ObservationIgnored var replayScheduled = false
     /// 원격 replay 줄이 남았다. 이 동안 블록이 필요 없는 실시간 훅은 그 뒤에 세운다(TRK-53).
@@ -246,8 +249,13 @@ final class AppServices {
         var cleared = 0
         if PromptRetention.isDue(lastRun: lastPromptRetention, now: now) {
             lastPromptRetention = now
-            let result = PromptRetention.apply(in: context, now: now)
-            cleared = result.events + result.sessions
+            cleared = PromptRetention.apply(in: context, now: now)
+        }
+        if RecordRetention.isDue(lastRun: lastRecordRetention, unfinished: recordRetentionUnfinished, now: now) {
+            lastRecordRetention = now
+            let result = RecordRetention.apply(in: context, now: now)
+            recordRetentionUnfinished = result.unfinished
+            cleared += result.total
         }
         let open = FetchDescriptor<Session>(predicate: #Predicate<Session> { $0.endedAt == nil })
         let sessions = (try? context.fetch(open)) ?? []

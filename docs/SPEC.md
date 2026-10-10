@@ -81,7 +81,7 @@ Session      id(= Claude Code session_id), project, kind: main | subagent,
              parent: Session?, agentName?, cwd, gitBranch?,
              startedAt, lastSeenAt, endedAt?, claudePid:Int?,   // claudePid: 메인 세션만, 훅 스크립트가 보낸 Claude Code PID
              contextProjectKey:String?,          // 대화에 Waypoint 블록을 준 프로젝트 키(5장 「늦은 주입」)
-             lastPrompt:String?,                 // 메인 세션의 마지막 사용자 요청 문장, 300자까지(5장 「마지막 요청 문장」). 끝난 세션은 30일 뒤 비운다
+             lastPrompt:String?,                 // 메인 세션의 마지막 사용자 요청 문장, 300자까지(5장 「마지막 요청 문장」). 끝난 세션은 14일 뒤 비운다
              lastPromptAt:Date?,                 // lastPrompt를 적은 훅 시각, lastPrompt와 함께 바뀐다
              state: live | stalled | ended          // 파생값, 저장 캐시
 
@@ -191,7 +191,20 @@ Mac 카드 상세에서 재개 문맥을 준비하고 Claude Code·Codex를 선�
 
 활동 탭의 사용자 요청은 `note`의 `kind: user.prompt`로 최대 300자씩 저장한다. 이 버전 이전의 전체 요청 이력은 복원하지 않는다. 재수신된 동일 시각·내용의 요청은 중복 저장하지 않으며, 지연 수신은 세션 시작·프로젝트 연결 이력과 당시 카드 연결 구간으로 소속을 결정한다.
 
-요청 문장 보관(`PromptRetention`): 요청 이벤트의 문장(`text`)은 기록 시각부터 30일이 지나면 지운다. 이벤트·시각·세션·카드 연결은 남고 활동 탭·카드 기록에는 문장 없이 「요청」으로 보인다(세션 묶음 제목은 세션 이름). 끝난 세션의 `lastPrompt`도 `lastPromptAt`(없으면 `endedAt`)부터 30일이 지나면 비운다(`lastPromptAt`은 남긴다). 끝나지 않은 세션의 `lastPrompt`는 두지만, 그 세션의 요청 이벤트 문장은 같은 30일 규칙으로 지운다. Mac 앱이 시작 직후 점검에서 한 번, 그 뒤 하루에 한 번 정리하고 지운 결과는 iCloud로 iPhone에 간다. 30일이 지난 요청이 outbox로 늦게 들어오면 다음 정리 때까지 문장이 남는다.
+기록 보관(`RecordRetention`, 기준 14일 `RecordRetention.days`): 기록 시각(`at`)부터 14일이 지난(딱 14일 포함) 기록 가운데 카드에 이어지지 않은 것을 지운다. 카드에 남긴 글과 완료 근거는 날짜와 상관없이 남는다.
+
+| 종류 | 14일 뒤 | 조건 |
+|---|---|---|
+| `file.changed` | 지움 | 카드에 이어진 것은 카드마다 가장 최근 것 하나만 남긴다(같은 시각이 여럿이어도 하나, 근거가 「변경 후 미검증」인지 가리는 시각, `CardEvidence`) |
+| 요청(`note`, `kind: user.prompt`) | 지움 | 이벤트째 지운다. 카드에 이어졌어도 지운다 |
+| `guide.synced`·`card.attached`·`card.detached` | 지움 | 세션 연결 시각은 `CardSession`에 남는다 |
+| `check`·`commit` | 카드 없는 것만 지움 | 카드에 이어진 것은 남긴다(완료 근거) |
+| `project.status` | 지움 | 프로젝트마다 가장 최근 것 하나는 남긴다 |
+| 세션 | 카드에 이어지지 않은 것만 지움 | 메인 세션과 그 서브에이전트를 한 묶음으로 본다. 묶음 모두가 끝났고, 끝난 시각과 마지막 활동이 모두 14일을 넘겼고, 누구도 카드 연결(`CardSession`)이나 카드에 이어진 기록(`work_file`로 넘긴 것 포함)이 없을 때 묶음째 지운다. 세션의 `session.start`·`session.end`·`session.filed`·프로젝트 옮김 메모·요청도 같이 지운다 |
+| `GuideVersion` | 지움 | 문서마다 가장 최근 판 하나는 남긴다 |
+| `card.created`·`card.status`·요청이 아닌 `note`·`github.*`·카드·프로젝트·`CardSession`·끝나지 않은 세션 | 남김 | — |
+
+끝난 세션의 `lastPrompt`는 `lastPromptAt`(없으면 `endedAt`)부터 14일이 지나면 비운다(`PromptRetention`, `lastPromptAt`은 남긴다). 끝나지 않은 세션의 `lastPrompt`는 둔다. Mac 앱이 시작 직후 점검에서 한 번, 그 뒤 하루에 한 번 정리한다. 한 번에 500건까지 지우고(`batchLimit`) 남으면 1분이 지난 다음 점검 때 이어서 지운다. 지운 결과는 iCloud로 iPhone에 간다. 파일 크기는 바로 줄지 않는다(VACUUM 안 함). 14일이 지난 기록이 outbox로 늦게 들어오면 다음 정리 때 지운다. 지워진 세션과 같은 `session_id`의 훅이 다시 오면 새 세션으로 만든다. 「자동 갱신 지표」의 기간도 같은 14일이다.
 
 설정 예시: `integration/hooks/settings.example.json`. 사용자 전역(`~/.claude/settings.json`)에 둔다.
 **이벤트 이름과 입력 JSON 필드는 구현 시점의 Claude Code hooks 문서로 반드시 확인할 것.**
@@ -288,7 +301,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 - 메인 세션의 `UserPromptSubmit`에서 `prompt`(실측·문서. 옛 문서 예시 이름 `prompt_text`도 받는다)를 앞뒤 공백 정리 후 앞 300자(문자 단위)만 `Session.lastPrompt`에 적고, 그 훅 시각을 `lastPromptAt`에 적는다(`HookParsing.userPrompt`). 세션당 마지막 하나만 둔다. 두 값은 아래 규칙대로 늘 함께 바뀐다.
 - 넣지 않는 것: 서브에이전트 안의 훅(`agent_id` 있음), 빈 문장, `<`로 시작하는 자동 메시지(서브에이전트 완료 알림 `<agent-message from=…>` — 실측 `real-UserPromptSubmit-agent-message.json`, 백그라운드 작업 알림 `<task-notification>` 등). 그때는 앞 값을 그대로 둔다. 슬래시 명령(`/tracker init`)은 그대로 적는다. 붙여 넣은 글(`<pasted_content id=…>…</pasted_content>`, 전사에서 확인)은 태그만 벗겨 적는다.
 - outbox로 흡수한 훅도 적는다. 단 비어 있지 않으면 이 훅이 지금까지 받은 것 중 가장 새것(`at >= lastSeenAt`)일 때만 바꿔서, 늦게 들어온 옛 프롬프트가 더 최근 값을 덮지 않는다(`claudePid`와 같은 규칙).
-- 보관: 끝난 세션은 `lastPromptAt`(없으면 `endedAt`)부터 30일이 지나면 `lastPrompt`를 비운다(위 「요청 문장 보관」).
+- 보관: 끝난 세션은 `lastPromptAt`(없으면 `endedAt`)부터 14일이 지나면 `lastPrompt`를 비운다(위 「기록 보관」).
 - 화면(`SessionFormat.promptPreview`): 줄바꿈·연속 공백을 공백 하나로 모아 한 줄로 만들고 앞 160자(넘으면 「…」). 대시보드·iPhone은 흐리게 한 줄(iPhone 두 줄), 보드 타일은 두 줄. Mac은 마우스를 올리면 저장된 문장 전체.
 
 등록되지 않은 폴더의 세션은 무시한다 (단, `SessionStart` 컨텍스트로 "이 폴더는 Waypoint에 없음, `/tracker init` 가능"을 한 줄 알린다). 하위 폴더에서 연 세션은 가장 가까운 상위 `rootPath` 프로젝트로 매칭한다.
@@ -638,12 +651,12 @@ macOS 앱만. Sparkle 2.10.0(SwiftPM, 사용자 승인)의 표준 화면(`SPUSta
 
 ### 자동 갱신 지표 (2026-10-02, TRK-62·63)
 
-에이전트가 일하면서 기록을 얼마나 갱신했는지 본다(`TrackingCoverage`, 순수 함수, 저장하지 않고 요청 때 저장소에서 계산). 최근 30일, 보관 안 된 프로젝트별, 세션은 마지막 활동(`lastSeenAt`)이 기간 안인 끝난 메인 세션.
+에이전트가 일하면서 기록을 얼마나 갱신했는지 본다(`TrackingCoverage`, 순수 함수, 저장하지 않고 요청 때 저장소에서 계산). 최근 14일(`RecordRetention.days`, 그보다 오래된 파일 변경·카드 없는 세션은 지워져 셀 수 없다), 보관 안 된 프로젝트별, 세션은 마지막 활동(`lastSeenAt`)이 기간 안인 끝난 메인 세션.
 
 - 카드 연결: 파일을 바꾼 세션(세션·서브에이전트의 `file.changed`가 있음) 중 카드에 붙은 적이 있거나 `work_file`로 처리한(연결·넘김 모두) 세션 / 파일을 바꾼 세션.
 - 메모 갱신: 카드에 붙은 세션 중 세션 동안(`startedAt`…`endedAt`) 붙었던 카드에 `card_note` 메모·다음 세션 메모·완료 조건 체크 변경(`note` kind 없음·`handoff`·`criterion`)이나 에이전트 검증 보고(`check` `source: agent`)가 하나라도 남은 세션 / 카드에 붙은 세션. `card_note`·`card_handoff`는 세션을 적지 않으므로 시각으로 가른다.
 - 상황 경과: 마지막 `project.status` 이후 일수(없으면 없음).
-- 내보내기: 숫자와 프로젝트 키만. 「진단 정보 복사」 끝에 `자동 갱신 (최근 30일)` · `전체: 카드 연결 a/b · 메모 갱신 c/d` · 프로젝트마다 `<키>: 카드 연결 … · 메모 갱신 … · 상황 N일 전|오늘|없음`. `/integration/status`의 `coverage` `{windowDays, projects: [{key, workedSessions, linkedSessions, linkRate, attachedSessions, notedSessions, noteRate, statusAgeDays}]}`(분모 0이면 비율 `null`). 연동 상태 패널 「기록 지표」에 `최근 30일 · 카드 연결 a/b · 메모 갱신 c/d`, `지금 상황 · 7일 안에 갱신 x/y 프로젝트`(패널을 열 때 한 번 계산).
+- 내보내기: 숫자와 프로젝트 키만. 「진단 정보 복사」 끝에 `자동 갱신 (최근 14일)` · `전체: 카드 연결 a/b · 메모 갱신 c/d` · 프로젝트마다 `<키>: 카드 연결 … · 메모 갱신 … · 상황 N일 전|오늘|없음`. `/integration/status`의 `coverage` `{windowDays, projects: [{key, workedSessions, linkedSessions, linkRate, attachedSessions, notedSessions, noteRate, statusAgeDays}]}`(분모 0이면 비율 `null`). 연동 상태 패널 「기록 지표」에 `최근 14일 · 카드 연결 a/b · 메모 갱신 c/d`, `지금 상황 · 7일 안에 갱신 x/y 프로젝트`(패널을 열 때 한 번 계산).
 - 시작 블록 지연(2026-10-02, Dev Debug, `SessionStart` 새 세션 → 끝을 반복해 왕복을 잼, 확인 머리 있음): 같은 저장소에서 main과 이 변경을 30회씩 번갈아 6번 — 중앙값 평균 218 → 233 ms, p95 평균 386 → 407 ms(회차마다 134–289 ms로 흔들려 차이는 잡음 안), 최대 595 ms(main)·528 ms(이 변경). 블록 생성만 따로 재면(저장소 사본, swift test Debug) 끝난 메인 세션 732개·카드 없는 파일 변경 1,279건인 Dev 실측 저장소에서 정리 안 된 작업 17 ms, 실제 저장소 백업 사본(메인 세션 9개)에서 0.5–1 ms. 첫 구현(세션마다 관계를 따라감)은 Dev 저장소에서 280 ms라 질의를 바꿨다.
 
 ### 이벤트 기반 작업 상태 (2026-09-30)
@@ -848,14 +861,14 @@ Claude·Codex가 읽는 지침과 기억 파일을 찾아 목록으로 보인다
 | 항목 | 남기는 것(코드에서 확인) | 보관 |
 |---|---|---|
 | 프로젝트 | 이름·키·폴더 경로·개요·스택·다음 카드 번호·만든/보관 시각 | 계속 |
-| 카드 | 제목·본문·종류·상태·완료 조건(글·체크)·만든 쪽·부모·시각, 세션 연결(붙은/떨어진 시각), 이벤트 `card.*`, 조건 체크 메모(`kind: criterion`), 정리 안 된 작업 처리(`session.filed`: 세션 ID·결과·카드 ID·파일·옮긴 수) | 계속 |
-| 세션 | 도구·종류·에이전트 이름·작업 폴더·브랜치·시작/마지막/끝 시각·끝난 까닭·요청 시각(`lastPromptAt`, 요청 이벤트의 시각·`promptId`), `session.*`, 프로젝트 옮김(`kind: project.bound`) | 계속 |
-| 요청 문장 | `Session.lastPrompt`와 요청 이벤트의 `text`, 앞 300자 | 30일(`PromptRetention`) |
-| 바뀐 파일 | `file.changed`: 프로젝트 기준 경로·저장소 폴더(`checkout`)·늘고 준 줄 수 | 계속 |
-| 커밋 | `commit`: 해시·메시지 첫 줄(커밋 출력의 `[branch hash] 메시지` 줄) | 계속 |
-| 검증 기록 | `check`: 명령(값 가림, 300자)·결과·출처·조건 번호와 글·짧은 설명(200자)·끝 코드 | 계속 |
-| 메모 | 카드 메모(`card_note`)·다음 세션 메모(`nextSessionNote`, `kind: handoff`)·프로젝트 지금 상황(`project.status`: 글·도구·세션 ID). 에이전트가 도구로 남긴 글도 여기 든다 | 계속 |
-| 지침 문서 | 등록한 문서의 **내용 전체**·저장 안 한 편집·충돌 때 읽은 로컬 내용·이전 판(`GuideVersion`) | 계속 |
+| 카드 | 제목·본문·종류·상태·완료 조건(글·체크)·만든 쪽·부모·시각, 세션 연결(붙은/떨어진 시각), 이벤트 `card.created`·`card.status`(`card.attached`·`card.detached`는 14일), 조건 체크 메모(`kind: criterion`), 정리 안 된 작업 처리(`session.filed`: 세션 ID·결과·카드 ID·파일·옮긴 수) | 계속 |
+| 세션 | 도구·종류·에이전트 이름·작업 폴더·브랜치·시작/마지막/끝 시각·끝난 까닭·마지막 요청 시각(`lastPromptAt`), `session.*`, 프로젝트 옮김(`kind: project.bound`) | 14일 · 카드에 이어진 것은 계속 |
+| 요청 문장 | `Session.lastPrompt`와 요청 이벤트(`text` 앞 300자·시각·`promptId`) | 14일(`RecordRetention`·`PromptRetention`) |
+| 바뀐 파일 | `file.changed`: 프로젝트 기준 경로·저장소 폴더(`checkout`)·늘고 준 줄 수 | 14일(카드마다 가장 최근 것 하나는 계속) |
+| 커밋 | `commit`: 해시·메시지 첫 줄(커밋 출력의 `[branch hash] 메시지` 줄) | 14일 · 카드에 이어진 것은 계속 |
+| 검증 기록 | `check`: 명령(값 가림, 300자)·결과·출처·조건 번호와 글·짧은 설명(200자)·끝 코드 | 14일 · 카드에 이어진 것은 계속 |
+| 메모 | 카드 메모(`card_note`)·다음 세션 메모(`nextSessionNote`, `kind: handoff`)·프로젝트 지금 상황(`project.status`: 글·도구·세션 ID). 에이전트가 도구로 남긴 글도 여기 든다 | 계속(지난 `project.status`는 14일) |
+| 지침 문서 | 등록한 문서의 **내용 전체**·저장 안 한 편집·충돌 때 읽은 로컬 내용·이전 판(`GuideVersion`) | 14일 · 최신 판은 계속 |
 
 - 남기지 않는 것: AI 답변, 대화 전체, 명령 출력(끝 코드·커밋 줄만 뽑고 버린다), 지침 문서가 아닌 파일의 내용(편집 원문·읽은 파일은 저장하지 않는다. outbox에는 앱이 켜질 때까지 요청 600자·편집 크기·앱이 읽는 출력 줄(끝 코드·커밋 줄을 찾는 몫)이 잠시 머문다).
 - 내보내기에 넣지 않는 작동 상태 값(표의 `exported: false`): `Project.lastEventAt`, `Card.statusBeforeActive`, `Session`의 PID·블록 확인(`context*`)·상태 캐시·활동 상태·대기 중인 도구, `GuideDoc.contentHash`.
@@ -899,7 +912,7 @@ UTF-8 JSON, 들여쓰고 키 정렬, 날짜는 ISO 8601 UTC 밀리초(`2026-10-0
 
 `-WaypointSettingsTab records`(설정 창을 기록 탭으로 연다), `-WaypointSettingsScroll bottom`, `-WaypointExport <경로>`(+`-WaypointExportProject <키>`), `-WaypointBackupNow 1`, `-WaypointRestore <백업 폴더 이름|latest>`, `-WaypointWipe 1`. 버튼과 같은 `RecordsModel` 길을 대화상자 없이 탄다. 절차는 docs/DEVELOPMENT.md 「기록 탭 실측」.
 
-검증: `RecordScopeTests`(스키마 속성 ↔ 표 양방향, 생성 지점 payload 키, `Event.record(` 호출 목록, 30일 항목은 요청 문장뿐, 지침 문서 내용·판), `RecordExportTests`(전체 왕복 디코드·재인코드 바이트 같음, 프로젝트 하나에 다른 프로젝트 것 없음, 작동 상태 값 제외, 임시 저장소 지우기 → 7종 0개 + `beforeDelete` 백업이 먼저 생기고 지우기 전 내용을 담음, 백업 실패·진행 중이면 안 지움, 지금 백업과 daily의 겹침, 문구, 다시 시작 명령의 환경 변수 전달과 따옴표).
+검증: `RecordScopeTests`(스키마 속성 ↔ 표 양방향, 생성 지점 payload 키, `Event.record(` 호출 목록, 보관 기간 표시, 지침 문서 내용·판), `RecordExportTests`(전체 왕복 디코드·재인코드 바이트 같음, 프로젝트 하나에 다른 프로젝트 것 없음, 작동 상태 값 제외, 임시 저장소 지우기 → 7종 0개 + `beforeDelete` 백업이 먼저 생기고 지우기 전 내용을 담음, 백업 실패·진행 중이면 안 지움, 지금 백업과 daily의 겹침, 문구, 다시 시작 명령의 환경 변수 전달과 따옴표).
 
 ## GitHub 이슈·PR 열기 (2026-10-08, TRK-68)
 
