@@ -60,3 +60,15 @@ Shared/Hooks/ProjectMatcher.swift	false → true	var isDir: ObjCBool = false	fil
 Shared/Hooks/ProjectMatcher.swift	true → false	var dir = URL(fileURLWithPath: cwd, isDirectory: true).standardizedFileURL	표준화한 경로와 그 뒤의 `.git` 붙이기·상위 폴더 올라가기가 폴더 표시와 상관없이 같다
 Shared/Hooks/RemoteReplay.swift	true → false	support.appendingPathComponent(folderName, isDirectory: true)	경로 문자열은 같고 쓰는 쪽은 `.path`와 appendingPathComponent만 쓴다
 Shared/Hooks/SessionContext.swift	< → <=	let next = cards.filter { $0.status == .next }.sorted { $0.number < $1.number }.prefix(nextLimit)	카드 번호가 프로젝트 안에서 겹치지 않아 같은 번호끼리 비교하지 않는다
+Shared/Rules/RecordRetention.swift	false → true	func expires(_ event: Event, kind: String? = nil, isLatest: Bool = false) -> Bool {	isLatest를 넘기지 않는 호출은 카드 없는 이벤트와 isLatest를 보지 않는 종류뿐이라 결과가 같다
+Shared/Rules/RecordRetention.swift	> → >=	for step in steps where run.left > 0 { step(&run) }	남은 수가 0이면 각 단계의 반복이 같은 조건으로 하나도 지우지 않는다. 다른 점은 질의를 더 하는 것뿐이다
+Shared/Rules/RecordRetention.swift	&& → ||	for event in fetch(#Predicate { $0.typeRaw == raw && $0.at <= cutoff && $0.card != nil }, limit: left + cards) {	질의가 더 넓게 읽어도 expires가 종류·시각·카드를 다시 가려 지우는 것이 같다
+Shared/Rules/RecordRetention.swift	== → !=	session.parent == nil && session.endedAt != nil && session.lastSeenAt <= cutoff	세션을 읽기 전에 미리 빼는 질의라, 빼는 집합이 달라져도 같은 조건을 facts가 다시 봐서 지우는 세션이 같다
+Shared/Rules/RecordRetention.swift	!= → ==	session.parent == nil && session.endedAt != nil && session.lastSeenAt <= cutoff	세션을 읽기 전에 미리 빼는 질의라, 빼는 집합이 달라져도 같은 조건을 facts가 다시 봐서 지우는 세션이 같다
+Shared/Rules/RecordRetention.swift	<= → <	session.parent == nil && session.endedAt != nil && session.lastSeenAt <= cutoff	세션을 읽기 전에 미리 빼는 질의라, 빼는 집합이 달라져도 같은 조건을 facts가 다시 봐서 지우는 세션이 같다
+Shared/Rules/RecordRetention.swift	> → >=	&& ((session.cardSessions?.contains { $0.attachedAt > past } ?? false)	attachedAt이 distantPast인 연결은 없다
+Shared/Rules/RecordRetention.swift	false → true	&& ((session.cardSessions?.contains { $0.attachedAt > past } ?? false)	세션을 읽기 전에 미리 빼는 질의라, 빼는 집합이 달라져도 같은 조건을 facts가 다시 봐서 지우는 세션이 같다
+Shared/Rules/RecordRetention.swift	|| → &&	|| (session.children?.contains { child in	세션을 읽기 전에 미리 빼는 질의라, 빼는 집합이 달라져도 같은 조건을 facts가 다시 봐서 지우는 세션이 같다
+Shared/Rules/RecordRetention.swift	> → >=	child.cardSessions?.contains { $0.attachedAt > past } ?? false	attachedAt이 distantPast인 연결은 없다
+Shared/Rules/RecordRetention.swift	false → true	child.cardSessions?.contains { $0.attachedAt > past } ?? false	세션을 읽기 전에 미리 빼는 질의라, 빼는 집합이 달라져도 같은 조건을 facts가 다시 봐서 지우는 세션이 같다
+Shared/Rules/RecordRetention.swift	false → true	} ?? false))	세션을 읽기 전에 미리 빼는 질의라, 빼는 집합이 달라져도 같은 조건을 facts가 다시 봐서 지우는 세션이 같다

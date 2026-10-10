@@ -39,7 +39,7 @@ extension AppServices {
         ]).serializedString)
     }
 
-    /// 자동 갱신 지표(최근 30일). 요청 때 저장소에서 계산한다.
+    /// 자동 갱신 지표(최근 14일). 요청 때 저장소에서 계산한다.
     func trackingCoverage(now: Date = Date()) -> TrackingCoverage {
         TrackingCoverage.compute(in: container.mainContext, now: now)
     }

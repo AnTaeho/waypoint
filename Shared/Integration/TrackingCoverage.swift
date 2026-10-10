@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// 자동 갱신 지표(TRK-62·63): 최근 30일 프로젝트별로 에이전트가 기록을 얼마나 갱신했는가. 요청 때 저장소에서 계산하고 저장하지 않는다.
+/// 자동 갱신 지표(TRK-62·63): 최근 14일 프로젝트별로 에이전트가 기록을 얼마나 갱신했는가. 요청 때 저장소에서 계산하고 저장하지 않는다.
 /// 숫자와 프로젝트 키만 담는다(프로젝트 이름·경로·세션 ID·대화 없음).
 ///
 /// - 연결률: 바뀐 파일이 있는 끝난 메인 세션 중 카드에 붙었거나(서브에이전트 포함, 지금 풀렸어도) `work_file`로 정리한(연결·넘김) 비율.
@@ -10,7 +10,7 @@ import SwiftData
 /// - 상황 경과: 마지막 `project.status` 이후 일수(없으면 nil).
 /// 세션은 마지막 활동(`lastSeenAt`)이 기간 안인 것을 센다.
 public struct TrackingCoverage: Equatable, Sendable {
-    public static let windowDays = 30
+    public static let windowDays = RecordRetention.days
 
     public struct Row: Equatable, Sendable {
         public let key: String

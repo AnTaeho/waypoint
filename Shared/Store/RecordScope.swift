@@ -15,13 +15,16 @@ public enum RecordScope {
     public enum Retention: Hashable, Sendable {
         /// 지울 때까지
         case kept
-        /// 이 일수가 지나면 문장만 비운다
+        /// 이 일수가 지나면 지운다
         case days(Int)
+        /// 이 일수가 지나면 지우되 일부는 남긴다(`kept`: 남는 것)
+        case daysExcept(Int, kept: String)
 
         public var label: String {
             switch self {
             case .kept: "계속"
             case .days(let days): "\(days)일"
+            case .daysExcept(let days, let kept): "\(days)일 · \(kept) 계속"
             }
         }
     }
@@ -49,8 +52,8 @@ public enum RecordScope {
             switch self {
             case .projects: "이름 · 키 · 폴더 위치 · 소개 · 쓰는 기술"
             case .cards: "제목 · 본문 · 완료 조건 · 상태가 바뀐 때"
-            case .sessions: "시작·끝 시각 · 작업 폴더 · 브랜치 · 요청을 보낸 시각"
-            case .prompts: "내가 보낸 요청 앞 \(HookParsing.lastPromptLimit)자"
+            case .sessions: "시작·끝 시각 · 작업 폴더 · 브랜치"
+            case .prompts: "내가 보낸 요청 앞 \(HookParsing.lastPromptLimit)자 · 보낸 시각"
             case .files: "경로 · 저장소 폴더 · 늘고 준 줄 수"
             case .commits: "해시 · 메시지 첫 줄"
             case .checks: "명령 · 결과 · 짧은 설명"
@@ -61,7 +64,13 @@ public enum RecordScope {
         }
 
         public var retention: Retention {
-            self == .prompts ? .days(PromptRetention.days) : .kept
+            let days = RecordRetention.days
+            return switch self {
+            case .projects, .cards, .github, .notes: .kept
+            case .prompts, .files: .days(days)
+            case .sessions, .commits, .checks: .daysExcept(days, kept: "카드에 이어진 것은")
+            case .guides: .daysExcept(days, kept: "최신 판은")
+            }
         }
     }
 
@@ -152,8 +161,7 @@ public enum RecordScope {
         + keys(.note, .notes, ["text"])
         + keys(.note, kind: MCPTools.handoffNoteKind, .notes, ["kind", "text"])
         + keys(.note, kind: CardEditing.criterionNoteKind, .cards, ["kind", "text", "isDone"])
-        + keys(.note, kind: PromptRetention.promptKind, .sessions, ["kind", "promptId"])
-        + keys(.note, kind: PromptRetention.promptKind, .prompts, ["text"])
+        + keys(.note, kind: PromptRetention.promptKind, .prompts, ["kind", "promptId", "text"])
         + keys(.note, kind: SessionProjectBinding.boundNoteKind, .sessions, ["kind", "from", "to"])
 
     /// payload 키 하나의 항목. 표에 없으면 nil.
