@@ -46,6 +46,7 @@ assert r[\"five_hour\"]=={\"used_percentage\":42.5,\"resets_at\":1790000000}
 assert r[\"seven_day\"][\"used_percentage\"]==18
 " "$WAYPOINT_SUPPORT_DIR/usage.json"'
 check "임시 파일 안 남음" '[ -z "$(ls -A "$WAYPOINT_SUPPORT_DIR" | grep -v "^usage.json$")" ]'
+check "session_id 없음: session-status.json 안 씀" '[ ! -e "$WAYPOINT_SUPPORT_DIR/session-status.json" ]'
 
 # 4) rate_limits 없음: 파일 안 씀, 출력 동일
 rm -f "$WAYPOINT_SUPPORT_DIR/usage.json"
@@ -81,10 +82,82 @@ check "jq 없음: 파일 안 씀" '[ ! -e "$WAYPOINT_SUPPORT_DIR/usage.json" ]'
 out="$(bash "$TAP" < "$WITH")"; code=$?
 check "다음 명령 없음: 출력 없음, exit 0" '[ -z "$out" ] && [ $code -eq 0 ]'
 
-# 9) 추가 시간: 가짜 명령 직접 vs 중계 경유, 각 30회
+# 9) 세션 이름·컨텍스트 사용률(session-status.json)
+STATUS="$WAYPOINT_SUPPORT_DIR/session-status.json"
+rm -rf "$WAYPOINT_SUPPORT_DIR"
+py() { python3 -c "import json,sys,time
+d=json.load(open(sys.argv[1])); now=time.time()
+$1" "$STATUS"; }
+NAMED="$TMP/named.json"
+cat > "$NAMED" <<'JSON'
+{"session_id":"aaaa-1111","session_name":"결제 \"영수증\" 고치기","context_window":{"used_percentage":62.5},"rate_limits":{"five_hour":{"used_percentage":42.5,"resets_at":1790000000}}}
+JSON
+bash "$FAKE" < "$NAMED" > "$TMP/direct9.out"; direct_code=$?
+bash "$TAP" bash "$FAKE" < "$NAMED" > "$TMP/tap9.out" 2> "$TMP/tap9.err"; tap_code=$?
+check "세션: 출력 바이트·종료 코드 동일, stderr 없음" 'cmp -s "$TMP/direct9.out" "$TMP/tap9.out" && [ $direct_code -eq $tap_code ] && [ ! -s "$TMP/tap9.err" ]'
+check "세션: 항목 생김" 'py "
+e=d[\"aaaa-1111\"]
+assert e[\"name\"]==\"결제 \\\"영수증\\\" 고치기\" and e[\"context\"]==62.5
+assert isinstance(e[\"at\"], int) and abs(e[\"at\"]-now) < 60
+assert len(d)==1"'
+check "세션: usage.json도 그대로 씀" 'python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+assert d[\"rateLimits\"]=={\"five_hour\":{\"used_percentage\":42.5,\"resets_at\":1790000000}} and set(d)=={\"capturedAt\",\"rateLimits\"}
+" "$WAYPOINT_SUPPORT_DIR/usage.json"'
+
+# 다른 세션(이름 없음·rate_limits 없음)이 더해지고 앞 항목은 남는다
+rm -f "$WAYPOINT_SUPPORT_DIR/usage.json"
+printf '{"session_id":"bbbb-2222","context_window":{"used_percentage":91}}' | bash "$TAP" bash "$FAKE" > /dev/null
+check "세션: 이름 없는 입력은 name 키 없음, 앞 항목 유지" 'py "
+assert d[\"bbbb-2222\"][\"context\"]==91 and \"name\" not in d[\"bbbb-2222\"]
+assert d[\"aaaa-1111\"][\"name\"].startswith(\"결제\") and len(d)==2"'
+check "세션: rate_limits 없으면 usage.json 안 씀" '[ ! -e "$WAYPOINT_SUPPORT_DIR/usage.json" ]'
+
+# 같은 세션이 다시 오면 자기 항목만 바뀐다
+printf '{"session_id":"aaaa-1111","session_name":"새 이름","context_window":{"used_percentage":70}}' | bash "$TAP" > /dev/null
+check "세션: 자기 항목만 갱신" 'py "
+assert d[\"aaaa-1111\"][\"name\"]==\"새 이름\" and d[\"aaaa-1111\"][\"context\"]==70
+assert d[\"bbbb-2222\"][\"context\"]==91 and len(d)==2"'
+
+# 사용률이 null·없음, 이름이 빈 글이면 키가 없다
+printf '{"session_id":"cccc-3333","session_name":"","context_window":{"used_percentage":null}}' | bash "$TAP" > /dev/null
+printf '{"session_id":"dddd-4444","context_window":"x"}' | bash "$TAP" > /dev/null
+check "세션: null 사용률·빈 이름은 at만" 'py "
+assert set(d[\"cccc-3333\"])=={\"at\"} and set(d[\"dddd-4444\"])=={\"at\"} and len(d)==4"'
+
+# session_id가 없거나 글자가 아니면 그대로 둔다
+cp "$STATUS" "$TMP/status-before.json"
+printf '{"session_name":"이름만","context_window":{"used_percentage":5}}' | bash "$TAP" bash "$FAKE" > "$TMP/tap10.out" 2> "$TMP/tap10.err"
+printf '{"session_id":7,"session_name":"숫자 ID"}' | bash "$TAP" > /dev/null
+printf '{"session_id":""}' | bash "$TAP" > /dev/null
+check "세션: session_id 없는 입력은 파일 그대로, stderr 없음" 'cmp -s "$STATUS" "$TMP/status-before.json" && [ ! -s "$TMP/tap10.err" ]'
+
+# 24시간 넘은 항목·모양이 다른 항목은 다음에 쓸 때 빠진다
+now=$(python3 -c 'import time;print(int(time.time()))')
+printf '{"old":{"at":%s,"name":"어제"},"recent":{"at":%s,"context":12},"bad":"x","noat":{"name":"시각 없음"}}\n' "$((now - 90000))" "$((now - 80000))" > "$STATUS"
+printf '{"session_id":"eeee-5555","session_name":"오늘"}' | bash "$TAP" > /dev/null
+check "세션: 24시간 넘은 항목 제거" 'py "
+assert set(d)=={\"recent\",\"eeee-5555\"}, set(d)
+assert d[\"recent\"]=={\"at\":$((now - 80000)),\"context\":12} and d[\"eeee-5555\"][\"name\"]==\"오늘\""'
+
+# 깨진 기존 파일은 새로 쓴다
+printf 'not json' > "$STATUS"
+printf '{"session_id":"ffff-6666","session_name":"다시"}' | bash "$TAP" > /dev/null 2> "$TMP/tap11.err"
+check "세션: 깨진 기존 파일은 새로 씀" 'py "assert set(d)=={\"ffff-6666\"}" && [ ! -s "$TMP/tap11.err" ]'
+check "세션: 임시 파일 안 남음" '[ -z "$(ls -A "$WAYPOINT_SUPPORT_DIR" | grep -v "^session-status.json$")" ]'
+
+# 쓰기 불가 폴더·jq 없음: 출력 동일, 파일 안 씀
+WAYPOINT_SUPPORT_DIR="$TMP/locked" bash "$TAP" bash "$FAKE" < "$NAMED" > "$TMP/tap12.out" 2> "$TMP/tap12.err"
+check "세션: 쓰기 불가 폴더도 출력 동일" 'cmp -s "$TMP/direct9.out" "$TMP/tap12.out" && [ ! -s "$TMP/tap12.err" ] && [ -z "$(ls -A "$TMP/locked")" ]'
+rm -f "$STATUS"
+PATH="$TMP/nojq" "$TMP/nojq/bash" "$TAP" "$TMP/nojq/bash" "$FAKE" < "$NAMED" > "$TMP/tap13.out" 2> "$TMP/tap13.err"
+check "세션: jq 없음도 출력 동일, 파일 안 씀" 'cmp -s "$TMP/direct9.out" "$TMP/tap13.out" && [ ! -s "$TMP/tap13.err" ] && [ ! -e "$STATUS" ]'
+
+# 10) 추가 시간: 가짜 명령 직접 vs 중계 경유, 각 30회
 t() { python3 -c 'import time;print(time.perf_counter())'; }
-start=$(t); for i in $(seq 30); do bash "$FAKE" < "$WITH" >/dev/null; done; mid=$(t)
-for i in $(seq 30); do bash "$TAP" bash "$FAKE" < "$WITH" >/dev/null; done; end=$(t)
+start=$(t); for i in $(seq 30); do bash "$FAKE" < "$NAMED" >/dev/null; done; mid=$(t)
+for i in $(seq 30); do bash "$TAP" bash "$FAKE" < "$NAMED" >/dev/null; done; end=$(t)
 python3 -c "import sys;a,b,c=map(float,sys.argv[1:]);d=(b-a)/30*1000;v=(c-b)/30*1000;print('info 직접 %.1f ms, 중계 %.1f ms, 추가 %.1f ms (30회 평균)'%(d,v,v-d))" "$start" "$mid" "$end"
 
 [ $FAIL -eq 0 ] && echo "모두 통과" || echo "실패 있음"

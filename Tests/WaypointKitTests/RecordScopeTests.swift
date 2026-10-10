@@ -199,6 +199,7 @@ import Testing
         #expect(paths.contains(GuidanceBackupStore.folderName))
         #expect(paths.contains(IntegrationInstallContext.backupFolderName))
         #expect(paths.contains(UsageSnapshot.fileName))
+        #expect(paths.contains(SessionStatusSnapshot.fileName))
         #expect(!paths.contains("Waypoint.store"))  // 저장소는 「어디에」의 첫 줄
     }
 

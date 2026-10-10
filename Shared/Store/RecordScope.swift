@@ -187,6 +187,8 @@ public enum RecordScope {
         LocalItem(title: "앱이 꺼진 동안 온 기록", detail: "앱이 켜지면 옮기고 비움", paths: [Outbox.fileName]),
         LocalItem(title: "연결 상태와 지표", detail: "시각과 숫자", paths: ["integration-health.json", "metrics.json"]),
         LocalItem(title: "사용량", detail: "마지막으로 읽은 한도", paths: [UsageSnapshot.fileName]),
+        LocalItem(title: "세션 이름 · 컨텍스트 사용률", detail: "최근 하루 동안 연 세션",
+                  paths: [SessionStatusSnapshot.fileName]),
         LocalItem(title: "이슈 · PR 상태", detail: "마지막으로 확인한 상태", paths: [GitHubStatusCache.fileName]),
     ]
 

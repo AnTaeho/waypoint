@@ -77,6 +77,11 @@ public enum DashboardQuery {
         now: Date,
         stallTimeout: TimeInterval = SessionRules.defaultStallTimeout
     ) -> [DashboardRow] {
+        rows(of: openSessions(of: project), now: now, stallTimeout: stallTimeout)
+    }
+
+    /// 이미 읽은 끝나지 않은 세션으로 줄을 만든다(상황판이 같은 세션을 두 번 읽지 않게).
+    static func rows(of sessions: [Session], now: Date, stallTimeout: TimeInterval) -> [DashboardRow] {
         struct Pending {
             let card: Card?
             let session: Session
@@ -86,7 +91,7 @@ public enum DashboardQuery {
 
         var pending: [Pending] = []
         // 끝난 세션은 줄이 되지 않는다. 상태 판정(끝난 까닭을 이벤트에서 찾을 수 있다)을 건너뛴다.
-        for session in openSessions(of: project) {
+        for session in sessions {
             let state = SessionRules.state(of: session, now: now, stallTimeout: stallTimeout)
             let work: CardWorkState
             switch state {

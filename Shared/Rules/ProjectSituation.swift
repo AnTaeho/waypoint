@@ -24,6 +24,8 @@ public struct ProjectSituation: Identifiable {
     /// 카드 없는 세션까지 포함해 live 줄이 하나라도 있는가(타일 머리의 작업중 점)
     public let isLive: Bool
     public let lastActivityAt: Date?
+    /// 나를 기다리는 세션 수(승인·질문). 카드 없는 세션·서브에이전트도 센다
+    public let waiting: SessionWaiting
     /// 최신 지금 상황. 없으면 nil
     public let status: ProjectStatus.Entry?
     /// 진행 중 카드, 대시보드 줄 순서(세션 시작순) 최대 `itemLimit`
@@ -41,7 +43,7 @@ public struct ProjectSituation: Identifiable {
     public var id: UUID { project.id }
 
     /// 타일 하나를 만든다.
-    /// - provider: 주면 진행 중 카드는 그 도구 세션이 붙은 것만, 작업중 점도 그 도구 줄로만 본다.
+    /// - provider: 주면 진행 중 카드는 그 도구 세션이 붙은 것만, 작업중 점·기다림 수도 그 도구 세션으로만 본다.
     /// - cardFilter: 주면 카드 섹션(진행 중·다음·최근 끝냄)에 맞는 카드만 남긴다(검색). 개수도 거른 뒤 센다.
     public static func make(
         for project: Project,
@@ -53,8 +55,12 @@ public struct ProjectSituation: Identifiable {
         stallTimeout: TimeInterval = SessionRules.defaultStallTimeout
     ) -> ProjectSituation {
         let keep = cardFilter ?? { _ in true }
-        let rows = DashboardQuery.rows(for: project, now: now, stallTimeout: stallTimeout)
+        // 끝나지 않은 세션은 한 번만 읽어 줄과 기다림 수에 같이 쓴다.
+        let sessions = DashboardQuery.openSessions(of: project)
+        let rows = DashboardQuery.rows(of: sessions, now: now, stallTimeout: stallTimeout)
             .filter { provider == nil || $0.session.provider == provider }
+        let waiting = SessionWaiting.count(sessions.filter { provider == nil || $0.provider == provider },
+                                           now: now, stallTimeout: stallTimeout)
 
         var order: [UUID] = []
         var grouped: [UUID: (card: Card, live: Bool, providers: [AgentProvider], overlaps: Set<String>)] = [:]
@@ -83,6 +89,7 @@ public struct ProjectSituation: Identifiable {
             project: project,
             isLive: rows.contains { $0.workState == .live },
             lastActivityAt: DashboardQuery.lastActivityAt(of: project),
+            waiting: waiting,
             status: status,
             inProgress: Array(work.prefix(itemLimit)),
             inProgressCount: work.count,
@@ -95,7 +102,7 @@ public struct ProjectSituation: Identifiable {
         )
     }
 
-    /// 상황판 전체. 보관된 프로젝트는 뺀다. 순서: 작업 중인 프로젝트 먼저, 그다음 마지막 활동 최근순, 같으면 키순.
+    /// 상황판 전체. 보관된 프로젝트는 뺀다. 순서는 `comesBefore`.
     /// 지금 상황은 한 번에 읽고(`ProjectStatus.latestEntries`), 정리 안 된 작업은 개수만 센다(`UnfiledWork.count`).
     /// - cardFilter: 프로젝트마다 카드 거르기(nil이면 그 프로젝트는 거르지 않는다).
     public static func board(
@@ -115,11 +122,15 @@ public struct ProjectSituation: Identifiable {
                 provider: provider, cardFilter: cardFilter(project), stallTimeout: stallTimeout
             )
         }
-        return tiles.sorted { a, b in
-            if a.isLive != b.isLive { return a.isLive }
-            let at = a.lastActivityAt ?? .distantPast, bt = b.lastActivityAt ?? .distantPast
-            if at != bt { return at > bt }
-            return a.project.key < b.project.key
-        }
+        return tiles.sorted(by: comesBefore)
+    }
+
+    /// 타일 순서: 나를 기다리는 프로젝트, 작업 중인 프로젝트, 마지막 활동 최근순, 키순.
+    static func comesBefore(_ a: ProjectSituation, _ b: ProjectSituation) -> Bool {
+        if a.waiting.isEmpty != b.waiting.isEmpty { return !a.waiting.isEmpty }
+        if a.isLive != b.isLive { return a.isLive }
+        let at = a.lastActivityAt ?? .distantPast, bt = b.lastActivityAt ?? .distantPast
+        if at != bt { return at > bt }
+        return a.project.key < b.project.key
     }
 }

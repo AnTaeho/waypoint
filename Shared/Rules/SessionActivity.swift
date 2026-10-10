@@ -19,6 +19,8 @@ public enum SessionActivity: String, Sendable {
 
 public enum SessionActivityRules {
     private struct PendingTool: Codable { let name: String; let at: Date }
+    /// 사용자에게 묻는 도구. 떠 있는 동안 세션은 답을 기다린다.
+    public static let questionTools: Set<String> = ["AskUserQuestion", "request_user_input"]
     public static let hookEvents: Set<String> = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest", "Stop", "Interrupt", "SessionEnd", "SubagentStart", "SubagentStop"]
     public static func tools(_ session: Session) -> [String: String] {
         trackedTools(session).mapValues(\.name)
@@ -71,7 +73,7 @@ public enum SessionActivityRules {
         case "UserPromptSubmit": pending = [:]; session.activityRaw = SessionActivity.working.rawValue
         case "PreToolUse":
             pending[key] = PendingTool(name: String((input.toolName ?? "도구").prefix(120)), at: at)
-            session.activityRaw = (["AskUserQuestion", "request_user_input"].contains(input.toolName ?? "") ? SessionActivity.waiting : .toolRunning).rawValue
+            session.activityRaw = (questionTools.contains(input.toolName ?? "") ? SessionActivity.waiting : .toolRunning).rawValue
         case "PermissionRequest": session.activityRaw = SessionActivity.approval.rawValue
         case "PostToolUse", "PostToolUseFailure":
             if input.toolUseID != nil { pending[key] = nil }

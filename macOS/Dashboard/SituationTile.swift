@@ -12,6 +12,7 @@ struct SituationTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Situation.sectionGap) {
             head
+            if !tile.waiting.isEmpty { SituationWaitingRow(waiting: tile.waiting) }
             if let status = tile.status {
                 SituationStatus(entry: status, now: now)
             }

@@ -22,5 +22,9 @@ extension Theme {
         static let rowTitle = Theme.body
         static let statusText = Theme.body
         static let meta = Theme.caption
+        /// 나를 기다리는 세션 알약(작업중 강조색)
+        static let waitingFont = Theme.captionLargeMedium
+        static let waitingText = Theme.liveText
+        static let waitingBackground = Theme.liveBg
     }
 }

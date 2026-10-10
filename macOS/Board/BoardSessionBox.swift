@@ -1,17 +1,21 @@
 import SwiftUI
 import WaypointKit
 
-/// 작업중 카드 안의 세션 정보: 세션 종류·ID(서브에이전트는 이름), 최근 파일.
+/// 작업중 카드 안의 세션 정보: 세션 종류·이름(없으면 ID, 서브에이전트는 에이전트 이름)·컨텍스트 사용률, 최근 파일.
 struct BoardSessionBox: View {
     let card: Card
     let session: Session
+    @Environment(UsageMonitor.self) private var usage
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             // 좁은 칸에서 종류가 두 줄로 꺾이거나 ID가 잘리지 않게, 한 줄에 안 들어가면 ID를 아래 줄로 내린다.
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: Theme.Spacing.xs + 2) { kindLabel; idText }
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) { kindLabel; idText }
+                HStack(spacing: Theme.Spacing.xs + 2) { kindLabel; idText; SessionContextText(status: status) }
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    kindLabel
+                    HStack(spacing: Theme.Spacing.xs + 2) { idText; SessionContextText(status: status) }
+                }
             }
             .foregroundStyle(Theme.text)
             if let file = SessionFormat.recentFileName(card: card, session: session) {
@@ -39,12 +43,15 @@ struct BoardSessionBox: View {
         .fixedSize()
     }
 
+    private var status: SessionStatusLine { usage.status(for: session) }
+
     private var idText: some View {
-        Text(identifier)
-            .font(Theme.monoCaption)
+        Text(status.label(fallback: identifier))
+            .font(status.name == nil ? Theme.monoCaption : Theme.caption)
             .foregroundStyle(Theme.textMuted)
             .lineLimit(1)
-            .truncationMode(.middle)
+            .truncationMode(status.name == nil ? .middle : .tail)
+            .help(status.name ?? "")
     }
 
     private var isSubagent: Bool { session.kind == .subagent }

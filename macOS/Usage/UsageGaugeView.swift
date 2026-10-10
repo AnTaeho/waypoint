@@ -107,3 +107,19 @@ private struct UsageBar: View {
             .frame(height: Theme.Size.gaugeBar)
     }
 }
+
+/// 세션 줄의 「컨텍스트 62%」. 높으면 진하게, 값이 없으면 아무것도 그리지 않는다.
+struct SessionContextText: View {
+    let status: SessionStatusLine
+
+    var body: some View {
+        if let text = status.contextText {
+            Text(text)
+                .font(status.isContextHigh ? Theme.tableHeader : Theme.caption)
+                .foregroundStyle(status.isContextHigh ? Theme.liveText : Theme.textMuted)
+                .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+}
