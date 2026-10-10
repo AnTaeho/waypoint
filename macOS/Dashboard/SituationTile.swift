@@ -18,7 +18,7 @@ struct SituationTile: View {
             }
             if !tile.inProgress.isEmpty {
                 SituationSection(title: "진행 중", count: tile.inProgressCount) {
-                    ForEach(tile.inProgress) { item in SituationWorkRow(item: item) }
+                    ForEach(tile.inProgress) { item in SituationWorkRow(item: item, now: now) }
                 }
             }
             if !tile.next.isEmpty {

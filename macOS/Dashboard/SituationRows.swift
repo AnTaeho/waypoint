@@ -41,6 +41,8 @@ struct SituationWaitingRow: View {
 struct SituationCardRow<Leading: View>: View {
     let card: Card
     var trailing: String?
+    /// 오른쪽 덧붙임이 내 답을 기다린다는 글이면 강조색
+    var trailingWaits = false
     var muted = false
     /// 제목 뒤 작은 강조 표시(같은 파일 작업 중)
     var flag: String?
@@ -60,7 +62,8 @@ struct SituationCardRow<Leading: View>: View {
                     Text(flag).font(Theme.Situation.meta).foregroundStyle(Theme.Overlap.text).fixedSize()
                 }
                 if let trailing {
-                    Text(trailing).font(Theme.Situation.meta).foregroundStyle(Theme.textMuted).fixedSize()
+                    Text(trailing).font(Theme.Situation.meta)
+                        .foregroundStyle(trailingWaits ? Theme.Situation.waitingText : Theme.textMuted).fixedSize()
                 }
             }
             .contentShape(Rectangle())
@@ -72,22 +75,25 @@ struct SituationCardRow<Leading: View>: View {
 
 extension SituationCardRow where Leading == EmptyView {
     init(card: Card, trailing: String? = nil) {
-        self.init(card: card, trailing: trailing, muted: false, flag: nil) { EmptyView() }
+        self.init(card: card, trailing: trailing, trailingWaits: false, muted: false, flag: nil) { EmptyView() }
     }
 }
 
-/// 진행 중 카드 줄: 상태 점 + 카드 줄 + 도구(멈추면 「멈춤」).
+/// 진행 중 카드 줄: 상태 점 + 카드 줄 + 도구(멈추면 「멈춤」, 내 답을 기다리면 「승인 대기 3분」).
 struct SituationWorkRow: View {
     let item: ProjectSituation.WorkItem
+    let now: Date
 
     var body: some View {
-        SituationCardRow(card: item.card, trailing: trailing, muted: item.workState != .live,
+        SituationCardRow(card: item.card, trailing: trailing, trailingWaits: item.waiting != nil,
+                         muted: item.workState != .live,
                          flag: item.overlapFileCount > 0 ? "같은 파일 \(item.overlapFileCount)" : nil) {
             WorkStateDot(state: item.workState)
         }
     }
 
     private var trailing: String {
+        if let waiting = item.waiting { return waiting.text(now: now) }
         let tools = item.providers.map(\.name).joined(separator: " · ")
         return item.workState == .live ? tools : "멈춤 · \(tools)"
     }

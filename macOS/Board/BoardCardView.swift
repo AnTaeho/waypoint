@@ -13,7 +13,9 @@ struct BoardCardView: View {
 
     var body: some View {
         let link = column == .active ? BoardQuery.primaryLink(of: card, now: now) : nil
-        let state = column == .active ? CardRules.workState(of: card, now: now) : .none
+        let waiting = column == .active ? SessionWaiting.shown(for: card, now: now) : nil
+        // 내 답을 기다리는 카드는 대시보드 줄처럼 멈춘 점으로 보인다.
+        let state = column != .active ? .none : waiting != nil ? .stalled : CardRules.workState(of: card, now: now)
         VStack(alignment: .leading, spacing: Theme.Spacing.s) {
             HStack(spacing: Theme.Spacing.s) {
                 WorkStateDot(state: state)
@@ -22,7 +24,12 @@ struct BoardCardView: View {
                     .foregroundStyle(Theme.textMuted)
                     .fixedSize()
                 Spacer(minLength: 0)
-                if let link, let session = link.session,
+                if let waiting {
+                    Text(waiting.text(now: now))
+                        .font(Theme.captionLargeMedium)
+                        .foregroundStyle(Theme.Situation.waitingText)
+                        .lineLimit(1)
+                } else if let link, let session = link.session,
                    let time = CardFormat.workTime(
                        state: state, attachedAt: link.attachedAt, lastSeenAt: session.lastSeenAt, now: now, session: session
                    ) {

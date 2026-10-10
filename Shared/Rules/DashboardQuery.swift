@@ -12,8 +12,10 @@ public struct DashboardRow: Identifiable {
     public let depth: Int
     /// 이 카드에 세션이 연결된 시각(`CardSession.attachedAt`). 카드 없는 줄은 nil
     public let attachedAt: Date?
-    /// 이 세션이 내 답(승인·질문)을 기다리면 그 종류. 이때도 `workState`는 stalled다
-    public var waitingKind: SessionWaiting.Kind?
+    /// 이 줄에 보일 기다림(승인·질문). 세션 자신의 것이거나 줄이 없는 서브에이전트의 것. 있으면 `workState`는 stalled다
+    public var waiting: SessionWaiting.Shown?
+
+    public var waitingKind: SessionWaiting.Kind? { waiting?.kind }
 
     public var id: String { "\(session.id)|\(card?.id.uuidString ?? "-")" }
 }
@@ -91,7 +93,7 @@ public enum DashboardQuery {
             let session: Session
             let state: CardWorkState
             let attachedAt: Date
-            let waiting: SessionWaiting.Kind?
+            let waiting: SessionWaiting.Shown?
         }
 
         var pending: [Pending] = []
@@ -104,17 +106,19 @@ public enum DashboardQuery {
             case .stalled: work = .stalled
             case .ended: continue
             }
-            // 기다림은 멈춘 세션에서만 나온다. 세션마다 한 번만 본다.
-            let waiting = work == .stalled ? SessionWaiting.kind(of: session, now: now, stallTimeout: stallTimeout) : nil
-            let links = session.openCardSessions.filter { $0.card != nil }
-            for link in links {
-                pending.append(Pending(card: link.card, session: session, state: work, attachedAt: link.attachedAt,
-                                       waiting: waiting))
+            // 기다리는 줄은 멈춘 줄로 둔다(내 답 없이는 못 나아간다). 세션마다 한 번만 본다.
+            let waiting = SessionWaiting.shown(for: session, now: now, stallTimeout: stallTimeout)
+            let links = session.openCardSessions.filter { $0.card != nil }.sorted { $0.attachedAt < $1.attachedAt }
+            for (index, link) in links.enumerated() {
+                // 서브에이전트에게서 올린 기다림은 첫 줄에만 둔다(두 번 세지 않게).
+                let shown = index == 0 || waiting?.session === session ? waiting : nil
+                pending.append(Pending(card: link.card, session: session, state: shown == nil ? work : .stalled,
+                                       attachedAt: link.attachedAt, waiting: shown))
             }
             if links.isEmpty, session.kind == .main,
                SessionRules.hasUnassignedWork(session, now: now, stallTimeout: stallTimeout) {
-                pending.append(Pending(card: nil, session: session, state: work, attachedAt: session.startedAt,
-                                       waiting: waiting))
+                pending.append(Pending(card: nil, session: session, state: waiting == nil ? work : .stalled,
+                                       attachedAt: session.startedAt, waiting: waiting))
             }
         }
 
@@ -142,12 +146,12 @@ public enum DashboardQuery {
             while index < top.count, top[index].session === session {
                 let p = top[index]
                 result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 0,
-                                          attachedAt: p.card == nil ? nil : p.attachedAt, waitingKind: p.waiting))
+                                          attachedAt: p.card == nil ? nil : p.attachedAt, waiting: p.waiting))
                 index += 1
             }
             for p in nested where p.session.parent === session {
                 result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 1,
-                                          attachedAt: p.card == nil ? nil : p.attachedAt, waitingKind: p.waiting))
+                                          attachedAt: p.card == nil ? nil : p.attachedAt, waiting: p.waiting))
             }
         }
         return result

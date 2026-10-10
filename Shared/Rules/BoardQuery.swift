@@ -35,6 +35,8 @@ public struct BoardSessionTile: Identifiable {
     public let workState: CardWorkState
     /// 끝나지 않은 서브에이전트 수
     public let runningSubagents: Int
+    /// 내 답(승인·질문)을 기다리면 그 기다림. 대시보드 줄과 같다
+    public var waiting: SessionWaiting.Shown?
 
     public var id: String { session.id }
 }
@@ -93,7 +95,8 @@ public enum BoardQuery {
                 let running = (row.session.children ?? []).filter {
                     $0.kind == .subagent && SessionRules.state(of: $0, now: now, stallTimeout: stallTimeout) != .ended
                 }
-                return BoardSessionTile(session: row.session, workState: row.workState, runningSubagents: running.count)
+                return BoardSessionTile(session: row.session, workState: row.workState, runningSubagents: running.count,
+                                        waiting: row.waiting)
             }
     }
 
