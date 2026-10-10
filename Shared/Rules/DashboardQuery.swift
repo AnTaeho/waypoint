@@ -12,6 +12,8 @@ public struct DashboardRow: Identifiable {
     public let depth: Int
     /// 이 카드에 세션이 연결된 시각(`CardSession.attachedAt`). 카드 없는 줄은 nil
     public let attachedAt: Date?
+    /// 이 세션이 내 답(승인·질문)을 기다리면 그 종류. 이때도 `workState`는 stalled다
+    public var waitingKind: SessionWaiting.Kind?
 
     public var id: String { "\(session.id)|\(card?.id.uuidString ?? "-")" }
 }
@@ -34,6 +36,8 @@ public struct ProjectSummary {
     public let ideaCount: Int
     /// 이벤트·세션 활동·카드 수정 중 가장 늦은 시각. 아무것도 없으면 nil.
     public let lastActivityAt: Date?
+    /// 내 답(승인·질문)을 기다리는 세션 수. 사이드바 점 모양에만 쓴다
+    public var waitingCount = 0
 }
 
 public enum DashboardQuery {
@@ -87,6 +91,7 @@ public enum DashboardQuery {
             let session: Session
             let state: CardWorkState
             let attachedAt: Date
+            let waiting: SessionWaiting.Kind?
         }
 
         var pending: [Pending] = []
@@ -99,13 +104,17 @@ public enum DashboardQuery {
             case .stalled: work = .stalled
             case .ended: continue
             }
+            // 기다림은 멈춘 세션에서만 나온다. 세션마다 한 번만 본다.
+            let waiting = work == .stalled ? SessionWaiting.kind(of: session, now: now, stallTimeout: stallTimeout) : nil
             let links = session.openCardSessions.filter { $0.card != nil }
             for link in links {
-                pending.append(Pending(card: link.card, session: session, state: work, attachedAt: link.attachedAt))
+                pending.append(Pending(card: link.card, session: session, state: work, attachedAt: link.attachedAt,
+                                       waiting: waiting))
             }
             if links.isEmpty, session.kind == .main,
                SessionRules.hasUnassignedWork(session, now: now, stallTimeout: stallTimeout) {
-                pending.append(Pending(card: nil, session: session, state: work, attachedAt: session.startedAt))
+                pending.append(Pending(card: nil, session: session, state: work, attachedAt: session.startedAt,
+                                       waiting: waiting))
             }
         }
 
@@ -133,12 +142,12 @@ public enum DashboardQuery {
             while index < top.count, top[index].session === session {
                 let p = top[index]
                 result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 0,
-                                          attachedAt: p.card == nil ? nil : p.attachedAt))
+                                          attachedAt: p.card == nil ? nil : p.attachedAt, waitingKind: p.waiting))
                 index += 1
             }
             for p in nested where p.session.parent === session {
                 result.append(DashboardRow(card: p.card, session: p.session, workState: p.state, depth: 1,
-                                          attachedAt: p.card == nil ? nil : p.attachedAt))
+                                          attachedAt: p.card == nil ? nil : p.attachedAt, waitingKind: p.waiting))
             }
         }
         return result
@@ -164,7 +173,9 @@ public enum DashboardQuery {
             }
         }
         // 카드 없이 도는 메인 세션도 작업중·멈춤에 센다(대시보드 줄과 같은 기준).
-        for session in openSessions(of: project) where session.kind == .main {
+        // 끝나지 않은 세션은 한 번만 읽어 기다림 수에도 쓴다.
+        let sessions = openSessions(of: project)
+        for session in sessions where session.kind == .main {
             guard !session.openCardSessions.contains(where: { $0.card != nil }),
                   SessionRules.hasUnassignedWork(session, now: now, stallTimeout: stallTimeout) else { continue }
             switch SessionRules.state(of: session, now: now, stallTimeout: stallTimeout) {
@@ -178,7 +189,8 @@ public enum DashboardQuery {
             stalledCount: stalled,
             nextCount: next,
             ideaCount: idea,
-            lastActivityAt: lastActivityAt(of: project)
+            lastActivityAt: lastActivityAt(of: project),
+            waitingCount: SessionWaiting.count(sessions, now: now, stallTimeout: stallTimeout).total
         )
     }
 

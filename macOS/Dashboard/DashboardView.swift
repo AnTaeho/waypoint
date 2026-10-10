@@ -24,7 +24,7 @@ struct DashboardView: View {
         let rows = sections.flatMap(\.rows).filter { provider == nil || $0.session.provider == provider }
         let live = rows.filter { $0.workState == .live }
         let overlaps = WorkOverlap.byRow(live, now: now)
-        let stalled = rows.filter { $0.workState == .stalled }
+        let held = DashboardOverview.split(rows)
         let notes = overview.resumeCards.filter { card in
             guard let query else { return true }
             return DashboardSearch.matches(card, query)
@@ -46,12 +46,12 @@ struct DashboardView: View {
                             HStack(alignment: .top, spacing: Theme.Spacing.xl) {
                                 DashboardWorkList(rows: live, now: now, provider: $provider, overlaps: overlaps)
                                     .frame(maxWidth: .infinity)
-                                DashboardContinue(rows: stalled, cards: notes, now: now)
+                                DashboardContinue(waiting: held.waiting, rows: held.resting, cards: notes, now: now)
                                     .frame(width: Theme.Dashboard.contextWidth)
                             }
                         } else {
                             DashboardWorkList(rows: live, now: now, provider: $provider, overlaps: overlaps)
-                            DashboardContinue(rows: stalled, cards: notes, now: now)
+                            DashboardContinue(waiting: held.waiting, rows: held.resting, cards: notes, now: now)
                         }
                         SituationBoard(tiles: tiles, width: width, now: now, select: selectProject)
                     }
@@ -68,9 +68,7 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
             Text("지금, 프로젝트들은 어디쯤일까")
                 .font(Theme.pageTitle).foregroundStyle(Theme.text)
-            Text(overview.liveProjectCount > 0
-                 ? "\(overview.liveProjectCount)개 프로젝트에서 작업 중입니다."
-                 : "진행 중인 작업이 없습니다.")
+            Text(overview.headline)
                 .font(Theme.body).foregroundStyle(Theme.textMuted)
         }
     }
