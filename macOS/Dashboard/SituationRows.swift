@@ -19,6 +19,24 @@ struct SituationSection<Rows: View>: View {
     }
 }
 
+/// 나를 기다리는 세션: 「승인 기다림 1」「질문 기다림 1」 알약을 나란히.
+struct SituationWaitingRow: View {
+    let waiting: SessionWaiting
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.s) {
+            ForEach(waiting.labels, id: \.self) { label in
+                Text(label)
+                    .font(Theme.Situation.waitingFont).foregroundStyle(Theme.Situation.waitingText)
+                    .monospacedDigit().lineLimit(1).fixedSize()
+                    .padding(.horizontal, Theme.Spacing.s)
+                    .padding(.vertical, Theme.Spacing.xxs)
+                    .background(Theme.Situation.waitingBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.badge))
+            }
+        }
+    }
+}
+
 /// 카드 한 줄: ID · 제목 · 오른쪽 덧붙임. 누르면 카드 상세.
 struct SituationCardRow<Leading: View>: View {
     let card: Card
