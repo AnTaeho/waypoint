@@ -15,6 +15,27 @@ struct SidebarKey: View {
     }
 }
 
+/// 내 답을 기다리는 세션 수 알약.
+struct SidebarWaitingPill: View {
+    let count: Int
+    /// 선택된 줄(파란 배경)에서는 계층 색으로
+    @Environment(\.backgroundProminence) private var prominence
+
+    private var isProminent: Bool { prominence == .increased }
+
+    var body: some View {
+        Text("\(count)")
+            .font(Theme.Situation.waitingFont)
+            .foregroundStyle(isProminent ? AnyShapeStyle(.primary) : AnyShapeStyle(Theme.Situation.waitingText))
+            .monospacedDigit().lineLimit(1).fixedSize()
+            .padding(.horizontal, Theme.Spacing.s)
+            .padding(.vertical, Theme.Spacing.xxs)
+            .background(isProminent ? AnyShapeStyle(.quaternary) : AnyShapeStyle(Theme.Situation.waitingBackground),
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.badge))
+            .accessibilityLabel("내 답 기다림 \(count)")
+    }
+}
+
 /// 「보관됨」 구역의 줄: 키와 이름만, 흐리게.
 struct SidebarArchivedRow: View {
     let project: Project

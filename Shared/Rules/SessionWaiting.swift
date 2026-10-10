@@ -40,6 +40,11 @@ public struct SessionWaiting: Equatable, Sendable {
             guard let agentName, !agentName.isEmpty else { return text }
             return "\(text) · \(agentName)"
         }
+
+        /// 좁은 줄에 쓰는 「승인 대기 3분」. 에이전트 이름을 붙이지 않는다.
+        public func shortText(now: Date) -> String {
+            SessionWaiting.text(kind, session: session, now: now)
+        }
     }
 
     /// 승인 대기면 승인, 질문 도구가 떠 있는 입력 대기면 질문. 끝난 세션과 그 밖은 nil.

@@ -38,8 +38,21 @@ public struct ProjectSummary {
     public let ideaCount: Int
     /// 이벤트·세션 활동·카드 수정 중 가장 늦은 시각. 아무것도 없으면 nil.
     public let lastActivityAt: Date?
-    /// 내 답(승인·질문)을 기다리는 세션 수. 사이드바 점 모양에만 쓴다
+    /// 내 답(승인·질문)을 기다리는 세션 수(서브에이전트 포함). 사이드바 표시에 쓴다
     public var waitingCount = 0
+
+    /// 사이드바 프로젝트 줄 오른쪽에 그릴 것 하나.
+    public enum SidebarMark: Equatable, Sendable {
+        case waiting(Int), live(Int), stalled(Int)
+    }
+
+    /// 내 답을 기다리는 세션이 있으면 그것부터, 다음은 작업중, 다음은 멈춤. 아무것도 없으면 nil.
+    public var sidebarMark: SidebarMark? {
+        if waitingCount > 0 { return .waiting(waitingCount) }
+        if liveCount > 0 { return .live(liveCount) }
+        if stalledCount > 0 { return .stalled(stalledCount) }
+        return nil
+    }
 }
 
 public enum DashboardQuery {

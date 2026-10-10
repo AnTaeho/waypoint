@@ -93,7 +93,7 @@ struct SituationWorkRow: View {
     }
 
     private var trailing: String {
-        if let waiting = item.waiting { return waiting.text(now: now) }
+        if let waiting = item.waiting { return waiting.shortText(now: now) }
         let tools = item.providers.map(\.name).joined(separator: " · ")
         return item.workState == .live ? tools : "멈춤 · \(tools)"
     }
