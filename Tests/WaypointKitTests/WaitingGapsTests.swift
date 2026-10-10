@@ -225,6 +225,70 @@ import Testing
         #expect(after.workState == .live && after.waiting == nil)
     }
 
+    /// 좁은 줄의 글은 에이전트 이름을 뺀다. 긴 글에는 남는다.
+    @Test func shortTextDropsAgentName() throws {
+        let h = try HookHarness()
+        try childAsks(h)
+        let shown = try #require(DashboardQuery.rows(for: h.project, now: t0 + 10).first?.waiting)
+        #expect(shown.agentName == "test-writer")
+        #expect(shown.shortText(now: t0 + 5 + minutes(3)) == "승인 대기 3분")
+        #expect(shown.text(now: t0 + 5 + minutes(3)) == "승인 대기 3분 · test-writer")
+    }
+
+    // MARK: - 사이드바 표시
+
+    private func mark(_ h: HookHarness, now: Date) -> ProjectSummary.SidebarMark? {
+        DashboardQuery.summary(for: h.project, now: now).sidebarMark
+    }
+
+    @Test func sidebarMarkIsNilWithoutSessions() throws {
+        #expect(mark(try HookHarness(), now: t0 + 10) == nil)
+    }
+
+    @Test func sidebarMarkLiveThenStalled() throws {
+        let h = try HookHarness()
+        try send(h, "SessionStart", at: t0)
+        try send(h, "UserPromptSubmit", at: t0 + 1)
+        try send(h, "PreToolUse", at: t0 + 2, id: "a")
+        #expect(mark(h, now: t0 + 3) == .live(1))
+        try send(h, "PostToolUse", at: t0 + 4, id: "a")
+        try send(h, "Stop", at: t0 + 5)
+        #expect(mark(h, now: t0 + 10) == .stalled(1))
+    }
+
+    @Test func sidebarMarkWaitingWhenMainAsks() throws {
+        let h = try HookHarness()
+        try send(h, "SessionStart", at: t0)
+        try send(h, "UserPromptSubmit", at: t0 + 1)
+        try send(h, "PreToolUse", at: t0 + 2, id: "a")
+        try send(h, "PermissionRequest", at: t0 + 3)
+        #expect(mark(h, now: t0 + 10) == .waiting(1))
+    }
+
+    /// 부모는 도는 중이고 서브에이전트만 승인을 기다려도 기다림이 먼저다. 풀리면 작업중으로 돌아간다.
+    @Test func sidebarMarkPutsSubagentWaitingBeforeLiveParent() throws {
+        let h = try HookHarness()
+        try childAsks(h)
+        let main = try #require(try h.session())
+        CardLifecycle.attach(h.project.makeCard(in: h.context, title: "one", at: t0), main, at: t0 + 1, in: h.context)
+        #expect(SessionRules.state(of: main, now: t0 + 10) == .live)
+        #expect(mark(h, now: t0 + 10) == .waiting(1))
+        try send(h, "PostToolUse", at: t0 + 11, id: "b", agent: HookHarness.agentID)
+        #expect(mark(h, now: t0 + 12) == .live(1))
+    }
+
+    /// 기다림·작업중·멈춤이 섞이면 기다리는 세션 수만 보인다.
+    @Test func sidebarMarkOrder() {
+        func mark(live: Int, stalled: Int, waiting: Int) -> ProjectSummary.SidebarMark? {
+            ProjectSummary(liveCount: live, stalledCount: stalled, nextCount: 0, ideaCount: 0, lastActivityAt: nil,
+                           waitingCount: waiting).sidebarMark
+        }
+        #expect(mark(live: 2, stalled: 3, waiting: 4) == .waiting(4))
+        #expect(mark(live: 2, stalled: 3, waiting: 0) == .live(2))
+        #expect(mark(live: 0, stalled: 3, waiting: 0) == .stalled(3))
+        #expect(mark(live: 0, stalled: 0, waiting: 0) == nil)
+    }
+
     /// 메뉴 막대: 질문 대기를 따로 세고 「입력 대기」에는 쉬는 세션만 남긴다.
     @Test func menuLineSplitsQuestionFromResting() throws {
         let h = try HookHarness()
