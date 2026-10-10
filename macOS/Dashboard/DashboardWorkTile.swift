@@ -57,12 +57,14 @@ struct DashboardWorkTile: View {
     private var elapsed: some View {
         HStack(spacing: Theme.Spacing.s) {
             WorkStateDot(state: row.workState)
-            Text(SessionFormat.rowElapsed(
-                state: row.workState, lastPromptAt: row.session.lastPromptAt, attachedAt: row.attachedAt,
-                lastSeenAt: row.session.lastSeenAt, now: now, session: row.session
-            ) ?? "작업 중")
+            Text(row.waitingKind.map { SessionWaiting.text($0, session: row.session, now: now) }
+                 ?? SessionFormat.rowElapsed(
+                    state: row.workState, lastPromptAt: row.session.lastPromptAt, attachedAt: row.attachedAt,
+                    lastSeenAt: row.session.lastSeenAt, now: now, session: row.session
+                 ) ?? "작업 중")
             .font(Theme.captionLargeMedium)
-            .foregroundStyle(row.workState == .live ? Theme.liveText : Theme.textMuted)
+            .foregroundStyle(row.workState == .live ? Theme.liveText
+                             : row.waitingKind != nil ? Theme.Situation.waitingText : Theme.textMuted)
             .fixedSize()
         }
     }

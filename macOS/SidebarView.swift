@@ -101,7 +101,10 @@ private struct SidebarProjectRow: View {
             if summary.liveCount > 0 {
                 count(summary.liveCount) { LiveDot() }
             } else if summary.stalledCount > 0 {
-                count(summary.stalledCount) { StalledDot() }
+                // 내 답을 기다리는 세션이 있으면 점을 채운다.
+                count(summary.stalledCount) {
+                    if summary.waitingCount > 0 { FilledDot(color: Theme.Situation.waitingText) } else { StalledDot() }
+                }
             }
         }
     }

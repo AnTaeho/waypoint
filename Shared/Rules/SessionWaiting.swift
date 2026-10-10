@@ -2,7 +2,11 @@ import Foundation
 
 /// 나를 기다리며 서 있는 세션 수(TRK-72). 턴이 끝나 다음 요청을 기다리는 세션은 세지 않는다.
 public struct SessionWaiting: Equatable, Sendable {
-    public enum Kind: Sendable { case approval, question }
+    public enum Kind: Sendable {
+        case approval, question
+        /// 세션 줄에 쓰는 말
+        public var title: String { self == .approval ? "승인 대기" : "질문 대기" }
+    }
 
     /// 권한 승인을 기다리는 세션 수
     public var approval = 0
@@ -15,6 +19,7 @@ public struct SessionWaiting: Equatable, Sendable {
     }
 
     public var isEmpty: Bool { approval == 0 && question == 0 }
+    public var total: Int { approval + question }
 
     /// 화면에 나란히 놓는 글. 0인 쪽은 뺀다.
     public var labels: [String] {
@@ -36,6 +41,11 @@ public struct SessionWaiting: Equatable, Sendable {
             return asks ? .question : nil
         default: return nil
         }
+    }
+
+    /// 세션 줄의 「승인 대기 3분」. 기다리기 시작한 때부터 잰다.
+    public static func text(_ kind: Kind, session: Session, now: Date) -> String {
+        "\(kind.title) \(TimeFormat.elapsed(from: session.activityAt ?? session.lastSeenAt, to: now))"
     }
 
     /// 세션마다 한 번씩 센다. 서브에이전트가 기다리면 그 세션 하나로 센다(부모는 도구 작업 중이라 겹치지 않는다).

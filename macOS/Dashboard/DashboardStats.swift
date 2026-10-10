@@ -18,6 +18,9 @@ struct DashboardStats: View {
 
     @ViewBuilder private var metrics: some View {
         metric("작업 중", count: overview.liveCount, color: Theme.liveText)
+        if overview.waitingCount > 0 {
+            metric("내 답 기다림", count: overview.waitingCount, color: Theme.Situation.waitingText)
+        }
         metric("대기·활동 없음", count: overview.stalledCount, color: Theme.text)
         metric("다음 할 일", count: overview.nextCount, color: Theme.next)
         metric("오늘 완료", count: overview.doneTodayCount, color: Theme.done)
