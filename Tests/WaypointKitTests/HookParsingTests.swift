@@ -177,7 +177,7 @@ import Testing
     }
 
     @Test func gitBranchFromHead() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-git-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-git-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let sub = dir.appendingPathComponent("src/deep", isDirectory: true)
         try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)

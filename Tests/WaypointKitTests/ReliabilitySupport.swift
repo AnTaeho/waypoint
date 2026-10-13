@@ -23,7 +23,7 @@ final class ReliabilityWorld {
         ("PRB", ReliabilityWorld.probe), ("OTH", ReliabilityWorld.other), ("KIT", ReliabilityWorld.nested),
     ]) throws {
         if onDisk {
-            let url = FileManager.default.temporaryDirectory
+            let url = TestTemp.root
                 .appendingPathComponent("waypoint-reliability-\(UUID().uuidString)").appendingPathComponent("t.store")
             storeURL = url
             container = try WaypointStore.makeContainer(url: url)
@@ -33,7 +33,7 @@ final class ReliabilityWorld {
         }
         context = ModelContext(container)
         processor = HookProcessor(context: context, home: Self.home, gitBranch: { _ in "main" })
-        outboxDir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-reliability-outbox-\(UUID().uuidString)")
+        outboxDir = TestTemp.root.appendingPathComponent("waypoint-reliability-outbox-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: outboxDir, withIntermediateDirectories: true)
         for item in register { try registerProject(item.key, root: item.root) }
     }

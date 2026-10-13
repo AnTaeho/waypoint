@@ -6,7 +6,7 @@ import Testing
 @Suite struct OutboxTests {
 
     private func tempDir() throws -> URL {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-outbox-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-outbox-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
@@ -282,7 +282,7 @@ import Testing
     }
 
     @Test func missingDirectoryIsNoop() {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-none-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-none-\(UUID().uuidString)")
         #expect(Outbox.drain(directory: dir) { _ in } == Outbox.DrainResult())
     }
 }

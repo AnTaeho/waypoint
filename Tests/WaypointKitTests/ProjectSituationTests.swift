@@ -208,7 +208,7 @@ private func status(_ ctx: ModelContext, _ project: Project, _ text: String, at 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"] != nil))
     func realStoreBoardTiming() throws {
         let source = URL(fileURLWithPath: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"]!)
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-situation-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-situation-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("Waypoint.store")

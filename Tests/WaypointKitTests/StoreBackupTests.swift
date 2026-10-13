@@ -309,7 +309,7 @@ struct StoreTemp {
     var backup: StoreBackup { StoreBackup(storeURL: store) }
 
     init() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-backup-\(UUID().uuidString)")
+        dir = TestTemp.root.appendingPathComponent("waypoint-backup-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     }
 

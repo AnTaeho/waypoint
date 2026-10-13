@@ -51,7 +51,7 @@ import Testing
     }
 
     @Test func scriptRunsInShellAndCarriesNoConversationOrResumeFlag() throws {
-        let folder = FileManager.default.temporaryDirectory
+        let folder = TestTemp.root
             .appendingPathComponent("waypoint 테스트 it's \(UUID().uuidString)").path
         try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: folder) }

@@ -9,7 +9,7 @@ struct FakeGH {
     let folder: URL
 
     init(stdout: String = "", stderr: String = "", status: Int = 0, sleep: Double = 0) throws {
-        folder = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-fakegh-\(UUID().uuidString)")
+        folder = TestTemp.root.appendingPathComponent("waypoint-fakegh-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try stdout.write(to: folder.appendingPathComponent("stdout"), atomically: true, encoding: .utf8)
         try stderr.write(to: folder.appendingPathComponent("stderr"), atomically: true, encoding: .utf8)
@@ -44,7 +44,7 @@ struct FakeGH {
 /// `.git`만 흉내 낸 작업 트리(`origin`·현재 브랜치·원격에 있는 브랜치).
 func makeCheckout(origin: String? = "git@github.com:Me/App.git", branch: String = "feat/x",
                   pushed: [String] = ["main", "feat/x"], local: [String] = ["main", "feat/x", "wip"]) throws -> String {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-repo-\(UUID().uuidString)")
+    let root = TestTemp.root.appendingPathComponent("waypoint-repo-\(UUID().uuidString)")
     let git = root.appendingPathComponent(".git")
     func write(_ path: String, _ text: String) throws {
         let url = git.appendingPathComponent(path)
@@ -251,7 +251,7 @@ func makeCheckout(origin: String? = "git@github.com:Me/App.git", branch: String 
     }
 
     @Test func savesPrivateFile() throws {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-ghcache-\(UUID().uuidString)")
+        let folder = TestTemp.root.appendingPathComponent("waypoint-ghcache-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         #expect(GitHubStatusCache.load(directory: folder) == GitHubStatusCache())
         let cache = GitHubStatusCache(entries: ["me/app#pr#34": .init(state: .merged, title: "제목", checkedAt: t0)])

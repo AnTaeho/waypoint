@@ -8,7 +8,7 @@ import Testing
 @Suite struct GuidanceReadOnlyTests {
 
     func tempDir() throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("guidance-\(UUID().uuidString)")
+        let url = TestTemp.root.appendingPathComponent("guidance-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url.resolvingSymlinksInPath()
     }

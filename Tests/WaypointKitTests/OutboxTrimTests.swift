@@ -13,7 +13,7 @@ import Testing
 
     /// 스크립트에 `input`을 넣고 outbox 한 줄을 읽는다. 줄이 없으면 nil.
     static func trimmedLine(_ input: Data, event: String, provider: AgentProvider) throws -> Outbox.Entry? {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-trim-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-trim-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let process = Process()

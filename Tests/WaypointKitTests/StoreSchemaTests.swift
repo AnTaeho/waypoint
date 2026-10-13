@@ -13,7 +13,7 @@ import Testing
 
     /// 판 없는 `Schema([...])`로 만든 저장소를 V1 + 옮기기 계획으로 연다.
     @Test func unversionedStoreOpensAsV1() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-schema-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-schema-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("Waypoint.store")
@@ -41,7 +41,7 @@ import Testing
     @Test(.enabled(if: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"] != nil))
     func realStoreCopyOpensAsV1() throws {
         let source = URL(fileURLWithPath: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"]!)
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-real-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-real-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("Waypoint.store")

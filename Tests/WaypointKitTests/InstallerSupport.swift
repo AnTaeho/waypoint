@@ -13,7 +13,7 @@ final class InstallSandbox {
 
     /// 이름에 공백을 넣어 경로 인용을 함께 시험한다.
     init() {
-        let base = FileManager.default.temporaryDirectory
+        let base = TestTemp.root
             .appendingPathComponent("waypoint installer \(UUID().uuidString.prefix(8))", isDirectory: true)
         try! FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         root = URL(fileURLWithPath: IntegrationFile.resolved(base.path), isDirectory: true)

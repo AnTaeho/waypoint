@@ -151,7 +151,7 @@ import Testing
         try collect(filed)
 
         // 지침 문서
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-scope-\(UUID().uuidString)")
+        let folder = TestTemp.root.appendingPathComponent("waypoint-scope-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try "# 지침\n".write(to: folder.appendingPathComponent("CLAUDE.md"), atomically: true, encoding: .utf8)
         let (guideContainer, guides) = try makeContext()

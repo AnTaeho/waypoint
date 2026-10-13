@@ -107,7 +107,7 @@ import Testing
         #expect(LocalOrigin.originURL(config: "[remote \"upstream\"]\n\turl = x") == nil)
 
         // 등록 폴더가 작업 트리의 하위 폴더여도 작업 트리 최상위를 찾는다. git 명령 없이 .git/config만 읽는다.
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-origin-\(UUID().uuidString)")
+        let root = TestTemp.root.appendingPathComponent("waypoint-origin-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root.appendingPathComponent(".git"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("app"), withIntermediateDirectories: true)
@@ -130,7 +130,7 @@ import Testing
 
     // worktree는 `commondir`가 가리키는 공용 git 폴더의 config에서 원격 주소를 읽는다.
     @Test func readsOriginThroughWorktreeCommonDir() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-worktree-\(UUID().uuidString)")
+        let root = TestTemp.root.appendingPathComponent("waypoint-worktree-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let gitDir = root.appendingPathComponent("main/.git/worktrees/wt")
         let worktree = root.appendingPathComponent("wt")
@@ -263,7 +263,7 @@ import Testing
     // MARK: - replay
 
     @Test func replayEndpointAppendsReadableLines() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         func request(_ body: String, method: String = "POST") -> HTTPRequest {
             HTTPRequest(method: method, path: HookRouter.replayPath, headers: [:], body: Data(body.utf8))
@@ -292,7 +292,7 @@ import Testing
     /// replay 줄은 실시간 경로(`RemoteReplay.drain` → `HookProcessor.handle(_:)`)로 처리한다.
     @Test func replayedBatchTwiceRecordsOnce() throws {
         let h = try Harness(onDisk: true)
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         func line(_ event: String, _ data: Data, at date: Date) -> String {
             #"{"event":"\#(event)","receivedAt":\#(Int(date.timeIntervalSince1970)),"trimmed":true,"payload":\#(String(decoding: data, as: UTF8.self))}"#
@@ -319,7 +319,7 @@ import Testing
 
     /// 시간 예산이 다 되면 남은 줄을 두고 멈추고(`more`), 다음 흡수가 그 줄부터 순서대로 이어 간다.
     @Test func drainWithDeadlinePausesAndResumesInOrder() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-budget-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-budget-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let lines = (0..<5).map { #"{"event":"Stop","receivedAt":\#($0),"payload":{"session_id":"s\#($0)"}}"# }
         _ = try Outbox.append(Data((lines.joined(separator: "\n") + "\n").utf8), directory: dir)
@@ -342,7 +342,7 @@ import Testing
 
     /// 남아 있던 처리 중 파일의 밀리초가 지금 시각 이상이어도 새로 온 줄은 그 뒤에 선다.
     @Test func drainKeepsLeftoverBeforeNewlyClaimedLines() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-order-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-order-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let leftover = dir.appendingPathComponent("\(Outbox.processingPrefix)9000000000000-\(UUID().uuidString).jsonl")
@@ -392,7 +392,7 @@ import Testing
     /// replay 저장 실패: 그 줄부터 남기고(`retryPending`) 다음 처리에서 이어 간다. 기록은 한 번만.
     @Test func replaySaveFailureKeepsLineForRetry() throws {
         let h = try Harness(onDisk: true)
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let edit = Self.edit(Self.remoteRoot + "/src/OCR.swift")
         let line = #"{"event":"PostToolUse","receivedAt":\#(Int(t0.timeIntervalSince1970)),"payload":\#(String(decoding: edit, as: UTF8.self))}"#
@@ -432,7 +432,7 @@ import Testing
 @Suite struct RemoteOutboxScriptTests {
     @Test func remoteModeOutboxCarriesRemoteCheckout() throws {
         #if os(macOS)
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-remote-\(UUID().uuidString)")
+        let base = TestTemp.root.appendingPathComponent("waypoint-remote-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: base) }
         let repo = base.appendingPathComponent("repo")
         try FileManager.default.createDirectory(at: repo.appendingPathComponent(".git"), withIntermediateDirectories: true)

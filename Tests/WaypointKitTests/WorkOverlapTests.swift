@@ -230,7 +230,7 @@ import Testing
 
     @Test func hookRecordsCheckoutRootIncludingWorktree() throws {
         let fm = FileManager.default
-        let repo = fm.temporaryDirectory.appendingPathComponent("waypoint-overlap-\(UUID().uuidString)")
+        let repo = TestTemp.root.appendingPathComponent("waypoint-overlap-\(UUID().uuidString)")
             .resolvingSymlinksInPath()
         defer { try? fm.removeItem(at: repo) }
         let worktree = repo.appendingPathComponent(".claude/worktrees/x")
@@ -370,7 +370,7 @@ import Testing
     @Test(.enabled(if: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"] != nil))
     func realStoreOverlapTiming() throws {
         let source = URL(fileURLWithPath: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"]!)
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-overlap-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-overlap-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("Waypoint.store")

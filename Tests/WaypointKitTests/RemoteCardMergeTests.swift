@@ -6,7 +6,7 @@ import Testing
 @Suite struct RemoteCardMergeTests {
     /// 메인 context에 옛 값이 남은 카드(여기서는 저장하지 않은 옛 값으로 흉내)를 새로 읽은 값으로 맞춘다.
     @Test func copiesNewerCardIntoRegisteredModel() throws {
-        let url = FileManager.default.temporaryDirectory
+        let url = TestTemp.root
             .appendingPathComponent(UUID().uuidString).appendingPathComponent("t.store")
         let container = try WaypointStore.makeContainer(url: url)
         let main = ModelContext(container)
@@ -35,7 +35,7 @@ import Testing
 
     /// 메인 context가 읽지 않은 카드는 건드리지 않는다(다음에 읽을 때 저장소 값이 온다).
     @Test func skipsUnregisteredCards() throws {
-        let url = FileManager.default.temporaryDirectory
+        let url = TestTemp.root
             .appendingPathComponent(UUID().uuidString).appendingPathComponent("t.store")
         let container = try WaypointStore.makeContainer(url: url)
         let writer = ModelContext(container)

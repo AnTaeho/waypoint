@@ -231,7 +231,7 @@ import Testing
 
     @Test func outboxKeepsProviderAndReplaysWithoutInjection() throws {
         let h = try HookHarness()
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-codex-\(UUID())")
+        let directory = TestTemp.root.appendingPathComponent("waypoint-codex-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let payload = try JSONSerialization.jsonObject(with: fixture("doc-codex-SessionStart"))
@@ -252,7 +252,7 @@ import Testing
     @Test func projectInitRetainsCodexOriginForSeedCards() throws {
         let (container, context) = try makeContext()
         _ = container
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-codex-init-\(UUID())")
+        let root = TestTemp.root.appendingPathComponent("waypoint-codex-init-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let queue = ProjectDraftQueue()
