@@ -91,7 +91,7 @@ import Testing
     }
 
     @Test func droppedStatusSurvivesReopeningFileStore() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-test-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-test-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("Board.store")
         let id: UUID

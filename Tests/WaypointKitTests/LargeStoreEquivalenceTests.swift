@@ -393,7 +393,7 @@ private func buildFixture(_ ctx: ModelContext) -> Fixture {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"] != nil))
     func copyMatchesReferenceAndTiming() throws {
         let source = URL(fileURLWithPath: ProcessInfo.processInfo.environment["WAYPOINT_REAL_STORE_COPY"]!)
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-trk66-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-trk66-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("Waypoint.store")

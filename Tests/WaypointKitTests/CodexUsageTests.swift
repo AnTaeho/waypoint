@@ -69,7 +69,7 @@ import Testing
     /// 최근 날짜 폴더만, 수정 시각이 최근인 순. 가장 최근 파일에 Codex 한도가 없으면 다음 파일에서 찾는다.
     @Test func candidatesAndFallThrough() throws {
         let fm = FileManager.default
-        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let root = TestTemp.root.appendingPathComponent(UUID().uuidString)
         defer { try? fm.removeItem(at: root) }
         func write(_ folder: String, _ name: String, _ text: String, modified: TimeInterval) throws -> URL {
             let dir = root.appendingPathComponent(folder)
@@ -99,7 +99,7 @@ import Testing
     /// 끝부분 크기보다 큰 파일: 끝에서만 찾고, 거기 없으면 더 크게 읽어 찾는다.
     @Test func largeFileTailRead() throws {
         let fm = FileManager.default
-        let url = fm.temporaryDirectory.appendingPathComponent("rollout-\(UUID().uuidString).jsonl")
+        let url = TestTemp.root.appendingPathComponent("rollout-\(UUID().uuidString).jsonl")
         defer { try? fm.removeItem(at: url) }
         let codex = #"{"timestamp":"2026-10-01T00:00:00Z","payload":{"rate_limits":{"limit_id":"codex","primary":{"used_percent":33,"window_minutes":300}}}}"#
         let filler = String(repeating: "x", count: CodexUsage.tailSizes[0] + 10)

@@ -101,7 +101,7 @@ import Testing
     }
 
     @Test func fileStoreAtGivenURL() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-test-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-test-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("Test.store")
         do {

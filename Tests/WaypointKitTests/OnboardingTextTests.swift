@@ -107,7 +107,7 @@ import Testing
 
 @Suite struct FolderDraftTests {
     @Test func folderDraftFillsNameKeyAndGuides() throws {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("folder-draft-\(UUID().uuidString.prefix(8))")
+        let base = TestTemp.root.appendingPathComponent("folder-draft-\(UUID().uuidString.prefix(8))")
         let root = base.appendingPathComponent("ledger-app", isDirectory: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent(".claude"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: base) }

@@ -134,7 +134,7 @@ import Testing
     }
 
     @Test func symlinkedHomeIsTheSameHome() throws {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("home-policy-\(UUID().uuidString.prefix(8))")
+        let base = TestTemp.root.appendingPathComponent("home-policy-\(UUID().uuidString.prefix(8))")
         let target = base.appendingPathComponent("real", isDirectory: true)
         let link = base.appendingPathComponent("link")
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)

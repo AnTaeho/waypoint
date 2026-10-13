@@ -8,7 +8,7 @@ import Testing
     private enum SaveFailure: Error { case diskUnavailable }
 
     private func tempDir() throws -> URL {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-absorb-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-absorb-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
