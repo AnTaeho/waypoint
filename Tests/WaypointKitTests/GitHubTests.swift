@@ -459,17 +459,17 @@ func makeCheckout(origin: String? = "git@github.com:Me/App.git", branch: String 
 
     /// 미룬 응답을 기다리는 동안 훅 요청은 메인 액터에서 바로 답을 받는다.
     @MainActor @Test func hookAnswersWhileDeferredResponseIsPending() async throws {
-        let port = UInt16.random(in: 49200...49900)
-        let server = LocalServer(port: port) { _ in .text("main") }
-        server.deferredHandler = { request, send in
-            guard request.path == "/slow" else { return false }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { send(.text("late")) }
-            return true
+        let server = try await LocalServerTests.startOnFreePort { port in
+            let server = LocalServer(port: port) { _ in .text("main") }
+            server.deferredHandler = { request, send in
+                guard request.path == "/slow" else { return false }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { send(.text("late")) }
+                return true
+            }
+            return server
         }
-        server.start()
         defer { server.stop() }
-        for _ in 0..<100 where server.state != .ready { try await Task.sleep(for: .milliseconds(20)) }
-        try #require(server.state == .ready)
+        let port = server.port
 
         let slow = Task.detached { try await LocalServerTests.post(port, "/slow") }
         try await Task.sleep(for: .milliseconds(200))

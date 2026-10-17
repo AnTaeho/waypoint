@@ -18,18 +18,31 @@ import Testing
                 Date().timeIntervalSince(start), Date())
     }
 
+    /// 운영체제가 바깥 연결에 쓰는 포트 범위(49152~) 밖에서 열고, 이미 쓰는 포트면 다른 포트로 다시 연다.
+    @MainActor static func startOnFreePort(_ make: (UInt16) -> LocalServer) async throws -> LocalServer {
+        for _ in 0..<5 {
+            let server = make(UInt16.random(in: 38000...38999))
+            server.start()
+            for _ in 0..<100 where server.state == .starting { try await Task.sleep(for: .milliseconds(20)) }
+            if server.state == .ready { return server }
+            server.stop()
+        }
+        throw NoFreePort()
+    }
+
+    struct NoFreePort: Error {}
+
     /// 동기 함수로 메인 액터를 막는다(비동기 문맥에서는 `Thread.sleep`을 바로 부를 수 없다).
     @MainActor static func blockMainActor(seconds: TimeInterval) {
         Thread.sleep(forTimeInterval: seconds)
     }
 
     @MainActor @Test func fastHandlerAnswersWhileMainActorIsBusy() async throws {
-        let port = UInt16.random(in: 49200...49900)
-        let server = LocalServer(port: port, fastHandler: { $0.path == "/fast" ? .noContent : nil }) { _ in .text("main") }
-        server.start()
+        let server = try await Self.startOnFreePort {
+            LocalServer(port: $0, fastHandler: { $0.path == "/fast" ? .noContent : nil }) { _ in .text("main") }
+        }
         defer { server.stop() }
-        for _ in 0..<100 where server.state != .ready { try await Task.sleep(for: .milliseconds(20)) }
-        try #require(server.state == .ready)
+        let port = server.port
 
         let fast = Task.detached { try await Self.post(port, "/fast") }
         Self.blockMainActor(seconds: 1)
