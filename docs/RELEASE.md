@@ -18,7 +18,7 @@ scripts/release-mac.sh --feed-url https://<호스트>/appcast.xml --download-bas
 
 **iCloud는 기본으로 끈다.** 배포 빌드는 archive에 `WAYPOINT_ICLOUD=NO`를 넘겨 앱 Info.plist `WaypointICloud`가 `NO`가 되고, 앱은 CloudKit을 열지 않는다(`AppInstance.cloudKitContainer`, 기록은 그 Mac에만). Production 스키마를 배포하지 않았고(「사전 준비 4」), 스키마 없이 켜진 앱이 어떻게 되는지 확인하지 못해서다. 사용자 결정. 스키마를 배포한 뒤에는 `--icloud`로 켠다. 엔타이틀먼트(컨테이너·Production)는 켜든 끄든 같다. 평소용(`install-local.sh`)·Debug·iOS는 `project.yml` 기본값 `WAYPOINT_ICLOUD: YES`라 그대로 켜져 있다.
 
-만든 앱은 이 Mac에서 실행하지 않는다. 번들 ID가 평소용(`dev.antaeho.waypoint`)과 같아 평소용 포트 47821과 저장 폴더를 같이 쓴다. 확인은 아래 정적 검사로만 한다.
+만든 앱은 이 Mac에서 그냥 실행하지 않는다. 번들 ID가 평소용(`dev.antaeho.waypoint`)과 같아 평소용 포트 47821과 저장 폴더를 같이 쓴다. 확인은 아래 정적 검사로 한다. 꼭 띄워 봐야 하면 스크래치에 풀어 `open -n -g -j --env WAYPOINT_SUPPORT_DIR=<임시> --env WAYPOINT_PORT=47823 --env WAYPOINT_CLOUDKIT=0 Waypoint.app`으로 옆에 띄우고, 종료는 번들 ID quit 대신 PID에 `kill -TERM`.
 
 ## 사전 준비 (사람이 할 일)
 
@@ -30,7 +30,7 @@ Xcode > Settings… > Accounts에 팀 `2FCXA77MC5`(Taeho An) 계정이 있어야
 
 ### 2. Developer ID Application 인증서 — 지금은 없어도 된다
 
-2026-10-02 실측: 키체인에 Developer ID 인증서가 없는데도 자동 서명 export가 **Xcode 클라우드 관리 인증서**로 `Developer ID Application: Taeho An (2FCXA77MC5)` 서명을 했다(개인 팀이라 계정 소유자 권한이 있다). 그래서 `--check`는 이 항목으로 막지 않는다.
+키체인에 Developer ID 인증서가 없어도 자동 서명 export가 **Xcode 클라우드 관리 인증서**로 `Developer ID Application: Taeho An (2FCXA77MC5)` 서명을 한다(개인 팀이라 계정 소유자 권한이 있다). 그래서 `--check`는 이 항목으로 막지 않는다.
 
 export가 인증서 오류(「No signing certificate "Developer ID Application" found」 등)로 실패하면 그때 만든다.
 
@@ -57,7 +57,7 @@ export가 인증서 오류(「No signing certificate "Developer ID Application" 
 
 기본 배포 빌드는 iCloud를 끄므로 이 절은 필요 없다. `--check`도 `--icloud`를 줄 때만 이 항목을 보인다.
 
-Developer ID 앱은 CloudKit **Production** 환경을 쓴다(export 결과 엔타이틀먼트 `com.apple.developer.icloud-container-environment = Production`, 아래 「이번 실제 결과」). 평소용(`install-local.sh`, Apple Development 서명)과 Debug는 Development 환경을 쓴다. Production에 스키마가 없으면 외부 사용자 앱이 레코드를 올리지 못해 동기화가 되지 않는다.
+Developer ID 앱은 CloudKit **Production** 환경을 쓴다(엔타이틀먼트 `com.apple.developer.icloud-container-environment = Production`). 평소용(`install-local.sh`, Apple Development 서명)과 Debug는 Development 환경을 쓴다. Production에 스키마가 없으면 외부 사용자 앱이 레코드를 올리지 못해 동기화가 되지 않는다.
 
 Development 스키마는 평소용 앱이 실제로 쓰면서 이미 만들어져 있다(Core Data + CloudKit이 개발 환경에서는 첫 저장 때 레코드 타입을 만든다). 그것을 Production으로 올린다.
 
@@ -70,7 +70,7 @@ Development 스키마는 평소용 앱이 실제로 쓰면서 이미 만들어�
 주의:
 - Production에 올린 레코드 타입·필드는 지울 수 없다. 모델에 필드를 더한 판을 배포할 때마다 그 판을 평소용으로 한 번 써서 Development 스키마를 갱신한 뒤 다시 Deploy한다.
 - 평소용(Development)의 데이터는 Production으로 옮겨지지 않는다. 같은 Apple ID로 베타 빌드를 써도 빈 상태에서 시작한다.
-- Deploy 버튼 위치·문구는 2026-10-02에 직접 보지 못했다(**확인 못 함**). 위 순서는 Apple 문서 「Deploying an iCloud Container's Schema」 기준이다.
+- 위 순서는 Apple 문서 「Deploying an iCloud Container's Schema」 기준이다. Deploy 버튼 위치·문구는 직접 확인하지 못했다.
 
 `xcrun cktool`(Xcode 27 포함)로는 스키마를 읽고 비교할 수 있다. 관리 토큰이 필요하다(CloudKit Console > 오른쪽 위 계정 메뉴 > Manage Tokens > 새 Management Token).
 
@@ -83,34 +83,22 @@ xcrun cktool export-schema --team-id 2FCXA77MC5 --container-id iCloud.dev.antaeh
 diff /tmp/schema-dev.ckdb /tmp/schema-prod.ckdb                # 차이가 없으면 Production이 최신
 ```
 
-이번에 실행하지 않았다(토큰 필요). `cktool import-schema`는 `--environment`를 받지만 Production에 바로 넣을 수 있는지는 **확인 못 함** — Production 배포는 Console의 Deploy로 한다.
+Production 배포는 Console의 Deploy로 한다. `cktool import-schema`로 Production에 바로 넣을 수 있는지는 확인하지 못했다.
 
-### 5. 하드닝 런타임에서 앱이 도는지 (첫 배포 전 한 번)
+### 5. 하드닝 런타임과 배포판 실측
 
-배포 빌드만 하드닝 런타임을 켠다(`project.yml`은 NO). 앱은 `Process`로 `claude`·`codex`를 띄우고 `NSWorkspace`로 터미널을 연다. 예외 엔타이틀먼트 없이 되는지는 배포 앱을 실행하지 않아 **확인 못 함**. 같은 설정의 Dev 빌드로 본다:
+배포 빌드만 하드닝 런타임을 켠다(`project.yml`은 NO). 공증된 배포판을 옆에 띄워(위 실행 방법) 하드닝 런타임 실행·저장소 백업·로컬 서버·훅 수신·연결 요청이 되는 것을 확인했다. 예외 엔타이틀먼트(`com.apple.security.cs.*`)는 없다.
+
+- 터미널 열기는 `NSWorkspace.open`만 써서 Apple Events 엔타이틀먼트가 필요 없다. 실행으로는 확인하지 못했다.
+- 설치기가 `Process`로 `claude`·`codex`를 띄우는 경로는 배포판에서 확인하지 못했다.
+
+같은 설정의 Dev 빌드로 볼 때:
 
 ```sh
 xcodebuild -project Waypoint.xcodeproj -scheme Waypoint -destination 'platform=macOS' \
   -derivedDataPath .build/xcode-hardened -allowProvisioningUpdates ENABLE_HARDENED_RUNTIME=YES build
 open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 ```
-
-실측 폴더에서 훅 수신(47822), 카드의 터미널 열기, 연동 상태 진단이 평소 Dev와 같은지 확인한다. 되면 `project.yml`에서 켜서 평소용과 배포 빌드를 맞출지 정한다.
-
-**배포판 실측 (2026-10-02, `Waypoint-0.0.1-229.zip`, 메인 세션)**: 공증된 zip을 스크래치에 풀어(`spctl` accepted) 평소용을 끄지 않고 옆에 띄웠다 — `open -n -g -j --env WAYPOINT_SUPPORT_DIR=<임시> --env WAYPOINT_PORT=47823 --env WAYPOINT_CLOUDKIT=0 Waypoint.app`. 같은 번들 ID라 종료는 번들 ID quit 대신 PID에 `kill -TERM`.
-
-| 확인 | 결과 |
-|---|---|
-| 하드닝 런타임으로 실행 | 됨(`flags=0x10000(runtime)`, Developer ID). 충돌 보고 없음 |
-| 저장소 열기·백업 | 임시 폴더에 저장소·`store-version.json`·`daily` 백업 생성 |
-| 로컬 서버 | 47823 LISTEN, `/integration/status` 200 |
-| 훅 수신 | `waypoint-hook.sh SessionStart`(픽스처) → 블록 출력·exit 0, 연동 기록에 claude 수신 |
-| 연결 요청 | `tools/list` 11개, `project_resolve` 정상 응답 |
-| 첫 실행 온보딩 | 지표에 시도 1회 기록(창은 숨김이라 화면은 안 봄) |
-| 터미널 열기 | 실행 안 함(화면을 가져감). 코드는 `NSWorkspace.open`만 써서 Apple Events 엔타이틀먼트가 필요 없다 |
-| `claude`·`codex` 하위 프로세스 | 실행 안 함(Release엔 화면 없이 설치기를 부르는 경로가 없음). 하드닝 런타임은 `Process` 실행을 막지 않는다 — 일반 사항, 이 앱에서 확인 못 함 |
-| iCloud(Production) | 베타 빌드는 끈다(`WaypointICloud=NO`, 위 「iCloud는 기본으로 끈다」). 켰을 때는 **확인 못 함**. `WAYPOINT_SUPPORT_DIR`을 주면 앱이 iCloud를 끈다(`AppInstance.cloudKitContainer`). 켜려면 실제 저장 폴더를 써야 해서 평소용 기록과 섞인다. Production 스키마가 없을 때 앱이 어떻게 되는지 모른다 |
-
 
 ## 단계와 기대 출력
 
@@ -123,9 +111,9 @@ open -g -j .build/xcode-hardened/Build/Products/Debug/Waypoint.app
 | export | `-exportArchive`, ExportOptions(method `developer-id`, signingStyle `automatic`, teamID, 스크립트가 `.build/release-mac/ExportOptions.plist`로 만든다) | `· export: 성공(developer-id, …)` |
 | 서명 검증 | Info.plist의 번들 ID·버전·빌드·`WaypointICloud`·`SUFeedURL`(이번 실행의 값과 다르면 실패)·`SUPublicEDKey`(`project.yml`과 같아야 함), `codesign --verify --deep --strict`, Authority가 Developer ID·팀, 하드닝 런타임, Sparkle 구성 요소(`Sparkle.framework`·`Autoupdate`·`Updater.app`·`Downloader.xpc`·`Installer.xpc`)도 Developer ID·하드닝 런타임, 실행 파일 실행 경로에 `@executable_path/../Frameworks`, 엔타이틀먼트 컨테이너·`icloud-container-environment`(Production이어야 함)·`aps-environment` 출력 | `Info.plist WaypointICloud: NO`, `Authority=…` 세 줄, 엔타이틀먼트 세 줄, `· 서명 검증: 통과(…, WaypointICloud=NO)` |
 | 공증 제출 | ExportOptions `destination` `upload`로 `-exportArchive`(Xcode 계정, 로그 `.build/release-mac/upload.log`). 제출 시각은 아카이브 `Info.plist`의 `Distributions[]` 마지막 upload 항목에서 읽는다 | `· 공증 제출: 성공(Xcode 계정, <시각>, …)` |
-| 공증 대기 | `-exportNotarizedApp`을 `--poll-interval`초마다 다시 부른다. 출력이 「is processing and not ready for distribution」이면 기다리고, 다른 오류면 출력 원문을 보이고 바로 실패. `--notarize-timeout`분을 넘기면 실패(이어 하기 명령을 알려 준다). Ctrl-C도 같은 안내 | 확인마다 `  HH:MM 처리 중 — 제출 뒤 N분, …` 한 줄, 끝나면 `· 공증: 수락(제출 뒤 N분째 확인, …)` |
+| 공증 대기 | `-exportNotarizedApp`을 `--poll-interval`초마다 다시 부른다. 출력이 「is processing and not ready for distribution」이면 기다리고, 다른 오류면 출력 원문을 보이고 바로 실패. `--notarize-timeout`분을 넘기면 실패(이어 하기 명령을 알려 준다). Ctrl-C도 같은 안내. 첫 공증은 약 45분, 그 뒤로는 5분 안팎 걸렸다. 수락 뒤에도 아카이브의 `processingEvent.state`는 `processing`으로 남아서 완료는 `-exportNotarizedApp` 결과로만 판단한다 | 확인마다 `  HH:MM 처리 중 — 제출 뒤 N분, …` 한 줄, 끝나면 `· 공증: 수락(제출 뒤 N분째 확인, …)` |
 | 공증된 앱 검증 | 받은 앱(`.build/release-mac/notarized/Waypoint.app`)은 따로 서명된 번들이라 서명 검증을 한 번 더, `stapler validate`(이미 staple됨) | `· 공증된 앱 서명 검증: 통과(…)`, `· staple: 확인(The validate action worked!)` |
-| Gatekeeper | `spctl -a -vvv -t exec`. 공증 빌드는 `accepted`, `source=Notarized Developer ID`여야 한다. `--skip-notarize`는 거부가 정상이라 기록만 | `· Gatekeeper: 통과(…)` |
+| Gatekeeper | `spctl -a -vvv -t exec`. 공증 빌드는 `accepted`, `source=Notarized Developer ID`여야 한다. `--skip-notarize`는 거부(`Unnotarized Developer ID`)가 정상이라 기록만 | `· Gatekeeper: 통과(…)` |
 | 산출물 | 공증·staple된 앱으로 zip을 만들고 SHA256 | `· 산출물: dist/<이름>.zip (…)` |
 | 업데이트 서명 | 최종 zip에 EdDSA 서명(`sign_update`, 키는 로그인 키체인 계정 `dev.antaeho.waypoint`) | `· 업데이트 서명: 완료(EdDSA, …, N바이트)` |
 | appcast | `dist/appcast.xml`(이번 빌드 한 항목)과 같은 내용의 `dist/<이름>-appcast.xml`. `--download-base`가 없으면 다운로드 주소가 `{{DOWNLOAD_BASE}}` | `· appcast: dist/appcast.xml (…)`, `완료: …`, `업데이트: …` |
@@ -158,7 +146,7 @@ scripts/release-mac.sh --resume-notarize .build/release-mac/Waypoint.xcarchive
 ```sh
 APP=.build/release-mac/notarized/Waypoint.app   # 공증 전 확인이면 export/Waypoint.app
 codesign --verify --deep --strict --verbose=2 $APP
-codesign -dv --verbose=4 $APP 2>&1 | grep -E '^(Authority|TeamIdentifier|CodeDirectory)'
+codesign -dv --verbose=4 $APP 2>&1 | grep -E '^(Authority|TeamIdentifier|CodeDirectory)'   # CodeDirectory에 flags=0x10000(runtime)
 codesign -d --entitlements - --xml $APP | plutil -p -
 spctl -a -vvv -t exec $APP
 xcrun stapler validate $APP
@@ -166,60 +154,6 @@ xcrun stapler validate $APP
 ditto -x -k dist/Waypoint-<버전>-<빌드>.zip /tmp/wp && spctl -a -vvv -t exec /tmp/wp/Waypoint.app
 shasum -a 256 -c dist/Waypoint-<버전>-<빌드>.zip.sha256   # dist/에서
 ```
-
-## 이번 실제 결과 (2026-10-02, 커밋 084dcde, Xcode 27.0 27A266a)
-
-`scripts/release-mac.sh --check` — 공증 프로필 없음, (점검 당시) 커밋 안 된 변경 있음으로 「준비 안 됨」(exit 1). Developer ID 인증서는 키체인에 없지만 막지 않음(아래 export 결과).
-
-`scripts/release-mac.sh --skip-notarize`(깨끗한 트리) — exit 0:
-
-```
-· archive: 성공(…/.build/release-mac/Waypoint.xcarchive)          # 로그 끝: ** ARCHIVE SUCCEEDED **
-· export: 성공(developer-id, …/export/Waypoint.app)               # 로그 끝: ** EXPORT SUCCEEDED **
-  Authority=Developer ID Application: Taeho An (2FCXA77MC5)
-  Authority=Developer ID Certification Authority
-  Authority=Apple Root CA
-  icloud-container-identifiers: iCloud.dev.antaeho.waypoint
-  icloud-container-environment: Production
-  aps-environment: production
-  …/Waypoint.app: rejected
-  source=Unnotarized Developer ID
-  origin=Developer ID Application: Taeho An (2FCXA77MC5)
-· 산출물: dist/Waypoint-0.0.1-218-unnotarized.zip (5.2M)
-```
-
-- `CodeDirectory … flags=0x10000(runtime)` — 하드닝 런타임 켜짐. `Format=app bundle with Mach-O universal (x86_64 arm64)`, `TeamIdentifier=2FCXA77MC5`, `Timestamp` 있음(보안 타임스탬프).
-- 엔타이틀먼트 전체: `application-identifier 2FCXA77MC5.dev.antaeho.waypoint`, `aps-environment production`, `icloud-container-environment Production`, `icloud-container-identifiers [iCloud.dev.antaeho.waypoint]`, `icloud-services [CloudKit]`, `team-identifier`. 하드닝 런타임 예외(`com.apple.security.cs.*`)는 없다.
-- 프로파일: `embedded.provisionprofile` = 「Mac Team Direct Provisioning Profile: dev.antaeho.waypoint」(Xcode가 export 때 만듦, 만료 2044-09-27, 모든 기기).
-- `spctl` 거부(`Unnotarized Developer ID`)는 공증 전이라 정상이다.
-- 이때는 공증을 하지 않았다(아래 Xcode 계정 공증 실측).
-
-### Xcode 계정 공증 실측 (2026-10-02, 빌드 220, 메인 세션이 손으로)
-
-- `xcodebuild -exportArchive … -exportOptionsPlist <destination upload> -allowProvisioningUpdates` → `Uploaded Waypoint`, `** EXPORT SUCCEEDED **`. 제출 15:18(아카이브 `Distributions[]`의 `uploadEvent.date` `2026-10-02T06:18:36Z`).
-- 처리 중 `-exportNotarizedApp` → `error: Archive "…" is processing and not ready for distribution.`
-- 수락까지 약 45분(첫 공증). 그 뒤 `-exportNotarizedApp` 성공 → `xcrun stapler validate` `The validate action worked!`, `spctl -a -vvv -t exec` `accepted`, `source=Notarized Developer ID`.
-- 수락 뒤에도 아카이브 `Info.plist`의 `processingEvent.state`는 `processing`으로 남았다. 그래서 스크립트는 완료를 `-exportNotarizedApp`의 결과로만 본다.
-- 이 아카이브로 `--resume-notarize`를 돌려 성공 경로(서명 재검증·staple 확인·spctl accepted·zip)를 확인했다.
-
-### 스크립트 기본 실행 (2026-10-02, 커밋 891ea1c, 빌드 229)
-
-`scripts/release-mac.sh`(깨끗한 트리) — exit 0. 두 번째 공증은 첫 확인(제출 직후)에서 처리 중, 다음 확인(5분 뒤)에서 수락:
-
-```
-· 공증 제출: 성공(Xcode 계정, 2026-10-02 16:13:01 +0900, …/upload.log)
-· 공증 결과 대기(300초마다 확인, 최대 180분)
-  16:13 처리 중 — 제출 뒤 0분, 300초 뒤 다시 확인
-· 공증: 수락(제출 뒤 5분째 확인, 로그 dist/Waypoint-0.0.1-229-notarize.log)
-· 공증된 앱 서명 검증: 통과(Developer ID Application: Taeho An (2FCXA77MC5), 하드닝 런타임, iCloud.dev.antaeho.waypoint Production, aps production)
-· staple: 확인(The validate action worked!)
-  …/notarized/Waypoint.app: accepted
-  source=Notarized Developer ID
-  origin=Developer ID Application: Taeho An (2FCXA77MC5)
-· 산출물: dist/Waypoint-0.0.1-229.zip (5.4M), SHA256 d57b378321e491fcfc4ae9bab3bbba4bce6ff99c8d12ba2048437b158fdfff07
-```
-
-zip을 풀어 본 앱도 `spctl` accepted(`Notarized Developer ID`), `stapler validate` 성공.
 
 ## 실패할 때
 
@@ -232,9 +166,9 @@ zip을 풀어 본 앱도 `spctl` accepted(`Notarized Developer ID`), `stapler va
 | `공증 프로필 … 을 쓸 수 없음` | `--notary-profile`을 줬을 때만. 「사전 준비 3」의 대안 절차, 또는 `--notary-profile`을 빼고 Xcode 계정으로 |
 | `archive 실패` | 화면의 마지막 오류와 `.build/release-mac/archive.log`. 평소 빌드(`install-local.sh`의 빌드 단계)와 같은 원인인지 본다 |
 | `Developer ID export 실패` | `.build/release-mac/export.log`. 인증서 오류면 「사전 준비 2」로 인증서를 만든다. 프로파일 오류면 Xcode 계정 로그인 상태를 확인하고 다시 |
-| `업데이트 서명 키가 키체인에 없거나 …`, `업데이트 서명 실패` | `--check`의 서명 키 줄. 이 Mac이 아니면 「자동 업데이트 > 서명 키」의 복원 절차 |
+| `업데이트 서명 키가 키체인에 없거나 …`, `업데이트 서명 실패` | `--check`의 서명 키 줄. 이 Mac이 아니면 「업데이트 서명 키」의 복원 절차 |
 | `Sparkle 구성 요소가 없음`·`Developer ID 서명이 아님: …Sparkle…` | `.build/release-mac/export.log`. export가 안쪽 실행 파일을 다시 서명하지 못한 것. Sparkle 판을 바꿨다면 되돌려 본다 |
-| `실행 파일 LC_RPATH에 …가 없음` | `project.yml`의 `LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]`가 빠졌다. 이대로 배포하면 앱이 열자마자 죽는다 |
+| `실행 파일 LC_RPATH에 …가 없음` | `project.yml`의 `LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]`가 빠졌다(다중 플랫폼 타깃의 기본값은 iOS 형식). 이대로 배포하면 앱이 열자마자 죽는다 |
 | `CloudKit 환경이 Production이 아님` | export가 개발용 서명으로 됐다는 뜻. ExportOptions method가 `developer-id`인지, Xcode 계정 권한을 본다 |
 | `Info.plist WaypointICloud가 …` | archive 줄의 `WAYPOINT_ICLOUD=`와 `Config/Waypoint-macOS-Info.plist`(`$(WAYPOINT_ICLOUD)`), `project.yml`의 `INFOPLIST_FILE[sdk=macosx*]`를 본다. `xcodegen generate`를 했는지 |
 | `하드닝 런타임이 꺼져 있음` | archive 줄의 `ENABLE_HARDENED_RUNTIME=YES`가 빠졌는지 본다 |
@@ -244,11 +178,11 @@ zip을 풀어 본 앱도 `spctl` accepted(`Notarized Developer ID`), `stapler va
 ## 버전과 빌드 번호
 
 - **빌드 번호**(`CFBundleVersion`) = `git rev-list --count HEAD`. 커밋마다 늘어난다. `release-mac.sh`와 `install-local.sh`가 같은 함수(`scripts/build-version.sh`의 `waypoint_build_number`)로 정해 `CURRENT_PROJECT_VERSION=<n>`으로 넘긴다. `project.yml`의 `CURRENT_PROJECT_VERSION: "1"`은 Xcode에서 직접 빌드할 때만 쓰인다.
-- 빌드 번호가 바뀌면 앱이 첫 실행 때 `store-version.json`과 비교해 저장소를 열기 전에 백업한다(TRK-46). 같은 커밋을 다시 빌드하면 번호가 같아 백업이 생기지 않는다.
+- 빌드 번호가 바뀌면 앱이 첫 실행 때 `store-version.json`과 비교해 저장소를 열기 전에 백업한다. 같은 커밋을 다시 빌드하면 번호가 같아 백업이 생기지 않는다.
 - **마케팅 버전**(`CFBundleShortVersionString`)은 `project.yml`의 `MARKETING_VERSION`이 원본이다. `--version X.Y.Z`(숫자 셋)를 주면 그 빌드에만 덮고 파일은 고치지 않는다. 계속 쓸 버전이면 `project.yml`을 고쳐 커밋한다.
 - 배포 빌드는 깨끗한 트리에서만 만든다. 그래야 빌드 번호와 커밋이 한 내용을 가리킨다(요약 파일에 커밋 해시가 남는다).
 
-## 자동 업데이트 (TRK-56)
+## 자동 업데이트
 
 앱은 Sparkle 2.10.0(SwiftPM, `project.yml`에서 판 고정, macOS 타깃만)으로 새 빌드를 찾고 받아 바꾼다. 앱 쪽 동작과 꺼짐 조건은 [SPEC.md](SPEC.md) 「자동 업데이트」.
 
@@ -258,10 +192,12 @@ zip을 풀어 본 앱도 `spctl` accepted(`Notarized Developer ID`), `stapler va
 - 배포 빌드에 `--feed-url <주소>`를 주면 그 주소가 앱에 들어간다. 한번 내보낸 앱은 그 주소만 보므로, 주소는 바꾸지 않을 곳으로 정한다.
 - 공개 키 `WAYPOINT_UPDATE_PUBLIC_KEY`(→ `SUPublicEDKey`)는 `project.yml`에 있다. 앱은 이 키로 서명이 맞는 zip만 설치한다.
 - 비샌드박스 앱이라 Sparkle XPC 설정(`SUEnableInstallerLauncherService` 등)은 필요 없다. 하드닝 런타임 예외 엔타이틀먼트도 더하지 않았다. 안쪽 실행 파일은 export가 Developer ID로 다시 서명한다(스크립트가 확인).
+- 기본값(`SUAutomaticallyUpdate` 없음)에서는 Sparkle 창이 새 판을 알리고 사람이 「설치」를 누른다. 자동 설치를 켜면 앱을 종료할 때 바꾸고, 다시 열지는 않는다.
+- 업데이트 경로는 Dev 빌드(Apple Development 서명)로 끝까지 확인했다. Developer ID 빌드는 번들 ID가 평소용과 같아 이 Mac에서 업데이트를 돌려 보지 못하고 정적 검사만 한다.
 
-### 서명 키
+### 업데이트 서명 키
 
-- 개인 키는 이 Mac 로그인 키체인에만 있다. 항목: 종류 「암호」, 서비스 `https://sparkle-project.org`, 계정 `dev.antaeho.waypoint`(2026-10-03 생성). 저장소·로그·산출물에는 없다.
+- 개인 키는 이 Mac 로그인 키체인에만 있다. 항목: 종류 「암호」, 서비스 `https://sparkle-project.org`, 계정 `dev.antaeho.waypoint`. 저장소·로그·산출물에는 없다.
 - **잃으면 이미 내보낸 앱에 새 판을 보낼 수 없다**(공개 키가 앱에 들어 있다). 그래서 따로 백업해 둔다.
   ```sh
   B=.build/SourcePackages/artifacts/sparkle/Sparkle/bin   # 배포 스크립트·Xcode가 받아 둔 Sparkle 도구
@@ -289,14 +225,5 @@ zip을 풀어 본 앱도 `spctl` accepted(`Notarized Developer ID`), `stapler va
 ### 실패해도 남는 것
 
 - Sparkle은 받은 zip의 EdDSA 서명과 앱 코드 서명(같은 팀)을 확인한 뒤에만 바꾼다. 확인이나 설치가 실패하면 옛 앱이 그대로 남는다.
-- 새 빌드가 처음 열릴 때 빌드 번호가 바뀐 것을 보고 저장소를 열기 전에 `upgrade` 백업을 만든다(TRK-46). 새 빌드가 저장소를 망가뜨려도 설정 「기록」 탭에서 되돌릴 수 있다.
+- 새 빌드가 처음 열릴 때 빌드 번호가 바뀐 것을 보고 저장소를 열기 전에 `upgrade` 백업을 만든다. 새 빌드가 저장소를 망가뜨려도 설정 「기록」 탭에서 되돌릴 수 있다.
 - 기록은 앱 번들 밖(`~/Library/Application Support/Waypoint/`)에 있어 앱을 바꿔도 지워지지 않는다.
-
-### 실측 (2026-10-03, Sparkle 2.10.0)
-
-- `scripts/release-mac.sh --skip-notarize --allow-dirty --feed-url http://127.0.0.1:8099/appcast.xml --download-base http://127.0.0.1:8099/` — exit 0. `SUFeedURL`·`SUPublicEDKey`가 앱 Info.plist에 들어가고, `Sparkle.framework`·`Autoupdate`·`Updater.app`·`Downloader.xpc`·`Installer.xpc`가 모두 `Developer ID Application: Taeho An (2FCXA77MC5)`·하드닝 런타임. 업데이트 서명·`dist/appcast.xml` 생성.
-- 처음 만든 빌드는 실행 경로에 `@executable_path/../Frameworks`가 없어 열자마자 죽었다(다중 플랫폼 타깃의 기본값이 iOS 형식). `project.yml`에 macOS 실행 경로를 더하고 스크립트 검사에 넣었다.
-- 끝까지 업데이트(Dev 구성, 화면 조작 없음): 피드를 넣은 Dev 빌드 9001·9002를 만들고, 9002 zip을 같은 키로 서명해 로컬 HTTP 서버(127.0.0.1:8099)에 appcast와 함께 두었다. 9001 사본을 `open -g -j`(`WAYPOINT_SUPPORT_DIR`=임시 폴더, `WAYPOINT_PORT=47899`, `WAYPOINT_CLOUDKIT=0`)로 열고 Dev 설정 도메인에 `SUAutomaticallyUpdate=YES`를 넣었다. 실행 직후 로컬 서버 기록에 피드와 zip 요청이 찍혔다(사람 조작 없음. 창이 떴는지는 화면을 보지 않아 확인 못 함). 번들 ID로 종료하자 2초 안에 사본의 `CFBundleVersion`이 9002로 바뀌었고 `codesign --verify --deep --strict` 통과. 다시 열자 9002로 떠서 임시 저장소·47899를 썼고, `store-version.json` 빌드가 9002로 바뀌며 `…-upgrade` 백업이 생겼다. 실험 뒤 Dev 설정 도메인의 `SU*` 키와 Sparkle 캐시 폴더를 지웠다.
-- 이 실측은 Debug(Apple Development 서명) 빌드다. Developer ID·하드닝 런타임 빌드의 업데이트는 번들 ID가 평소용과 같아 이 Mac에서 실행하지 못해 정적 검사만 했다.
-- 자동 설치는 종료할 때 일어나고 앱을 다시 열지는 않는다. 기본값(`SUAutomaticallyUpdate` 없음)에서는 Sparkle 창이 새 판을 알리고 사람이 「설치」를 누른다 — 이 경로는 화면 조작이 필요해 보지 않았다.
-
