@@ -1,6 +1,6 @@
-# SSH 원격·개발 컨테이너에서 쓰기 (TRK-53)
+# SSH 원격·개발 컨테이너에서 쓰기
 
-Mac에서 Waypoint가 켜져 있고, Claude Code·Codex는 SSH로 접속한 리눅스 서버나 개발 컨테이너 안에서 도는 경우. 원격 세션의 훅이 Mac 앱에 닿게 하고, 원격 폴더를 같은 git 저장소의 등록 프로젝트에 잇는다. 동작 규칙은 [`SPEC.md`](SPEC.md) 「원격·컨테이너 수집」, 실측은 [`RELIABILITY.md`](RELIABILITY.md) 「원격·컨테이너 (TRK-53)」.
+Mac에서 Waypoint가 켜져 있고, Claude Code·Codex는 SSH로 접속한 리눅스 서버나 개발 컨테이너 안에서 도는 경우. 원격 세션의 훅이 Mac 앱에 닿게 하고, 원격 폴더를 같은 git 저장소의 등록 프로젝트에 잇는다. 동작 규칙은 [`SPEC.md`](SPEC.md) 「원격·컨테이너 수집」, 확인 결과는 [`RELIABILITY.md`](RELIABILITY.md) 「원격·컨테이너」.
 
 ## 무엇이 이어지나
 
@@ -39,7 +39,7 @@ Mac 쪽: Waypoint 앱이 이 기능이 들어간 버전이어야 한다(옛 앱�
 
 ## 개발 컨테이너
 
-Docker Desktop의 `host.docker.internal`은 Mac의 `127.0.0.1`에만 열린 앱 서버에도 닿는다(2026-10-03 실측, Docker 29.6). 앱 서버를 다른 인터페이스로 열 필요가 없다. 훅에 앱 주소만 알려 주면 된다.
+Docker Desktop의 `host.docker.internal`은 Mac의 `127.0.0.1`에만 열린 앱 서버에도 닿는다(Docker Desktop 29.6에서 확인). 앱 서버를 다른 인터페이스로 열 필요가 없다. 훅에 앱 주소만 알려 주면 된다.
 
 `.devcontainer/devcontainer.json` 예:
 

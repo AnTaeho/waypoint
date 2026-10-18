@@ -32,7 +32,7 @@ Waypoint로 다른 저장소의 세션을 늘 추적하면서 Waypoint 자체도
 scripts/install-local.sh
 ```
 
-Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`, 빌드 번호 = 커밋 수) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 뒤에서 실행(`open -g`, 쓰던 창의 초점을 뺏지 않는다) → 47821을 설치한 앱이 여는지 확인. 실행 전에 옛 방식(System Events) 로그인 항목이 있으면 지우고 `defaults`에 `WaypointLoginItemLegacyRemoved`를 남긴다. 로그인 항목 등록은 앱이 첫 실행 때 `SMAppService`로 한다(TRK-55). 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
+Release 빌드(`.build/release`, 팀 서명, `-allowProvisioningUpdates`, 빌드 번호 = 커밋 수) → 서명과 컨테이너 엔타이틀먼트 확인 → 떠 있는 평소용 정상 종료(번들 ID로 `quit`, 10초 대기, 안 꺼지면 멈춤, 강제 종료 없음) → `ditto`로 `/Applications/Waypoint.app` 교체 → 뒤에서 실행(`open -g`, 쓰던 창의 초점을 뺏지 않는다) → 47821을 설치한 앱이 여는지 확인. 실행 전에 옛 방식(System Events) 로그인 항목이 있으면 지우고 `defaults`에 `WaypointLoginItemLegacyRemoved`를 남긴다. 로그인 항목 등록은 앱이 첫 실행 때 `SMAppService`로 한다. 끝에 한 줄로 결과를 보인다. 어느 단계든 실패하면 이유를 출력하고 exit 1. 여러 번 돌려도 된다.
 
 외부 베타용 배포 빌드(Developer ID·공증)는 [`docs/RELEASE.md`](RELEASE.md), `scripts/release-mac.sh`.
 
@@ -56,7 +56,7 @@ lsof -nP -iTCP:47822 -sTCP:LISTEN
 ## 서명과 CloudKit
 
 - 팀 `2FCXA77MC5`(Taeho An) 자동 서명. Xcode 설정 > Accounts에 이 팀 계정이 있어야 한다. CloudKit·푸시 엔타이틀먼트는 프로파일이 있어야 들어가서 애드혹 서명(`CODE_SIGN_IDENTITY=-`)으로는 빌드하지 않는다.
-- 명령행 빌드에는 `-allowProvisioningUpdates`(기기 빌드는 `-allowProvisioningDeviceRegistration`도)를 붙인다. App ID·iCloud 컨테이너·프로파일을 Xcode가 만들고 갱신한다. 2026-09-28 이렇게 생겼다:
+- 명령행 빌드에는 `-allowProvisioningUpdates`(기기 빌드는 `-allowProvisioningDeviceRegistration`도)를 붙인다. App ID·iCloud 컨테이너·프로파일을 Xcode가 만들고 갱신한다:
   - App ID `dev.antaeho.waypoint`(「XC dev antaeho waypoint」), `dev.antaeho.waypoint.dev`(「XC dev antaeho waypoint dev」)
   - 컨테이너 `iCloud.dev.antaeho.waypoint`, `iCloud.dev.antaeho.waypoint.dev`
   - 프로파일 「Mac Team Provisioning Profile: …」, 「iOS Team Provisioning Profile: …」(번들 ID마다)
@@ -124,29 +124,7 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 - 첫 연결 지표(`metrics.json`의 `onboarding`)는 `curl -s 127.0.0.1:47822/integration/status | jq .metrics.onboarding`으로 본다(파일은 10초 점검 때 쓴다).
 - `scripts/install-codex.py`·`dev-probe-setup.sh`는 개발용으로 남는다. Codex 쪽은 앱 설치기와 같은 파일을 쓴다(`CodexInstallerTests`).
 - 이 Mac의 실제 설치를 그대로 인식하는지는 `RealInstallStateTests`가 실제 설정을 임시 홈에 복사(읽기만)해 빈 계획인지 본다.
-
-### 깨끗한 환경 첫 설정 (TRK-45)
-
-설정이 하나도 없는 홈에서 첫 설정과 실제 수신을 잰다. 결과는 `docs/RELIABILITY.md` 같은 이름 절.
-
-```sh
-P=<스크래치>/clean; mkdir -p $P/home $P/support $P/app
-open -g -j --env WAYPOINT_INTEGRATION_HOME=$P/home --env WAYPOINT_SUPPORT_DIR=$P/support $APP \
-  --args -WaypointOnboarding apply -WaypointOnboardingFolder $P/app
-curl -s 127.0.0.1:47822/integration/status | jq .metrics.onboarding   # installed·projectAt 확인
-cd $P/app
-env -i HOME=$P/home PATH=$HOME/.local/bin:/usr/bin:/bin:/opt/homebrew/bin TERM=xterm \
-  claude -p "ok" --model haiku --debug                               # 한 번만
-env -i HOME=$P/home CODEX_HOME=$P/home/.codex PATH=/opt/homebrew/bin:/usr/bin:/bin TERM=xterm \
-  codex exec --skip-git-repo-check "ok" < /dev/null                  # 한 번만
-curl -s 127.0.0.1:47822/integration/status | jq '.history.hooks, .metrics.onboarding'
-osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
-```
-
-- `env -i`로 띄운다. Claude Code 안에서 돌리면 `CLAUDECODE`·메시징 소켓 변수가 따라가 지금 세션으로 섞인다.
-- 임시 홈에는 로그인 정보가 없어 Claude는 훅·MCP까지만 돌고 모델 호출에서 「Not logged in」, Codex는 `401`로 끝난다. 실제 대화까지 보려면 사람이 임시 홈에서 로그인하고, Codex는 대화형 `/hooks`에서 신뢰한다. 실제 홈의 인증 파일을 복사하지 않는다.
-- 끝나면 실제 홈 설정(`~/.claude/settings.json`·`~/.codex/config.toml`·`hooks.json`·`~/.agents`)의 수정 시각·해시와 `~/.claude.json`의 `mcpServers`가 그대로인지 본다(`~/.claude.json` 전체는 돌고 있는 Claude Code가 늘 고쳐 쓴다).
-- 설치된 훅의 outbox는 `$HOME/Library/Application Support/Waypoint-Dev`, 곧 임시 홈 안으로 간다. 앱이 `$P/support`를 쓰므로 앱이 꺼진 동안 온 기록은 흡수되지 않는다. 앱을 켠 채로 잰다.
+- 확인용 홈에서 `claude`·`codex`를 직접 돌릴 때는 `env -i HOME=$P/home …`로 띄운다. Claude Code 안에서 그냥 돌리면 `CLAUDECODE`·메시징 소켓 변수가 따라가 지금 세션으로 섞인다. 실제 홈의 인증 파일은 복사하지 않는다.
 - macOS에는 `timeout`이 없다. 시간 제한은 `perl -e 'alarm 150; exec @ARGV' …`.
 
 ## 실측 폴더
@@ -166,7 +144,7 @@ scripts/dev-probe-setup.sh --remove ~/workspace/projects/waypoint/waypoint-probe
 알아 둘 것:
 
 - **훅은 합쳐진다.** 사용자·프로젝트 설정의 훅이 모두 불려 전역 훅(47821)도 간다. 평소용은 등록되지 않은 폴더의 기록을 버리므로, 실측 폴더는 평소용에 등록하지 않는다. 다만 평소용이 `SessionStart`에 「이 폴더는 Waypoint에 없음」 한 줄을 돌려줘 Dev 컨텍스트와 함께 들어간다.
-- **MCP는 프로젝트 범위가 먼저다.** 같은 이름이면 로컬 > 프로젝트 > 사용자(https://code.claude.com/docs/en/mcp). 2026-09-28 Claude Code 2.1.283 실측: 실측 폴더의 `claude -p`에서 `mcp__waypoint__project_resolve`가 Dev(47822)로 갔다(이 저장소 경로를 물으면 평소용은 TRK, Dev는 null을 돌려준다). 다만 `claude mcp get/list`는 이 폴더에서도 사용자 범위(47821)를 보이고 「Conflicting scopes」 진단을 띄운다. 세션 동작과 표시가 다르니 확인은 도구 호출로 한다.
+- **MCP는 프로젝트 범위가 먼저다.** 같은 이름이면 로컬 > 프로젝트 > 사용자(https://code.claude.com/docs/en/mcp). 실측 폴더의 세션에서 `mcp__waypoint__*`는 Dev(47822)로 간다. 다만 `claude mcp get/list`는 이 폴더에서도 사용자 범위(47821)를 보이고 「Conflicting scopes」 진단을 띄운다. 확인은 도구 호출로 한다(이 저장소 경로로 `project_resolve`를 부르면 평소용은 TRK, Dev는 null).
 - 로컬 범위(`claude mcp add -s local`)는 `~/.claude.json`에 적히므로 쓰지 않는다.
 
 ## 되돌리기
@@ -179,7 +157,7 @@ scripts/dev-probe-setup.sh --remove ~/workspace/projects/waypoint/waypoint-probe
 - iPhone 앱: 기기에서 앱을 길게 눌러 삭제.
 - 인스턴스 분리 자체: `project.yml`의 `configs: Debug:` 블록을 지우고 `xcodegen generate`. Debug가 다시 `dev.antaeho.waypoint`가 되어 평소용과 같은 포트·저장소를 쓴다(둘을 동시에 켜지 않는다).
 
-## 기록 탭 실측 (TRK-47)
+## 기록 탭 실측
 
 실제 저장소는 열지 않는다. 평소용이 뜬 백업 폴더 하나를 스크래치 폴더로 복사해 쓴다.
 
@@ -201,7 +179,7 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 - 확인: 백업은 `$P/support/store-backups/*/info.json`, 복원은 `store-restore.json`과 `curl -s 127.0.0.1:47822/integration/status`의 `storeRestore`, 지우기는 `sqlite3 "file:$P/support/Waypoint.store?mode=ro"`의 `ZPROJECT`·`ZCARD`… 행 수.
 - 복원이 실제로 되돌리는지 보려면 백업 뒤 `POST 127.0.0.1:47822/hooks/SessionStart`(등록된 폴더 `cwd`, 새 `session_id`)로 세션을 하나 더하고 복원 뒤 그 세션이 없는지 본다.
 
-## 원격·컨테이너 실측 (TRK-53)
+## 원격·컨테이너 실측
 
 사용자 절차는 [`REMOTE.md`](REMOTE.md). 개발 중 실측은 실제 원격 서버 대신 Docker 컨테이너로 한다(Docker Desktop은 `open -g -j -a Docker`로 뒤에서 켜고, 끝나면 `osascript -e 'quit app "Docker"'`).
 
@@ -210,7 +188,7 @@ osascript -e 'quit app id "dev.antaeho.waypoint.dev"'
 - sshd 컨테이너를 원격으로 삼고 `ssh -N -R 47822:127.0.0.1:47822`로 터널을 연다. 실측 폴더(`~/workspace/projects/waypoint/waypoint-probe`)에 origin이 없으면 임시 bare 저장소를 origin으로 붙이고, 컨테이너 안 클론의 origin을 같은 문자열로 맞춘다(끝나면 실측 폴더의 origin을 지운다).
 - 훅 스크립트 단위 확인: `bash integration/hooks/test-waypoint-hook.sh`(8번 묶음이 `WAYPOINT_URL`·원격 정보·replay).
 
-## 뮤테이션 테스트 (TRK-69)
+## 뮤테이션 테스트
 
 테스트가 실제로 버그를 잡는지 잰다. 코드를 한 군데씩 일부러 틀리게 바꾸고(`==`→`!=`, `&&`→`||`, `>`→`>=`, `true`→`false`, `!` 제거, `+`→`-`) 테스트가 실패하는지 본다.
 
@@ -225,4 +203,3 @@ scripts/mutation-test.py Shared/Rules --list                      # 변형 목�
 - 변형 하나에 10~25초. 고친 파일만 돌린다. `Shared/Rules`+`Shared/Hooks` 전체는 세 시간쯤.
 - 실제 홈 폴더를 읽는 `GuidanceRealFileTests`·`RealInstallStateTests`는 변형 실행에서 뺀다.
 - 생존을 보면 그 줄의 동작을 확인하는 테스트를 더한다. 어떤 입력으로도 결과가 달라지지 않는 변형(동등 변형)은 `scripts/mutation-equivalents.txt`에 이유와 함께 적어 다음 실행에서 건너뛴다.
-- 기성 도구 Muter 16은 Swift 6.4에서 변형 코드가 컴파일되지 않아 쓰지 않는다.
