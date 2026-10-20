@@ -11,8 +11,9 @@ extension MCPTools {
             return ["project": .string(project.key), "status": ProjectStatus.latest(for: project).map(statusJSON) ?? .null]
         }
         let text = try ProjectStatus.normalized(raw)
-        let session = optionalString(args, "sessionId").flatMap(fetchSession)
-        let provider = try session?.provider ?? provider(args)
+        let found = optionalString(args, "sessionId").flatMap(fetchSession)
+        let session = projectSession(found, in: project)
+        let provider = try found?.provider ?? provider(args)
         var payload: [String: EventValue] = ["summary": .string(text), "provider": .string(provider.rawValue)]
         if let session { payload["sessionId"] = .string(session.id) }
         let date = now()

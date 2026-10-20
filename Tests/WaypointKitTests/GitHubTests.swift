@@ -352,6 +352,19 @@ func makeCheckout(origin: String? = "git@github.com:Me/App.git", branch: String 
         #expect(h.context.hasChanges == false)
     }
 
+    @Test func otherProjectSessionIsNotAttached() throws {
+        let gh = try FakeGH(stdout: "https://github.com/Me/App/issues/12\n")
+        let h = try Self.harness(gh)
+        let elsewhere = Project(key: "OTH", name: "other", rootPath: "~/other")
+        h.context.insert(elsewhere)
+        _ = makeSession(h.context, elsewhere, id: "oth-session")
+        let (value, isError) = try Self.call(h, "github_issue_create", ["project": "PRB", "title": "버그",
+                                                                       "sessionId": "oth-session"])
+        #expect(!isError, "\(value.serializedString)")
+        let event = try #require(h.project.events?.first { $0.type == .githubIssue })
+        #expect(event.session == nil)
+    }
+
     @Test func pullRequestFollowsSessionCard() throws {
         let gh = try FakeGH(stdout: "https://github.com/Me/App/pull/34\n")
         let h = try Self.harness(gh)

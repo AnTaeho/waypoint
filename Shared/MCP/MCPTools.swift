@@ -131,13 +131,13 @@ public final class MCPTools {
             guard parent?.project === project else { throw MCPToolError("parentId는 같은 프로젝트 카드여야 함") }
         }
         let date = now()
-        let sessionId = optionalString(args, "sessionId")
-        let session = sessionId.flatMap(fetchSession)
+        let found = optionalString(args, "sessionId").flatMap(fetchSession)
+        let session = projectSession(found, in: project)
         let requestedProvider = try provider(args)
-        let origin = (session?.provider ?? requestedProvider).cardOrigin
+        let origin = (found?.provider ?? requestedProvider).cardOrigin
         let card = project.makeCard(
             in: context, title: title, kind: kind, status: status,
-            body: optionalString(args, "body") ?? "", origin: origin, originSessionId: sessionId,
+            body: optionalString(args, "body") ?? "", origin: origin, originSessionId: session?.id,
             parent: parent, criteria: try criteria(args), at: date
         )
         Event.record(.cardCreated, in: context, project: project, card: card, session: session, at: date,
