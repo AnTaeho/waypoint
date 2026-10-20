@@ -179,6 +179,29 @@ import Testing
         #expect(try h.session()?.project === h.project)
     }
 
+    // 원격 훅의 PID는 원격 쪽 프로세스라 이 Mac에서 찾지 않는다. 원격 세션은 30분 규칙으로 끝낸다.
+    @Test func remoteSessionIgnoresPidAndEndsByInactivity() throws {
+        let h = try Harness()
+        h.processor.handle(event: "SessionStart", json: Self.payload("SessionStart"), at: t0, claudePid: 4242)
+        h.processor.handle(event: "PostToolUse", json: Self.edit(Self.remoteRoot + "/src/OCR.swift"), at: t0 + 10,
+                           claudePid: 4242)
+        let session = try #require(try h.session())
+        #expect(session.claudePid == nil)
+        #expect(h.processor.sweep(now: t0 + 60, probe: { _ in nil }) == 0)
+        #expect(session.endedAt == nil)
+        #expect(h.processor.sweep(now: t0 + 10 + 31 * 60, probe: { _ in .init(startedAt: nil) }) == 1)
+        #expect(session.endReason == SessionSweep.reasonInactive)
+    }
+
+    // 원격 훅이 세션의 첫 훅(파일 변경)이어도 PID를 적지 않는다.
+    @Test func remoteFirstEditDoesNotRecordPid() throws {
+        let h = try Harness()
+        h.processor.handle(event: "PostToolUse", json: Self.edit(Self.remoteRoot + "/src/OCR.swift"), at: t0,
+                           claudePid: 4242)
+        let session = try #require(try h.session())
+        #expect(session.claudePid == nil)
+    }
+
     // MARK: - 잇기
 
     /// 원격 작업 트리의 세션이 같은 원격 주소의 등록 프로젝트에 이어진다. 세션 폴더·브랜치는 원격 값, 파일은 작업 트리 기준 상대 경로.
