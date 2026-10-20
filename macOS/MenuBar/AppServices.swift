@@ -58,6 +58,8 @@ final class AppServices {
     @ObservationIgnored private var saveObserver: NSObjectProtocol?
     /// 화면 갱신(`lastDataChange`)을 묶는다. 원격 replay처럼 저장이 잦아도 간격마다 한 번만 다시 그린다.
     @ObservationIgnored private var refreshThrottle = RefreshThrottle()
+    /// 열지 못한 서버를 10초 점검에서 다시 여는 간격
+    @ObservationIgnored private var serverRestart = ServerRestartBackoff()
     /// 마지막 요청 문장 정리 시각(`PromptRetention`). 시작 직후 첫 점검에서 한 번 돌고 하루마다 다시 돈다.
     @ObservationIgnored private var lastPromptRetention: Date?
     /// 마지막 기록 정리 시각(`RecordRetention`). 다 못 지웠으면 곧 이어서 지운다.
@@ -148,7 +150,10 @@ final class AppServices {
             self.serverState = state
             if case .failed = state { self.reliability.update { $0.failures.server += 1 } }
             // 흡수와 서버가 열리는 사이에 스크립트가 outbox로 보낸 것까지 받는다.
-            if state == .ready { self.drainOutbox() }
+            if state == .ready {
+                self.serverRestart.reset()
+                self.drainOutbox()
+            }
         }
         deferGitHub(on: server, mcp: mcp)
         self.server = server
@@ -245,6 +250,10 @@ final class AppServices {
         drainOutbox()
         if replayBacklog { drainReplay() }
         let now = Date()
+        if case .failed = serverState, serverRestart.isDue(now: now) {
+            serverRestart.recordAttempt(now: now)
+            server?.start()
+        }
         let swept = processor?.sweep(now: now, probe: SessionSweep.systemProbe) ?? 0
         if swept > 0 { reliability.update { $0.recovery.sessionsClosed += swept } }
         let context = container.mainContext
@@ -301,6 +310,7 @@ final class AppServices {
     }
 
     func retryIntegration() {
+        serverRestart.reset()
         if serverState != .ready { server?.start() }
         refreshStates()
     }
