@@ -375,7 +375,7 @@ SSH 원격 서버·개발 컨테이너의 Claude Code·Codex 훅을 Mac 앱이 �
 
 - 매칭(`RemoteMatcher`·`HookProcessor.linkRemote`): origin을 `GitRemoteURL.normalize`(스킴·사용자 정보·포트·끝 `.git`·`/`를 떼고 소문자, scp 꼴 같음, 로컬 경로는 경로만)로 맞춘다. 등록 프로젝트의 origin은 작업 트리 `.git/config`를 읽는다(`LocalOrigin`, 5분 기억). ① `waypoint_remote`가 있고 ② `cwd`가 등록 폴더와 맞지 않고 ③ 원격 경로가 이 Mac에 없고 ④ 같은 주소의 보관 안 된 프로젝트들의 로컬 작업 트리가 **하나**일 때 잇는다.
 - 이으면 `cwd`와 파일 경로를 원격 작업 트리 → 로컬 작업 트리로 옮긴 뒤 로컬과 같은 규칙으로 처리한다. 세션 `cwd`는 원격 폴더, `gitBranch`는 `waypoint_remote.branch`, `checkout`은 `<host>:<원격 작업 트리>`.
-- 잇지 못한 원격 세션의 시작 블록에는 `remote: <origin>` 줄이 붙는다. `project_resolve`는 `remote`로 같은 규칙을 쓴다.
+- 잇지 못한 원격 세션의 시작 블록에는 `remote: <정규화한 origin>` 줄이 붙는다(사용자 정보·토큰은 뗀다). `project_resolve`는 `remote`로 같은 규칙을 쓴다.
 - 원격 훅의 PID(머리·outbox `claudePid`)는 원격 쪽 프로세스라 적지 않고, 이미 적힌 PID도 지운다. 원격 세션은 PID 없는 세션처럼 30분 규칙으로 끝난다.
 - 세션보다 이른 훅이 늦게 들어오면 `startedAt`과 가장 이른 `session.start`를 당기고 `source`를 채운다.
 - `POST /hooks/replay`: 본문 outbox 줄 500줄 이하. 읽을 수 있는 줄만 `replay/outbox.jsonl`에 한 번의 `O_APPEND`로 붙이고 바로 `200 {"accepted":n,"rejected":m}`. 읽을 줄이 없거나 상한 초과 `400`, 쓰기 실패 `500`, POST 아님 `405`.

@@ -228,7 +228,17 @@ import Testing
         _ = try h.add("LD2", "/Users/me/other/ledger")
         let text = h.processor.handle(event: "SessionStart", json: Self.payload("SessionStart"), at: t0)
         #expect(try h.session() == nil)
-        #expect(text?.contains("remote: \(Self.origin)") == true)
+        #expect(text?.contains("remote: github.com/me/ledger") == true)
+    }
+
+    // origin에 사용자 정보(토큰)가 있으면 대화에 넣지 않는다.
+    @Test func remoteLineHidesCredentials() throws {
+        let h = try Harness()
+        let origin = "https://me:ghp_secret123@github.com/me/other.git"
+        let text = try #require(h.processor.handle(event: "SessionStart",
+                                                   json: Self.payload("SessionStart", remote: Self.remoteField(origin: origin)), at: t0))
+        #expect(text.contains("remote: github.com/me/other"))
+        #expect(!text.contains("ghp_secret123") && !text.contains("@github"))
     }
 
     @Test func doesNotLinkWithoutMatchingOrigin() throws {

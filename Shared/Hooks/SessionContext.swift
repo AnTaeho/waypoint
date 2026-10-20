@@ -10,9 +10,10 @@ public enum SessionContext {
 
     /// 미등록 시작 폴더에서도 실제 ID를 전달해 작업 대상 프로젝트를 명시적으로 연결할 수 있다.
     /// 원격·컨테이너 훅(`waypoint_remote`)이면 git origin 주소도 준다(`project_resolve`의 `remote`, TRK-53).
+    /// 주소는 정규화한 꼴이라 `user:token@` 같은 사용자 정보가 대화에 들어가지 않는다.
     public static func awaitingProject(_ input: HookInput) -> String {
         var lines = [unregistered, "sessionId: \(input.sessionID)", "provider: \(input.provider.rawValue)"]
-        if let remote = input.remote { lines.append("remote: \(remote.origin)") }
+        if let origin = input.remote.flatMap({ GitRemoteURL.normalize($0.origin) }) { lines.append("remote: \(origin)") }
         lines.append("작업 대상 폴더가 정해지면 project_resolve로 확인하고 session_bind로 연결한 뒤 tracker 스킬을 따른다.")
         return lines.joined(separator: "\n")
     }
