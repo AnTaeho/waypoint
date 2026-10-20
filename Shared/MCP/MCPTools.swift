@@ -190,7 +190,7 @@ public final class MCPTools {
             card.body = body
             card.updatedAt = date
         }
-        if args["criteria"] != nil {
+        if let raw = args["criteria"], !raw.isNull {
             let old = card.criteria
             card.criteria = try criteria(args)
             card.updatedAt = date
