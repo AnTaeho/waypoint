@@ -40,6 +40,10 @@ import Testing
         #expect(HookParsing.lineCount("a\n") == 1)
         #expect(HookParsing.lineCount("a\nb") == 2)
         #expect(HookParsing.lineCount("a\n\nb\n") == 3)
+        // CRLF도 "\n" 개수로 센다
+        #expect(HookParsing.lineCount("a\r\nb") == 2)
+        #expect(HookParsing.lineCount("a\r\nb\r\n") == 2)
+        #expect(HookParsing.lineCount("\r\n") == 1)
     }
 
     @Test func commitOutputs() throws {

@@ -110,6 +110,21 @@ import Testing
         }
     }
 
+    /// CRLF 긴 내용도 줄 수를 빨리 센다(스크립트와 앱 모두 "\n" 개수).
+    @Test func longCRLFContentIsCountedQuickly() throws {
+        let content = Array(repeating: "line", count: 10000).joined(separator: "\r\n") + "\r\n"
+        let object: [String: Any] = ["session_id": "s", "cwd": "/x", "tool_name": "Write",
+                                     "tool_input": ["file_path": "/x/f", "content": content]]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let started = Date()
+        let entry = try #require(try Self.trimmedLine(data, event: "PostToolUse", provider: .claude))
+        #expect(Date().timeIntervalSince(started) < 3)
+        let trimmed = try #require(HookInput(event: entry.event, json: entry.payload))
+        #expect(HookParsing.changedFiles(trimmed).map(\.added) == [10000])
+        let original = try #require(HookInput(event: "PostToolUse", json: data))
+        #expect(HookParsing.changedFiles(original).map(\.added) == [10000])
+    }
+
     /// 스크립트의 검증 명령 패턴이 앱 패턴과 같은 문자열이다(셸·Swift 판정이 어긋나지 않게).
     @Test func scriptPatternMatchesAppPattern() throws {
         let script = try String(contentsOf: Self.script, encoding: .utf8)
