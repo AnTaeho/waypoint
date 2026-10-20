@@ -63,9 +63,11 @@ public final class MCPServer {
     public func handleDeferred(_ message: JSONValue, completion: @escaping (JSONValue) -> Void) -> Bool {
         guard message["jsonrpc"] == "2.0", message["method"] == "tools/call", let id = message["id"],
               id.stringValue != nil || id.numberValue != nil,
-              let name = message["params"]?["name"]?.stringValue, MCPTools.deferredTools.contains(name),
-              let arguments = message["params"]?["arguments"], arguments.objectValue != nil
+              let name = message["params"]?["name"]?.stringValue, MCPTools.deferredTools.contains(name)
         else { return false }
+        // arguments가 없으면 빈 객체로 보고 진행한다(필수 값 오류는 githubPlan이 낸다).
+        let arguments = message["params"]?["arguments"] ?? [:]
+        guard arguments.objectValue != nil else { return false }
         let plan: MCPTools.GitHubPlan
         do {
             plan = try tools.githubPlan(name, arguments)
