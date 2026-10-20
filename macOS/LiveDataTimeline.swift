@@ -1,7 +1,6 @@
-import SwiftData
 import SwiftUI
 
-/// 저장·훅 수신은 즉시 반영하고, 시간만 흐르는 상태도 5초마다 다시 계산한다.
+/// 저장·훅 수신(`AppServices.lastDataChange`, 묶어서 0.5초 안)과 5초마다 다시 계산한다.
 struct LiveDataTimeline<Content: View>: View {
     @Environment(AppServices.self) private var services: AppServices?
     @State private var refreshedAt = Date()
@@ -17,9 +16,6 @@ struct LiveDataTimeline<Content: View>: View {
         }
         .onChange(of: services?.lastDataChange) { _, date in
             if let date { refreshedAt = date }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in
-            refreshedAt = Date()
         }
     }
 

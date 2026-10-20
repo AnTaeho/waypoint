@@ -54,6 +54,9 @@ final class AppServices {
     @ObservationIgnored var activeObserver: NSObjectProtocol?
     @ObservationIgnored var wakeObserver: NSObjectProtocol?
     @ObservationIgnored private var importObserver: NSObjectProtocol?
+    @ObservationIgnored private var saveObserver: NSObjectProtocol?
+    /// 화면 갱신(`lastDataChange`)을 묶는다. 원격 replay처럼 저장이 잦아도 간격마다 한 번만 다시 그린다.
+    @ObservationIgnored private var refreshThrottle = RefreshThrottle()
     /// 마지막 요청 문장 정리 시각(`PromptRetention`). 시작 직후 첫 점검에서 한 번 돌고 하루마다 다시 돈다.
     @ObservationIgnored private var lastPromptRetention: Date?
     /// 마지막 기록 정리 시각(`RecordRetention`). 다 못 지웠으면 곧 이어서 지운다.
@@ -97,7 +100,7 @@ final class AppServices {
             return HookRouter.respondAck(to: request) { acks.insert($0) }
         }) { [weak self] request in
             defer {
-                self?.lastDataChange = Date()
+                if request.path != "/integration/status" { self?.markDataChanged() }
                 if let self { self.reliability.checkResumes(in: self.container.mainContext) }
             }
             if request.path == "/integration/status" {
@@ -132,7 +135,7 @@ final class AppServices {
                                  acknowledges: HookRouter.acknowledges(request))
                 let saved = Date()
                 if !processor.lastSaveFailed {
-                    self?.lastDataChange = saved
+                    self?.markDataChanged()
                     self?.reliability.receipt(receivedAt: request.receivedAt ?? now, savedAt: saved)
                 }
                 self?.receiveHook(input, at: now, replayed: false)
@@ -161,6 +164,7 @@ final class AppServices {
         guidance.start()
 
         observeCloudKitImports()
+        observeSaves()
 
         // 첫 outbox 흡수 뒤 한 번, 그 뒤 10초마다
         refreshStates()
@@ -230,7 +234,7 @@ final class AppServices {
         if result.processed > 0 || result.skipped > 0 || result.retryPending { reliability.update { $0.recordAbsorb(result) } }
         if result.skipped > 0 { integration.report("누락 기록 \(result.skipped)건 형식 오류") }
         if result.retryPending { integration.report("작업 기록 저장 실패 · 미처리 기록 보존") }
-        if result.processed > 0 || result.retryPending { lastDataChange = Date() }
+        if result.processed > 0 || result.retryPending { markDataChanged() }
         integration.refresh()
     }
 
@@ -240,7 +244,6 @@ final class AppServices {
         drainOutbox()
         if replayBacklog { drainReplay() }
         let now = Date()
-        defer { lastDataChange = now }
         let swept = processor?.sweep(now: now, probe: SessionSweep.systemProbe) ?? 0
         if swept > 0 { reliability.update { $0.recovery.sessionsClosed += swept } }
         let context = container.mainContext
@@ -259,6 +262,7 @@ final class AppServices {
         }
         let open = FetchDescriptor<Session>(predicate: #Predicate<Session> { $0.endedAt == nil })
         let sessions = (try? context.fetch(open)) ?? []
+        // 정리·캐시로 바뀐 것은 저장 알림(`observeSaves`)이 화면에 알린다.
         if SessionStateCache.refresh(sessions, now: now) > 0 || closed > 0 || cleared > 0 {
             try? context.save()
         }
@@ -266,8 +270,33 @@ final class AppServices {
         dailyBackup?.startIfDue(now: now)
     }
 
-    /// 기록이 바뀌었다(화면 갱신). 다른 파일의 확장(`AppServices+Replay`)에서 부른다.
-    func markDataChanged() { lastDataChange = Date() }
+    /// 기록이 바뀌었다(화면 갱신). 바로 반영하거나 간격 끝에 한 번 더 반영한다(`RefreshThrottle`).
+    func markDataChanged() {
+        switch refreshThrottle.note(at: Date()) {
+        case .fire:
+            lastDataChange = Date()
+        case .schedule(let at):
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, at.timeIntervalSinceNow)) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    let now = Date()
+                    self.refreshThrottle.fireScheduled(at: now)
+                    self.lastDataChange = now
+                }
+            }
+        case .ignore:
+            break
+        }
+    }
+
+    /// 어느 context든 저장하면 화면을 갱신한다(흡수·가져오기·기록 정리는 따로 만든 context에서 저장한다).
+    private func observeSaves() {
+        saveObserver = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.markDataChanged() }
+        }
+    }
 
     func retryIntegration() {
         if serverState != .ready { server?.start() }
