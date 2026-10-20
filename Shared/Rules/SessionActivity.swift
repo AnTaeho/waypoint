@@ -75,6 +75,8 @@ public enum SessionActivityRules {
             pending[key] = PendingTool(name: String((input.toolName ?? "도구").prefix(120)), at: at)
             session.activityRaw = (questionTools.contains(input.toolName ?? "") ? SessionActivity.waiting : .toolRunning).rawValue
         case "PermissionRequest": session.activityRaw = SessionActivity.approval.rawValue
+        // 사용자가 중단(Esc)하면 Stop이 오지 않는다.
+        case "PostToolUseFailure" where input.isInterrupt: pending = [:]; session.activityRaw = SessionActivity.waiting.rawValue
         case "PostToolUse", "PostToolUseFailure":
             if input.toolUseID != nil { pending[key] = nil }
             else { pending = pending.filter { $0.value.name != input.toolName } }
