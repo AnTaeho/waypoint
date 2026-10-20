@@ -133,11 +133,11 @@ public enum HookParsing {
         }
     }
 
-    /// 문자열의 줄 수. 빈 문자열은 0, 끝 줄바꿈은 줄로 세지 않는다.
+    /// 문자열의 줄 수("\n" 바이트 개수, CRLF 포함). 빈 문자열은 0, 끝 줄바꿈은 줄로 세지 않는다.
     public static func lineCount(_ text: String) -> Int {
         guard !text.isEmpty else { return 0 }
-        let count = text.split(separator: "\n", omittingEmptySubsequences: false).count
-        return text.hasSuffix("\n") ? count - 1 : count
+        let newlines = text.utf8.reduce(0) { $1 == UInt8(ascii: "\n") ? $0 + 1 : $0 }
+        return text.utf8.last == UInt8(ascii: "\n") ? newlines : newlines + 1
     }
 
     /// PostToolUse에서 바뀐 파일(절대 경로)과 줄 수.

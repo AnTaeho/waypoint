@@ -48,9 +48,8 @@ agent_pid() {
 # 실시간 POST는 원본을 그대로 보낸다. 이 필터는 앱이 꺼져 있을 때만 쓴다.
 OUTBOX_FILTER='
 def keep($ks): with_entries(select(.key as $k | $ks | index($k)));
-# HookParsing.lineCount와 같은 줄 수. Swift는 "\r\n"을 한 글자로 봐서 줄바꿈으로 세지 않는다.
-def lines_of: if . == "" then 0 else gsub("\r\n"; "x") as $s
-  | ($s | split("\n") | length) - (if $s | endswith("\n") then 1 else 0 end) end;
+# HookParsing.lineCount와 같은 줄 수("\n" 개수, 끝 줄바꿈은 줄로 세지 않는다)
+def lines_of: if . == "" then 0 else (split("\n") | length) - (if endswith("\n") then 1 else 0 end) end;
 # 문자열 → 줄 수만큼의 "\n"(같은 lineCount). 문자열이 아니면 null(앱에서 빈 값과 같다).
 def counted: if type == "string" then (lines_of as $n | if $n == 0 then "" else "\n" * $n end) else null end;
 # diff 조각: 줄마다 첫 글자 +/-만 남긴다. 조각 개수는 그대로(빈 배열과 빈 조각은 앱에서 다르다).
