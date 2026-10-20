@@ -246,4 +246,12 @@ import Testing
         #expect(throws: MiniTOML.ParseError.self) { try MiniTOML("a = [1, 2\n") }
         #expect(throws: MiniTOML.ParseError.self) { try MiniTOML("a = 1 b = 2\n") }
     }
+
+    @Test func miniTOMLReopensSubtablePerArrayElement() throws {
+        let toml = try MiniTOML("[[x]]\nn=1\n[x.env]\nA=\"1\"\n[[x]]\nn=2\n[x.env]\nB=\"2\"\n[[x.y]]\nm=3\n")
+        #expect(toml.leaf(["x", "[0]", "env", "A"]) == .string("1"))
+        #expect(toml.leaf(["x", "[1]", "env", "B"]) == .string("2"))
+        #expect(toml.leaf(["x", "[1]", "y", "[0]", "m"]) == .other("3"))
+        #expect(throws: MiniTOML.ParseError.self) { try MiniTOML("[[x]]\n[x.env]\n[x.env]\n") }
+    }
 }
