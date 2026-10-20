@@ -87,10 +87,11 @@ extension HookProcessor {
 
         let sub: Session
         if let existing = fetchSession(agentID) {
-            // 다시 이어 붙은 서브에이전트
+            // 다시 이어 붙은 서브에이전트. 끝난 시각 이전의 늦은 기록이면 다시 열지 않는다.
             guard existing.kind == .subagent else { return }
             sub = existing
-            if existing.endedAt != nil {
+            if let endedAt = existing.endedAt {
+                guard date > endedAt else { return }
                 existing.endedAt = nil
                 existing.cachedState = .live
             }

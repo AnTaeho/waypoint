@@ -186,7 +186,7 @@ GuideVersion doc, content, at, source: app | local
 | `SessionStart` | `source`(startup/resume/clear/compact/fork) | `cwd`로 프로젝트 조회 → 세션 생성(이미 있으면 다시 살림). 응답 본문을 stdout으로 출력해 **대화 컨텍스트에 주입** | 「SessionStart 주입」 |
 | `UserPromptSubmit` | `prompt` | heartbeat, 메인 세션의 `lastPrompt` 저장. 블록을 받지 못한 메인 세션에는 블록을 응답 본문으로 돌려줘 **주입**(한 번) | 「늦은 주입」 |
 | `PreToolUse` | `tool_name`, `tool_input`, `tool_use_id` | 도구 작업 시작(「작업 상태」). `Agent`면 부모 heartbeat, 프롬프트의 `[LDG-16]` 같은 카드 ID와 `subagent_type`을 **대기 목록**에 올린다 | 서브에이전트 도구 이름은 `Agent`(옛 이름 `Task`도 받는다) |
-| `SubagentStart` | `agent_id`, `agent_type` | 하위 세션 생성(`id`=`agent_id`, `agentName`=`agent_type`, 부모=`session_id` 세션). 대기 목록에서 같은 `agent_type`의 가장 오래된 항목을 꺼내 카드가 있으면 연결 | 두 이벤트를 잇는 키가 없어(`tool_use_id` 없음) 순서·종류로 짝짓는다 |
+| `SubagentStart` | `agent_id`, `agent_type` | 하위 세션 생성(`id`=`agent_id`, `agentName`=`agent_type`, 부모=`session_id` 세션). 대기 목록에서 같은 `agent_type`의 가장 오래된 항목을 꺼내 카드가 있으면 연결. 끝난 하위 세션은 끝난 시각보다 늦은 훅일 때만 다시 연다 | 두 이벤트를 잇는 키가 없어(`tool_use_id` 없음) 순서·종류로 짝짓는다 |
 | `PostToolUse` | `tool_name`, `tool_input`, `tool_response` | heartbeat(서브에이전트면 그 하위 세션도), 도구 종료, 변경 파일을 `file.changed`로, 커밋을 `commit`으로, 검증 명령을 `check`로 | 아래 「파일 변경·커밋」 |
 | `PostToolUseFailure` | `error`, `is_interrupt` | 도구 종료, 검증 명령이면 `check` | 「검증 근거」 |
 | `PermissionRequest` | | 승인 대기 | 관찰만 하고 결정을 출력하지 않는다 |
