@@ -95,6 +95,18 @@ final class TempDir {
         #expect(perms == 0o600)
     }
 
+    @Test func atomicWriteKeepsSymlink() throws {
+        let dir = try TempDir()
+        let target = try dir.write("docs/AGENTS.md", "옛 내용")
+        let link = dir.url.appendingPathComponent("CLAUDE.md")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "docs/AGENTS.md")
+        try GuideFile.writeAtomically("새 내용\n", to: link)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == "docs/AGENTS.md")
+        #expect(try dir.read("CLAUDE.md") == "새 내용\n")
+        #expect(try String(contentsOf: target, encoding: .utf8) == "새 내용\n")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: target.deletingLastPathComponent().path) == ["AGENTS.md"])
+    }
+
     @Test func atomicWriteCreatesMissingFile() throws {
         let dir = try TempDir()
         let file = dir.url.appendingPathComponent("NEW.md")
