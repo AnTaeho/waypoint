@@ -288,6 +288,18 @@ import Testing
         #expect(failing.status == 500)
     }
 
+    /// 문자열 안의 U+2028·U+2029·U+0085는 줄 끝이 아니다. CRLF 끝은 받는다.
+    @Test func replaySplitsOnlyOnLineFeed() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let unusual = #"{"event":"UserPromptSubmit","receivedAt":1,"payload":{"session_id":"s","prompt":"a\#u{2028}b\#u{2029}c\#u{85}d"}}"#
+        let crlf = #"{"event":"Stop","receivedAt":2,"payload":{"session_id":"s"}}"#
+        let result = try Outbox.append(Data((unusual + "\n" + crlf + "\r\n").utf8), directory: dir)
+        #expect(result == Outbox.AppendResult(accepted: 2, rejected: 0))
+        let text = try String(contentsOf: dir.appendingPathComponent(Outbox.fileName), encoding: .utf8)
+        #expect(text == unusual + "\n" + crlf + "\n")
+    }
+
     /// 원격이 200을 받지 못해 같은 묶음을 다시 보내도(앱은 이미 붙였다) 파일 변경·요청 기록이 한 번만 남는다.
     /// replay 줄은 실시간 경로(`RemoteReplay.drain` → `HookProcessor.handle(_:)`)로 처리한다.
     @Test func replayedBatchTwiceRecordsOnce() throws {

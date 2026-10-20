@@ -136,9 +136,9 @@ public enum Outbox {
     public static func append(_ body: Data, directory: URL, fileManager: FileManager = .default) throws -> AppendResult {
         var result = AppendResult()
         var accepted = Data()
-        let text = String(decoding: body, as: UTF8.self)
-        for line in text.split(whereSeparator: \.isNewline) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+        // "\n"으로만 나눈다(문자열 안의 U+2028 등은 줄 끝이 아니다)
+        for line in body.split(separator: UInt8(ascii: "\n")) {
+            let trimmed = String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             guard parse(line: Substring(trimmed)) != nil else {
                 result.rejected += 1
