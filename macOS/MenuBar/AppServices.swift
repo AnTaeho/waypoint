@@ -102,8 +102,8 @@ final class AppServices {
             guard request.path == HookRouter.ackPath else { return nil }
             return HookRouter.respondAck(to: request) { acks.insert($0) }
         }) { [weak self] request in
+            // 훅·MCP가 바꾼 것은 저장 알림(`observeSaves`)이 화면에 알린다. 읽기 요청은 다시 그리지 않는다.
             defer {
-                if request.path != "/integration/status" { self?.markDataChanged() }
                 if let self { self.reliability.checkResumes(in: self.container.mainContext) }
             }
             if request.path == "/integration/status" {
@@ -138,7 +138,6 @@ final class AppServices {
                                  acknowledges: HookRouter.acknowledges(request))
                 let saved = Date()
                 if !processor.lastSaveFailed {
-                    self?.markDataChanged()
                     self?.reliability.receipt(receivedAt: request.receivedAt ?? now, savedAt: saved)
                 }
                 self?.receiveHook(input, at: now, replayed: false)
