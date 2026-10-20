@@ -168,6 +168,26 @@ import Testing
         #expect(try quarantined(dir) == [broken, unknown])
     }
 
+    /// 동시 쓰기로 한글이 글자 중간에서 섞인 줄(UTF-8이 아님)만 격리하고 같은 파일의 나머지 줄은 처리한다.
+    @Test func invalidUTF8LineIsQuarantinedAndRestOfFileIsProcessed() throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let start = try line("SessionStart", "doc-SessionStart", at: t0)
+        let end = try line("SessionEnd", "doc-SessionEnd", at: t0 + 60)
+        let torn = Data(#"{"event":"Stop","receivedAt":1,"payload":{"prompt":"가"#.utf8).dropLast(1) + Data("나\"}}".utf8)
+        var data = Data((start + "\n").utf8)
+        data.append(torn)
+        data.append(Data(("\n" + end + "\n").utf8))
+        try data.write(to: dir.appendingPathComponent(Outbox.fileName))
+        var events: [String] = []
+        let result = Outbox.drain(directory: dir) { events.append($0.event) }
+        #expect(result == Outbox.DrainResult(processed: 2, skipped: 1))
+        #expect(events == ["SessionStart", "SessionEnd"])
+        let kept = try Data(contentsOf: dir.appendingPathComponent(Outbox.quarantineFileName))
+        #expect(kept == torn + Data("\n".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path) == [Outbox.quarantineFileName])
+    }
+
     @Test func corruptLinesAroundFailedSaveAreQuarantinedOnce() throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
