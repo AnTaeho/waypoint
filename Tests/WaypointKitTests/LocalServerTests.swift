@@ -37,6 +37,41 @@ import Testing
         Thread.sleep(forTimeInterval: seconds)
     }
 
+    /// 연결만 열고 아무것도 보내지 않는 클라이언트. 서버가 닫으면 true, `wait`초 안에 안 닫으면 false.
+    static func idleConnectionCloses(_ port: UInt16, wait: Int) -> Bool {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var address = sockaddr_in()
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = port.bigEndian
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        guard connected == 0 else { return false }
+        var timeout = timeval(tv_sec: wait, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        var byte: UInt8 = 0
+        // 0: 서버가 닫음, -1(EAGAIN): 제한 시간까지 열려 있음
+        let read = recv(fd, &byte, 1, 0)
+        return read == 0 || (read < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+    }
+
+    // 연결만 열고 보내지 않는 클라이언트도 수신 제한 시간에 끊는다.
+    @MainActor @Test func idleConnectionIsClosedAtReceiveTimeout() async throws {
+        let server = try await Self.startOnFreePort {
+            LocalServer(port: $0, receiveTimeout: 0.3) { _ in .text("main") }
+        }
+        defer { server.stop() }
+        let port = server.port
+        let closed = await Task.detached { Self.idleConnectionCloses(port, wait: 3) }.value
+        #expect(closed)
+        // 제때 온 요청은 그대로 처리한다
+        let main = try await Self.post(port, "/hooks/Stop")
+        #expect(main.status == 200 && main.body == "main")
+    }
+
     @MainActor @Test func fastHandlerAnswersWhileMainActorIsBusy() async throws {
         let server = try await Self.startOnFreePort {
             LocalServer(port: $0, fastHandler: { $0.path == "/fast" ? .noContent : nil }) { _ in .text("main") }
