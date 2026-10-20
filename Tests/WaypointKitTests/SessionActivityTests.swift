@@ -30,6 +30,22 @@ import Testing
         #expect(SessionFormat.activityText(s, now: t0 + 25 * 60).hasPrefix("입력 대기"))
     }
 
+    // Esc로 도구를 중단하면 Stop이 오지 않는다. 중단 실패(is_interrupt)는 Stop처럼 입력 대기로 둔다.
+    @Test func interruptedToolFailureWaitsForInput() throws {
+        let h = try HookHarness()
+        try send(h, "UserPromptSubmit", at: t0)
+        try send(h, "PreToolUse", at: t0 + 1, id: "toolu_01Qh7PcW8BH5uF53AUinVWNQ")
+        try send(h, "PreToolUse", at: t0 + 1, id: "other")
+        var object = try #require(try JSONSerialization.jsonObject(with: try fixture("real-PostToolUseFailure-Bash")) as? [String: Any])
+        object["is_interrupt"] = true
+        object["session_id"] = HookHarness.sessionID
+        object["cwd"] = "/Users/me/dev/ledger"
+        h.processor.handle(event: nil, json: try JSONSerialization.data(withJSONObject: object), at: t0 + 2)
+        let s = try #require(try h.session())
+        #expect(SessionActivityRules.tools(s).isEmpty)
+        #expect(SessionActivityRules.activity(s, now: t0 + 16 * 60) == .waiting)
+    }
+
     @Test func parallelToolsFinishIndependentlyEvenWhenReplayIsOutOfOrder() throws {
         let h = try HookHarness()
         try send(h, "PreToolUse", at: t0, id: "a")

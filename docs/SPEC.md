@@ -274,7 +274,7 @@ sessionId: ae25fca9-6e32-4d91-9b94-e059f57a5972
 
 - `SessionStart`/`Stop`/`Interrupt` → 입력 대기. `UserPromptSubmit` → 응답 진행 중. 응답 진행이 15분 넘게 갱신되지 않으면 활동 없음.
 - `PreToolUse` → 도구 작업 중(`tool_use_id`별 목록 `pendingToolsData`). `PermissionRequest` → 승인 대기. 질문 도구 `AskUserQuestion`/`request_user_input` → 입력 대기.
-- `PostToolUse`·`PostToolUseFailure` → 해당 도구 종료. 다른 병렬 호출이 남아 있으면 도구 작업 중을 유지한다. 늦은 완료는 해당 호출만 지우고 최신 시각을 되돌리지 않는다.
+- `PostToolUse`·`PostToolUseFailure` → 해당 도구 종료. 다른 병렬 호출이 남아 있으면 도구 작업 중을 유지한다. 늦은 완료는 해당 호출만 지우고 최신 시각을 되돌리지 않는다. `is_interrupt: true`인 `PostToolUseFailure`(사용자 중단, `Stop`이 오지 않는다)는 `Stop`처럼 도구 목록을 비우고 입력 대기.
 - 진행 중인 하위 작업이 있으면 부모도 작업 중으로 표시한다. 마지막 활동만 아는 옛 세션은 「최근 활동」 또는 「활동 없음」.
 - 카드 연결 해제 기록에 종료 이유를 남겨 재개 뒤에도 과거 추적 만료 표시가 바뀌지 않는다.
 
