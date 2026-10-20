@@ -52,9 +52,9 @@ extension MCPTools {
             "state": .string(created.state.rawValue),
         ]
         guard let project = allProjects().first(where: { $0.key == plan.projectKey }) else { return .object(json) }
-        let session = plan.sessionID.flatMap(fetchSession)
+        let session = projectSession(plan.sessionID.flatMap(fetchSession), in: project)
         let explicit = plan.cardID.flatMap { try? findCard($0) }
-        let card = GitHubLog.linkedCard(explicit: explicit, session: session?.project === project ? session : nil)
+        let card = GitHubLog.linkedCard(explicit: explicit, session: session)
         GitHubLog.record(created, project: project, card: card, session: session, at: now(), in: context)
         if let card { json["cardId"] = .string(card.displayID) }
         return .object(json)

@@ -93,6 +93,12 @@ extension MCPTools {
         return (try? context.fetch(descriptor))?.first
     }
 
+    /// 기록에 붙일 세션. 다른 프로젝트 세션은 붙이지 않는다.
+    func projectSession(_ session: Session?, in project: Project?) -> Session? {
+        guard let session, session.project === project else { return nil }
+        return session
+    }
+
     // MARK: - 결과 JSON
 
     func projectJSON(_ project: Project) -> JSONValue {

@@ -370,6 +370,28 @@ func mcpRequest(_ body: String, method: String = "POST", headers: [String: Strin
         #expect(events(a, .note).isEmpty)
     }
 
+    @Test func otherProjectSessionIsNotAttached() throws {
+        let elsewhere = Project(key: "OTH", name: "other", rootPath: "~/other")
+        h.context.insert(elsewhere)
+        let other = makeSession(h.context, elsewhere, id: "oth-session")
+        other.provider = .codex
+        _ = try h.ok("card_create", ["project": "PRB", "title": "a", "sessionId": "oth-session",
+                                     "criteria": ["x"]])
+        _ = try h.ok("card_create", ["project": "PRB", "title": "b", "sessionId": "ghost"])
+        let a = try #require(h.card(1)), b = try #require(h.card(2))
+        #expect(a.originSessionId == nil && a.origin == .codex && b.originSessionId == nil)
+        #expect(events(a, .cardCreated).first?.session == nil)
+
+        _ = try h.ok("card_evidence", ["id": "PRB-1", "criterion": 1, "command": "swift test", "outcome": "pass",
+                                       "sessionId": "oth-session"])
+        let check = try #require(events(a, .check).first)
+        #expect(check.session == nil && check.payloadValues["provider"] == "codex")
+
+        let status = try h.ok("project_status", ["project": "PRB", "text": "지금", "sessionId": "oth-session"])
+        #expect(status["status"]?["sessionId"] == nil && status["status"]?["provider"] == "codex")
+        #expect(h.project.events?.first { $0.type == .projectStatus }?.session == nil)
+    }
+
     @Test func noteAndHandoff() throws {
         let a = h.project.makeCard(in: h.context, title: "a", status: .next, at: t0)
         _ = try h.ok("card_note", ["id": "PRB-1", "text": "막힘: 인코딩"])

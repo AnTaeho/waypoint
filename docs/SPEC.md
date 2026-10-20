@@ -407,7 +407,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `session_bind` | **`project`**, **`sessionId`**, **`provider`**, **`cwd`** | 세션을 작업 대상 프로젝트에 잇고 그 프로젝트의 블록을 돌려준다(5장 「작업 대상 프로젝트 연결」) |
 | `card_list` | **`project`**, `status`, `query` | status를 안 주면 done·archived를 뺀다. 순서: active → next → idea → done → archived, 같은 상태는 번호순. `query`는 ID·제목·본문 부분 일치 |
 | `card_get` | **`id`** | 카드 + `body`, `origin`, `nextSessionNote`, `children`, 최근 기록 20개 |
-| `card_create` | **`project`**, **`title`**, `provider`, `kind`, `status`, `body`, `parentId`, `criteria`, `sessionId` | origin은 세션의 도구(세션이 없으면 `provider`, 기본 claude), `originSessionId`=`sessionId`. 기본 kind task, status next(kind idea면 idea). `active`는 받지 않는다(만든 뒤 `card_start`). `parentId`는 같은 프로젝트. `card.created` 기록 |
+| `card_create` | **`project`**, **`title`**, `provider`, `kind`, `status`, `body`, `parentId`, `criteria`, `sessionId` | origin은 세션의 도구(세션이 없으면 `provider`, 기본 claude), `originSessionId`=`sessionId`(같은 프로젝트 세션일 때). 기본 kind task, status next(kind idea면 idea). `active`는 받지 않는다(만든 뒤 `card_start`). `parentId`는 같은 프로젝트. `card.created` 기록 |
 | `card_start` | **`id`**, **`sessionId`** | 세션이 없거나 끝났거나 프로젝트가 다르면 오류. 그 세션에 붙은 **다른** 카드 연결을 먼저 푼다(그 카드는 작업 전 상태로). 그다음 연결 → 작업중. 같은 카드를 다시 부르면 아무 일 없음. 서브에이전트 세션 ID(`agent_id`)면 그 하위 세션에 붙인다. 결과: `card`, `detached`(풀린 카드 ID), `otherSessions`(같은 카드에 붙은 다른 살아 있는 세션) |
 | `card_update` | **`id`**, `title`, `body`, `status`, `criteria` | `status: active`는 받지 않는다. 다른 상태는 `CardLifecycle.move`(done이면 `doneAt`, active였으면 열린 연결을 모두 닫는다 — 4장 불변식). `criteria`는 통째로 바꾼다(null이면 그대로). 체크가 바뀐 조건마다 앱의 체크 상자와 같은 `note` `{kind: "criterion", text, isDone}` |
 | `card_note` | **`id`**, **`text`** | `note` 기록 `{text}` |
@@ -419,7 +419,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 | `github_pr_create` | **`project`**, **`title`**, `body`, `base`, `head`, `draft`, `cwd`, `cardId`, `sessionId` | 같은 저장소에 PR을 연다. push하지 않는다. `head` 기본은 `cwd`(없으면 프로젝트 폴더) 작업 트리의 현재 브랜치, `base` 기본은 저장소 기본 브랜치. 결과는 위와 같고 `state`는 `open`·`draft` |
 
 - `criteria`는 `[{text, done?}]`(문자열 항목도 받는다). `status: done`은 스킬이 사용자 확인을 받은 뒤에만 보낸다. 카드 결과는 `{id, title, kind, status, criteria, updatedAt, parentId?, sessions?}`(`sessions`는 붙어 있는 끝나지 않은 세션).
-- `sessionId`는 훅이 주입한 블록의 `sessionId:` 줄(Codex는 실행 환경)에서 에이전트가 읽어 전달한다.
+- `sessionId`는 훅이 주입한 블록의 `sessionId:` 줄(Codex는 실행 환경)에서 에이전트가 읽어 전달한다. 다른 프로젝트 세션이면 기록에 세션을 붙이지 않고 도구(`provider`) 판별에만 쓴다(`card_start`·`work_file`은 오류).
 - **`overlaps`**: `card_start`·`card_update`·`card_note`·`card_handoff`·`card_evidence`·`project_status` 결과가 객체이고 알릴 같은 파일 작업 중(4장)이 있으면 붙는다. 훅 출력은 늘리지 않는다.
   - 누구의 눈으로: `sessionId`를 주면 그 세션, 아니면 카드에 붙은 끝나지 않은 세션(`project_status`는 `sessionId`가 있을 때만). 메인과 그 서브에이전트가 같이 있으면 메인만.
   - 항목 `{sessionId: 상대 메인 세션 짧은 ID(앞 8자, Codex는 codex:), provider, cards?: 상대가 붙은 카드 ID, files: 최근 것부터 최대 5, fileCount}`.

@@ -26,13 +26,14 @@ extension MCPTools {
             }
             index = number - 1
         }
-        let session = optionalString(args, "sessionId").flatMap(fetchSession)
+        let found = optionalString(args, "sessionId").flatMap(fetchSession)
+        let session = projectSession(found, in: card.project)
         let trimmedDetail = optionalString(args, "detail")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let detail = trimmedDetail.isEmpty ? nil : String(trimmedDetail.prefix(Self.evidenceDetailLimit))
         let record = CheckRecord(
             at: now(), command: VerificationCommand.display(command), outcome: outcome, source: .agent,
             criterion: index, criterionText: index.map { card.criteria[$0].text }, detail: detail,
-            provider: session?.provider
+            provider: found?.provider
         )
         CardEvidence.record(record, card: card, session: session, in: context)
 
