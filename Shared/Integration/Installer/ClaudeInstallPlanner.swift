@@ -51,8 +51,8 @@ struct ClaudeInstallPlanner {
         if install {
             let hook = try context.sources.text(context.sources.hookScript)
             let tap = try context.sources.text(context.sources.statusLineTap)
-            plan.set(hookScriptPath, to: Data(hook.utf8), mode: Self.scriptMode, summary: "훅 스크립트")
-            plan.set(tapScriptPath, to: Data(tap.utf8), mode: Self.scriptMode, summary: "상태줄 중계")
+            try plan.set(hookScriptPath, to: Data(hook.utf8), mode: Self.scriptMode, summary: "훅 스크립트")
+            try plan.set(tapScriptPath, to: Data(tap.utf8), mode: Self.scriptMode, summary: "상태줄 중계")
         }
         try planSettings(install: install, into: &plan)
         try planSkill(install: install, into: &plan)
@@ -63,7 +63,7 @@ struct ClaudeInstallPlanner {
     // MARK: - settings.json
 
     private func planSettings(install: Bool, into plan: inout IntegrationPlan) throws {
-        let disk = IntegrationFile.read(IntegrationFile.resolved(settingsPath))
+        let disk = try IntegrationFile.read(IntegrationFile.resolved(settingsPath))
         let text = disk.data.flatMap { String(data: $0, encoding: .utf8) }
         if disk.data != nil && text == nil {
             throw IntegrationInstallError.unreadable(path: settingsPath, reason: "UTF-8이 아님")
@@ -92,7 +92,7 @@ struct ClaudeInstallPlanner {
         updated = planStatusLine(updated, install: install, notes: &plan.notes)
         guard updated != root else { return }
         let output = Self.serialize(updated, like: text)
-        plan.set(settingsPath, to: Data(output.utf8), mode: nil, newMode: 0o644,
+        try plan.set(settingsPath, to: Data(output.utf8), mode: nil, newMode: 0o644,
                  summary: install ? "훅·상태줄 연결" : "훅·상태줄 연결 해제")
     }
 
@@ -199,7 +199,7 @@ struct ClaudeInstallPlanner {
     // MARK: - 스킬
 
     private func planSkill(install: Bool, into plan: inout IntegrationPlan) throws {
-        let disk = IntegrationFile.read(IntegrationFile.resolved(skillPath))
+        let disk = try IntegrationFile.read(IntegrationFile.resolved(skillPath))
         let current = disk.data.flatMap { String(data: $0, encoding: .utf8) }
         let ours = current.map(Self.isWaypointTrackerSkill) ?? true
         if install {
@@ -208,13 +208,13 @@ struct ClaudeInstallPlanner {
                 plan.notes.append(.init(step: "tracker 스킬", reason: "같은 이름의 다른 스킬이 있음"))
                 return
             }
-            plan.set(skillPath, to: Data(skill.utf8), mode: nil, newMode: 0o644, summary: "tracker 스킬")
+            try plan.set(skillPath, to: Data(skill.utf8), mode: nil, newMode: 0o644, summary: "tracker 스킬")
         } else if disk.data != nil {
             guard ours else {
                 plan.notes.append(.init(step: "tracker 스킬", reason: "같은 이름의 다른 스킬이 있음"))
                 return
             }
-            plan.set(skillPath, to: nil, mode: nil, summary: "tracker 스킬 지움")
+            try plan.set(skillPath, to: nil, mode: nil, summary: "tracker 스킬 지움")
         }
     }
 

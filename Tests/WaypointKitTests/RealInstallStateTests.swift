@@ -18,8 +18,7 @@ import Testing
 
     private func copy(_ relative: String, into box: InstallSandbox) {
         let source = Self.realHome + "/" + relative
-        let disk = IntegrationFile.read(source)
-        guard let data = disk.data else { return }
+        guard let disk = try? IntegrationFile.read(source), let data = disk.data else { return }
         let target = box.path(relative)
         try? FileManager.default.createDirectory(atPath: (target as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         try? IntegrationFile.apply(path: target, data: data, mode: disk.mode ?? 0o600)
