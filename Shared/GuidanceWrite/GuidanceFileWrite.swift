@@ -1,7 +1,7 @@
 import Foundation
 
 /// 프로젝트 밖 지침 파일(전역·상위 폴더·기억·`.claude/rules`·Codex 규칙) 쓰기. 지침 문서(`GuideDoc`)로 등록하지 않고
-/// 파일만 다룬다: 읽은 내용과 디스크가 같은지 확인 → 규칙 파일 검사 → 지금 내용을 백업 → 원자적 쓰기(또는 지우기).
+/// 파일만 다룬다: 규칙 파일 검사 → 읽은 내용과 디스크가 같은지 확인 → 지금 내용을 백업 → 원자적 쓰기(또는 지우기).
 ///
 /// Codex 내부 기억 DB에 쓰는 길은 없다(`isWritable`이 거절하고, 이 타입은 텍스트 파일만 쓴다).
 public enum GuidanceFileWrite {
@@ -79,24 +79,25 @@ public enum GuidanceFileWrite {
         return ext == "md" || ext == "rules"
     }
 
-    /// 바뀜을 디스크에 쓴다. 모든 파일이 `before`와 같은지 먼저 확인하고(하나라도 다르면 아무것도 쓰지 않는다),
-    /// 규칙 파일은 새 내용을 검사한 뒤, 파일마다 지금 내용을 백업하고 쓴다(`after`가 nil이면 지운다).
+    /// 바뀜을 디스크에 쓴다. 규칙 파일은 새 내용을 먼저 검사하고, 모든 파일이 `before`와 같은지 확인한 뒤
+    /// (하나라도 다르면 아무것도 쓰지 않는다) 파일마다 지금 내용을 백업하고 쓴다(`after`가 nil이면 지운다).
     /// - Parameter checkRules: 규칙 파일 검사. nil이면 검사하지 않는다(되돌리기·복원처럼 있던 내용으로 돌릴 때).
     public static func apply(_ changes: [Change], backups: GuidanceBackupStore, reason: GuidanceBackupStore.Reason,
                              at date: Date, checkRules: ((String) -> CommandRulesCheck.Outcome)?) throws {
         guard changes.allSatisfy({ isWritablePath($0.path) }) else { throw Failure.notWritable }
-        var current: [String: Data?] = [:]
-        for change in changes {
-            let disk = try read(change.path)
-            guard same(disk, change.before) else { throw Failure.changed }
-            current[change.path] = disk
-        }
+        // 검사가 몇 초 걸릴 수 있어 디스크 확인은 그 뒤에 한다
         if let checkRules {
             for change in changes where change.path.hasSuffix(".rules") {
                 guard let after = change.after else { continue }
                 let outcome = checkRules(after)
                 if !outcome.isValid { throw Failure.invalidRules(outcome) }
             }
+        }
+        var current: [String: Data?] = [:]
+        for change in changes {
+            let disk = try read(change.path)
+            guard same(disk, change.before) else { throw Failure.changed }
+            current[change.path] = disk
         }
         for change in changes {
             if let data = current[change.path] ?? nil {
