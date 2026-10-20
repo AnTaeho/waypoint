@@ -392,6 +392,12 @@ func mcpRequest(_ body: String, method: String = "POST", headers: [String: Strin
         #expect(h.project.events?.first { $0.type == .projectStatus }?.session == nil)
     }
 
+    @Test func archivedProjectCardsAreNotFound() throws {
+        h.project.makeCard(in: h.context, title: "a", status: .next, at: t0)
+        h.project.archivedAt = t0
+        #expect(try h.fails("card_get", ["id": "PRB-1"]).contains("카드 없음"))
+    }
+
     @Test func noteAndHandoff() throws {
         let a = h.project.makeCard(in: h.context, title: "a", status: .next, at: t0)
         _ = try h.ok("card_note", ["id": "PRB-1", "text": "막힘: 인코딩"])
