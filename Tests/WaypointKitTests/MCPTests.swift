@@ -363,6 +363,13 @@ func mcpRequest(_ body: String, method: String = "POST", headers: [String: Strin
         _ = try h.fails("card_update", ["id": "PRB-1", "status": "finished"])
     }
 
+    @Test func updateIgnoresNullCriteria() throws {
+        let a = h.project.makeCard(in: h.context, title: "a", status: .next, criteria: [Criterion("x")], at: t0)
+        _ = try h.ok("card_update", ["id": "PRB-1", "title": .null, "criteria": .null])
+        #expect(a.criteria == [Criterion("x")])
+        #expect(events(a, .note).isEmpty)
+    }
+
     @Test func noteAndHandoff() throws {
         let a = h.project.makeCard(in: h.context, title: "a", status: .next, at: t0)
         _ = try h.ok("card_note", ["id": "PRB-1", "text": "막힘: 인코딩"])
