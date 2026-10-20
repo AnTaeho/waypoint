@@ -12,6 +12,8 @@ final class IntegrationMonitor {
     @ObservationIgnored private let home: URL
     @ObservationIgnored private let port: UInt16
     @ObservationIgnored private var lastSessions: [AgentProvider: String] = [:]
+    /// 파일에 아직 쓰지 않은 변경. 10초 점검과 종료 때 쓴다(`saveIfNeeded`).
+    @ObservationIgnored private var dirty = false
 
     init(port: UInt16, home: URL = URL(fileURLWithPath: NSHomeDirectory()), directory: URL? = try? WaypointStore.supportDirectory()) {
         self.port = port; self.home = home; self.directory = directory
@@ -38,7 +40,7 @@ final class IntegrationMonitor {
     func receive(_ provider: AgentProvider, sessionID: String, at: Date, project: String?, replayed: Bool) {
         if (history.hooks[provider.rawValue]?.at ?? .distantPast) <= at { lastSessions[provider] = sessionID }
         history.receive(provider, at: at, receivedAt: Date(), project: project, replayed: replayed)
-        save()
+        dirty = true
     }
 
     /// 미등록 시작 폴더의 훅 이후 실제 프로젝트에 연결한 경우. 수신 시각은 바꾸지 않는다.
@@ -46,19 +48,21 @@ final class IntegrationMonitor {
         for (provider, id) in lastSessions where id == sessionID {
             history.hooks[provider.rawValue]?.project = project
         }
-        save()
+        dirty = true
     }
 
-    func receiveMCP() { history.lastMCPAt = Date(); save() }
-    func report(_ message: String) { history.issue = message; save() }
-    func acknowledge() { history.issue = nil; save() }
+    func receiveMCP() { history.lastMCPAt = Date(); dirty = true }
+    func report(_ message: String) { history.issue = message; dirty = true }
+    func acknowledge() { history.issue = nil; dirty = true }
 
-    private func save() {
-        guard let directory, let data = try? JSONEncoder().encode(history) else { return }
+    /// 바뀐 것이 있으면 쓴다. 못 쓰면 다음 점검에서 다시 쓴다.
+    func saveIfNeeded() {
+        guard dirty, let directory, let data = try? JSONEncoder().encode(history) else { return }
         do {
             let url = directory.appendingPathComponent("integration-health.json")
             try data.write(to: url, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            dirty = false
         }
         catch { history.issue = "진단 기록 저장 실패" }
     }

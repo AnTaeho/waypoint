@@ -17,5 +17,18 @@ extension AppServices {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshStates() }
         }
+        // 끝내기 직전에 점검 주기를 기다리던 지표·진단 기록과 저장 안 된 변경을 쓴다. 메인 스레드에서 바로 돈다.
+        terminateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.saveBeforeTerminate() }
+        }
+    }
+
+    func saveBeforeTerminate() {
+        reliability.saveIfNeeded()
+        integration.saveIfNeeded()
+        let context = container.mainContext
+        if context.hasChanges { try? context.save() }
     }
 }
