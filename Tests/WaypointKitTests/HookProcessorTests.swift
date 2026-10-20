@@ -280,6 +280,18 @@ import Testing
         #expect(try h.context.fetchCount(FetchDescriptor<Session>()) == 2)
     }
 
+    // 끝난 시각보다 이른 SubagentStart 재수신(outbox)은 끝난 서브에이전트를 다시 열지 않는다.
+    @Test func lateSubagentStartRedeliveryKeepsItEnded() throws {
+        let h = try HookHarness()
+        try h.send("doc-SessionStart", at: t0)
+        try h.send("doc-SubagentStart", at: t0 + 1)
+        try h.send("doc-SubagentStop", at: t0 + 10)
+        try h.send("doc-SubagentStart", at: t0 + 5)
+        let sub = try #require(try h.session(HookHarness.agentID))
+        #expect(sub.endedAt == t0 + 10)
+        #expect(sub.cachedState == .ended)
+    }
+
     // 도구 실패 훅이 그 세션의 첫 훅이어도 세션을 만든다.
     @Test func toolFailureCreatesMissingSession() throws {
         let h = try HookHarness()
