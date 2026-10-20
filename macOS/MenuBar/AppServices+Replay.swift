@@ -21,7 +21,7 @@ extension AppServices {
     func deferBehindReplay(event: String, provider: AgentProvider, body: Data, pid: Int?, receivedAt: Date) -> Bool {
         guard replayBacklog, HookRouter.defersWhileDraining(event), let directory = replayDirectory,
               let line = Outbox.line(event: event, provider: provider, receivedAt: receivedAt, pid: pid, payload: body),
-              (try? Outbox.append(line, directory: directory)) != nil
+              let appended = try? Outbox.append(line, directory: directory), appended.accepted > 0
         else { return false }
         scheduleReplay()
         return true
