@@ -30,9 +30,10 @@ public enum GuideFile {
     }
 
     /// 같은 폴더의 임시 파일에 다 쓴 뒤 `rename`으로 바꿔 끼운다. 읽는 쪽은 옛 내용이나 새 내용만 본다.
-    /// 기존 파일의 권한은 그대로 옮긴다.
-    public static func writeAtomically(_ content: String, to url: URL) throws {
+    /// 기존 파일의 권한은 그대로 옮긴다. 심볼릭 링크면 링크를 두고 대상 파일을 바꾼다.
+    public static func writeAtomically(_ content: String, to link: URL) throws {
         let fm = FileManager.default
+        let url = resolved(link)
         let dir = url.deletingLastPathComponent()
         let temp = dir.appendingPathComponent(".\(url.lastPathComponent).waypoint-\(UUID().uuidString.prefix(8))")
         try Data(content.utf8).write(to: temp)
@@ -47,5 +48,12 @@ public enum GuideFile {
             try? fm.removeItem(at: temp)
             throw error
         }
+    }
+
+    /// 링크를 따라간 실제 경로. 대상이 없으면 그대로.
+    static func resolved(_ url: URL) -> URL {
+        guard let real = realpath(url.path, nil) else { return url }
+        defer { free(real) }
+        return URL(fileURLWithPath: String(cString: real))
     }
 }
