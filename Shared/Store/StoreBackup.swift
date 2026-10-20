@@ -53,6 +53,8 @@ public struct StoreBackup: Sendable {
     public static let dailyInterval: TimeInterval = 24 * 60 * 60
 
     public let storeURL: URL
+    /// 테스트가 `moveClosedStore`의 파일 하나를 옮긴 직후 실패를 넣는 자리
+    var afterMove: (@Sendable (URL) throws -> Void)?
 
     public init(storeURL: URL) {
         self.storeURL = storeURL
@@ -105,18 +107,30 @@ public struct StoreBackup: Sendable {
     }
 
     /// 닫힌 저장소 파일을 백업 폴더로 **옮긴다**(복사하지 않는다). 예약 복원이 지금 저장소를 비킬 때 쓴다.
+    /// 도중에 실패하면 옮긴 파일을 제자리로 돌려놓고 던진다.
     @discardableResult
     func moveClosedStore(reason: Reason, stamp: StoreVersionStamp, at date: Date) throws -> Entry? {
         guard storeExists else { return nil }
+        let fm = FileManager.default
         let folder = try makeFolder(reason: reason, at: date)
-        var sizes: [String: Int64] = [:]
-        for file in Self.storeFiles(of: storeURL) where FileManager.default.fileExists(atPath: file.path) {
-            let target = folder.appendingPathComponent(file.lastPathComponent)
-            try FileManager.default.moveItem(at: file, to: target)
-            try PrivateFile.restrict(target)
-            sizes[file.lastPathComponent] = try PrivateFile.size(target)
+        var moved: [(from: URL, to: URL)] = []
+        do {
+            var sizes: [String: Int64] = [:]
+            for file in Self.storeFiles(of: storeURL) where fm.fileExists(atPath: file.path) {
+                let target = folder.appendingPathComponent(file.lastPathComponent)
+                try fm.moveItem(at: file, to: target)
+                moved.append((file, target))
+                try afterMove?(target)
+                try PrivateFile.restrict(target)
+                sizes[file.lastPathComponent] = try PrivateFile.size(target)
+            }
+            return try finish(folder, reason: reason, stamp: stamp, at: date, method: .fileCopy, files: sizes)
+        } catch {
+            let restored = moved.reduce(true) { ok, pair in ((try? fm.moveItem(at: pair.to, to: pair.from)) != nil) && ok }
+            // 못 돌려놓은 파일이 있으면 폴더를 남긴다(지우면 저장소를 잃는다).
+            if restored { try? fm.removeItem(at: folder) }
+            throw error
         }
-        return try finish(folder, reason: reason, stamp: stamp, at: date, method: .fileCopy, files: sizes)
     }
 
     /// 열린 저장소를 SQLite 온라인 백업으로 뜬다. 앱이 쓰는 중이어도 한 시점의 일관된 사본이 된다.
