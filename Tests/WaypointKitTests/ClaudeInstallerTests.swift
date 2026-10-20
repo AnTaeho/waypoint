@@ -203,8 +203,8 @@ import Testing
         let settingsEntry = try #require(entries.first { $0["path"]?.stringValue == box.path(".claude/settings.json") })
         let name = try #require(settingsEntry["file"]?.stringValue)
         #expect(String(data: try Data(contentsOf: folder.appendingPathComponent(name)), encoding: .utf8) == original)
-        #expect(IntegrationFile.read(folder.appendingPathComponent(name).path).mode == 0o600)
-        #expect(IntegrationFile.read(folder.appendingPathComponent("paths.json").path).mode == 0o600)
+        #expect(try IntegrationFile.read(folder.appendingPathComponent(name).path).mode == 0o600)
+        #expect(try IntegrationFile.read(folder.appendingPathComponent("paths.json").path).mode == 0o600)
         // 없던 파일은 사본 없이 목록에만
         #expect(entries.contains { $0["file"] == .null && $0["path"]?.stringValue == box.path(".claude/skills/tracker/SKILL.md") })
     }
@@ -271,6 +271,15 @@ import Testing
         let box = InstallSandbox()
         box.write(".claude/settings.json", "{ not json")
         #expect(throws: IntegrationInstallError.self) {
+            try IntegrationInstaller.plan(.claude, .install, context: box.context())
+        }
+    }
+
+    @Test func settingsWithoutReadPermissionStopBeforeWriting() throws {
+        let box = InstallSandbox()
+        box.write(".claude/settings.json", "{\"model\": \"opus\"}\n", mode: 0o000)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: box.path(".claude/settings.json")) }
+        #expect(throws: IntegrationInstallError.unreadable(path: box.path(".claude/settings.json"), reason: "읽을 수 없음")) {
             try IntegrationInstaller.plan(.claude, .install, context: box.context())
         }
     }

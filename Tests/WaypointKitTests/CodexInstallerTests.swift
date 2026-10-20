@@ -157,6 +157,15 @@ import Testing
         }
     }
 
+    @Test func configWithoutReadPermissionStopsBeforeWriting() throws {
+        let box = InstallSandbox()
+        box.write(".codex/config.toml", Self.userConfig, mode: 0o000)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: box.path(".codex/config.toml")) }
+        #expect(throws: IntegrationInstallError.unreadable(path: box.path(".codex/config.toml"), reason: "읽을 수 없음")) {
+            try IntegrationInstaller.plan(.codex, .install, context: box.context())
+        }
+    }
+
     @Test func secondWriteFailureRollsBack() throws {
         let box = InstallSandbox()
         box.write(".codex/config.toml", Self.userConfig, mode: 0o600)

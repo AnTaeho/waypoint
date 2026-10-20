@@ -111,31 +111,31 @@ struct CodexInstallPlanner {
         let hooksText = Self.jsonText(hooks)
         if remove {
             if hooks.objectPairs?.isEmpty == false {
-                plan.set(hooksPath, to: Data(hooksText.utf8), mode: nil, summary: "Codex 훅 연결 해제")
+                try plan.set(hooksPath, to: Data(hooksText.utf8), mode: nil, summary: "Codex 훅 연결 해제")
             } else {
-                plan.set(hooksPath, to: nil, mode: nil, summary: "Codex 훅 설정 지움")
+                try plan.set(hooksPath, to: nil, mode: nil, summary: "Codex 훅 설정 지움")
             }
             if originalConfig != nil {
-                plan.set(configPath, to: Data(cleanedConfig.utf8), mode: nil, summary: "MCP 블록 지움")
+                try plan.set(configPath, to: Data(cleanedConfig.utf8), mode: nil, summary: "MCP 블록 지움")
             }
             if oldSkill != nil, manifestHashMatches {
-                plan.set(skillPath, to: nil, mode: nil, summary: "waypoint-tracker 스킬 지움")
+                try plan.set(skillPath, to: nil, mode: nil, summary: "waypoint-tracker 스킬 지움")
             }
             // 훅 스크립트·install.json·백업은 남겨 진행 중인 세션이 파일 누락으로 실패하지 않게 한다.
         } else {
             let common = Self.normalized(try context.sources.text(context.sources.hookScript))
             let bridge = Self.normalized(try context.sources.text(context.sources.codexBridge))
-            plan.set(commonHookPath, to: Data(common.utf8), mode: Self.scriptMode, summary: "공통 훅 스크립트")
-            plan.set(bridgePath, to: Data(bridge.utf8), mode: Self.scriptMode, summary: "Codex 브리지")
-            plan.set(skillPath, to: Data(skill.utf8), mode: nil, summary: "waypoint-tracker 스킬")
-            plan.set(configPath, to: Data(cleanedConfig.utf8), mode: nil, summary: "MCP 블록")
-            plan.set(hooksPath, to: Data(hooksText.utf8), mode: nil, summary: "Codex 훅 연결")
+            try plan.set(commonHookPath, to: Data(common.utf8), mode: Self.scriptMode, summary: "공통 훅 스크립트")
+            try plan.set(bridgePath, to: Data(bridge.utf8), mode: Self.scriptMode, summary: "Codex 브리지")
+            try plan.set(skillPath, to: Data(skill.utf8), mode: nil, summary: "waypoint-tracker 스킬")
+            try plan.set(configPath, to: Data(cleanedConfig.utf8), mode: nil, summary: "MCP 블록")
+            try plan.set(hooksPath, to: Data(hooksText.utf8), mode: nil, summary: "Codex 훅 연결")
             let skillHash = Self.sha256(skill)
             let manifestCurrent = manifest["skillHash"] == .string(skillHash) && manifest["port"] == .number(String(port))
             if !plan.files.isEmpty || !manifestCurrent {
                 let text = Self.jsonText(.object([("skillHash", .string(skillHash)), ("port", .number(String(port))),
                                                   ("backup", .string(plan.backupFolder.path))]))
-                plan.set(manifestPath, to: Data(text.utf8), mode: nil, summary: "설치 기록")
+                try plan.set(manifestPath, to: Data(text.utf8), mode: nil, summary: "설치 기록")
             }
         }
         return plan
@@ -180,7 +180,7 @@ struct CodexInstallPlanner {
 
     /// 파이썬 `read_text()`: UTF-8, 줄바꿈 `\r\n`·`\r` → `\n`. 없으면 nil.
     static func readText(_ path: String) throws -> String? {
-        guard let data = IntegrationFile.read(IntegrationFile.resolved(path)).data else { return nil }
+        guard let data = try IntegrationFile.read(IntegrationFile.resolved(path)).data else { return nil }
         guard let text = String(data: data, encoding: .utf8) else {
             throw IntegrationInstallError.unreadable(path: path, reason: "UTF-8이 아님")
         }

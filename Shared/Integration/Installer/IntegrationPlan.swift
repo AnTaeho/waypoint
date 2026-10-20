@@ -91,7 +91,7 @@ public struct IntegrationApplier: Sendable {
     public func apply(_ plan: IntegrationPlan) throws -> URL? {
         guard !plan.files.isEmpty else { return nil }
         for change in plan.files {
-            let disk = IntegrationFile.read(change.path)
+            let disk = try IntegrationFile.read(change.path)
             guard disk.data == change.before else { throw IntegrationInstallError.changedSincePlan(path: change.path) }
         }
         do {
@@ -182,9 +182,13 @@ public enum IntegrationFile {
         return String(cString: real)
     }
 
-    public static func read(_ path: String) -> Disk {
+    /// 없으면 `data`가 nil. 있는데 읽지 못하면(권한 없음 등) 멈춘다.
+    public static func read(_ path: String) throws -> Disk {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: path), let data = fm.contents(atPath: path) else { return Disk(data: nil, mode: nil) }
+        guard fm.fileExists(atPath: path) else { return Disk(data: nil, mode: nil) }
+        guard let data = fm.contents(atPath: path) else {
+            throw IntegrationInstallError.unreadable(path: path, reason: "읽을 수 없음")
+        }
         let mode = (try? fm.attributesOfItem(atPath: path)[.posixPermissions] as? NSNumber)?.uint16Value
         return Disk(data: data, mode: mode)
     }
@@ -242,9 +246,9 @@ public enum IntegrationFile {
 extension IntegrationPlan {
     /// 대상 파일 하나를 계획에 넣는다. 지금 내용·권한과 같으면 넣지 않는다.
     /// - Parameter mode: 쓸 권한. nil이면 있던 파일의 권한을 지키고, 새 파일은 `newMode`.
-    mutating func set(_ path: String, to after: Data?, mode: UInt16?, newMode: UInt16 = 0o600, summary: String) {
+    mutating func set(_ path: String, to after: Data?, mode: UInt16?, newMode: UInt16 = 0o600, summary: String) throws {
         let target = IntegrationFile.resolved(path)
-        let disk = IntegrationFile.read(target)
+        let disk = try IntegrationFile.read(target)
         let finalMode = mode ?? disk.mode ?? newMode
         if disk.data == after && (after == nil || disk.mode == finalMode) { return }
         if after == nil && disk.data == nil { return }
