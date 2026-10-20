@@ -82,7 +82,9 @@ public final class HookProcessor {
     public func handle(_ input: HookInput, at date: Date, delivers: Bool = true, acknowledges: Bool = false) -> String? {
         lastSaveFailed = false
         lastContextID = nil
-        let input = linkRemote(input)
+        var input = linkRemote(input)
+        // 원격·컨테이너 훅의 PID는 원격 쪽 프로세스다. 이 Mac에서 찾지 않게 버린다(원격 세션은 30분 규칙).
+        if input.remote != nil { input.claudePid = nil; input.processPid = nil }
         // 저장에 실패하면 DB와 함께 메모리의 대기 항목도 되돌린다. 같은 훅을 다시 처리해도 대기 항목이 겹치거나 사라지지 않게.
         // rollback이 되돌리지 못한 메모리 값은 저장소 값으로 다시 읽는다(`ContextReload`). 그대로 두면 다음 저장에 섞인다.
         let spawns = pendingSpawns
@@ -217,7 +219,9 @@ public final class HookProcessor {
     /// 메인 세션의 Claude Code PID를 적는다. 비어 있거나, 이 훅이 지금까지 받은 것 중 가장 새것이면 바꾼다
     /// (`--resume`은 같은 `session_id`를 새 프로세스로 이어 간다). outbox로 늦게 들어온 옛 훅은 PID를 되돌리지 않는다.
     /// `touch` 전에 불러야 한다(`lastSeenAt`과 비교).
+    /// 원격 훅이면 예전에 적힌 PID도 지운다.
     private func recordPid(_ session: Session, _ input: HookInput, at date: Date) {
+        if input.remote != nil { session.claudePid = nil; session.processPid = nil; return }
         let pid = input.provider == .claude ? input.claudePid : input.processPid
         guard let pid else { return }
         if input.provider == .claude {

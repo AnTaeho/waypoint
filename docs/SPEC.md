@@ -195,7 +195,7 @@ GuideVersion doc, content, at, source: app | local
 | `SessionEnd` | `reason` | 세션 종료, 모든 연결 해제(하위 세션 포함) | 가끔 오지 않는다 → 「종료 판정」 |
 
 - 서브에이전트 순서: `PreToolUse(Agent)` → `SubagentStart` → 서브에이전트의 훅 → `SubagentStop`. 백그라운드 실행이면 그사이 부모의 `Stop`·`UserPromptSubmit`이 섞이고, 끝나면 부모에 `<agent-message from="<agent_id>">…` 프롬프트가 한 번 더 온다(heartbeat로만 쓴다).
-- 모든 훅: 스크립트가 보낸 PID(6장)가 있으면 메인 세션 `claudePid`(Codex는 `processPid`)에 적는다. 비어 있거나 이 훅이 지금까지 받은 것 중 가장 새것(`at >= lastSeenAt`)일 때만 바꾼다. 서브에이전트 훅의 PID는 부모와 같은 프로세스라 메인 세션에만 적는다.
+- 모든 훅: 스크립트가 보낸 PID(6장)가 있으면 메인 세션 `claudePid`(Codex는 `processPid`)에 적는다. 비어 있거나 이 훅이 지금까지 받은 것 중 가장 새것(`at >= lastSeenAt`)일 때만 바꾼다. 서브에이전트 훅의 PID는 부모와 같은 프로세스라 메인 세션에만 적는다. 원격 훅(`waypoint_remote`)의 PID는 적지 않는다(「원격·컨테이너 수집」).
 - 재수신(docs/RELIABILITY.md): 실시간 응답이 1초를 넘으면 같은 훅이 outbox에도 쓰여 두 번 들어온다. 같은 세션에 같은 `tool_use_id`의 파일 변경·커밋 기록이 10분 안에 있으면 다시 남기지 않는다(payload `toolUseId`). 요청 문장은 `prompt_id`(Claude)·`turn_id`(Codex)가 같으면 같은 요청이고, ID가 없으면 같은 문장이 10초 안에 있을 때 같은 요청이다(payload `promptId`). `PreToolUse(Agent)`는 부모 세션·`tool_use_id`마다 대기 목록에 한 번만 올린다. 끝난 세션보다 이른 시각의 늦은 `PostToolUse`는 같은 ID의 세션을 새로 만들지 않는다.
 
 ### 파일 변경·커밋 (`PostToolUse`)
@@ -376,6 +376,7 @@ SSH 원격 서버·개발 컨테이너의 Claude Code·Codex 훅을 Mac 앱이 �
 - 매칭(`RemoteMatcher`·`HookProcessor.linkRemote`): origin을 `GitRemoteURL.normalize`(스킴·사용자 정보·포트·끝 `.git`·`/`를 떼고 소문자, scp 꼴 같음, 로컬 경로는 경로만)로 맞춘다. 등록 프로젝트의 origin은 작업 트리 `.git/config`를 읽는다(`LocalOrigin`, 5분 기억). ① `waypoint_remote`가 있고 ② `cwd`가 등록 폴더와 맞지 않고 ③ 원격 경로가 이 Mac에 없고 ④ 같은 주소의 보관 안 된 프로젝트들의 로컬 작업 트리가 **하나**일 때 잇는다.
 - 이으면 `cwd`와 파일 경로를 원격 작업 트리 → 로컬 작업 트리로 옮긴 뒤 로컬과 같은 규칙으로 처리한다. 세션 `cwd`는 원격 폴더, `gitBranch`는 `waypoint_remote.branch`, `checkout`은 `<host>:<원격 작업 트리>`.
 - 잇지 못한 원격 세션의 시작 블록에는 `remote: <origin>` 줄이 붙는다. `project_resolve`는 `remote`로 같은 규칙을 쓴다.
+- 원격 훅의 PID(머리·outbox `claudePid`)는 원격 쪽 프로세스라 적지 않고, 이미 적힌 PID도 지운다. 원격 세션은 PID 없는 세션처럼 30분 규칙으로 끝난다.
 - 세션보다 이른 훅이 늦게 들어오면 `startedAt`과 가장 이른 `session.start`를 당기고 `source`를 채운다.
 - `POST /hooks/replay`: 본문 outbox 줄 500줄 이하. 읽을 수 있는 줄만 `replay/outbox.jsonl`에 한 번의 `O_APPEND`로 붙이고 바로 `200 {"accepted":n,"rejected":m}`. 읽을 줄이 없거나 상한 초과 `400`, 쓰기 실패 `500`, POST 아님 `405`.
 - 처리(`RemoteReplay`): 메인 큐 한 차례에 0.1초씩 실시간 훅과 같은 경로(블록 없음)로 처리하고 남으면 넘긴다. 로컬 훅이 먼저 처리된다. 중복은 `tool_use_id`·`prompt_id`/`turn_id`로 막는다. replay 줄이 남은 동안 `SessionStart`·`UserPromptSubmit` 밖의 실시간 훅은 뒤에 붙이고 `204`(`HookRouter.defersWhileDraining`).
