@@ -273,14 +273,21 @@ start_replay() {
   return 0
 }
 
+# $2 한 줄을 $1 끝에 write 한 번으로 붙인다(O_APPEND). printf 내장은 1KB씩 나눠 써서 동시에 쓰는 훅과 줄이 섞인다.
+# dd는 here-string 임시 파일에서 줄 전체(+ 줄바꿈)를 한 번에 읽고 한 번에 쓴다. 실패하면 printf로.
+append_line() {
+  local LC_ALL=C
+  dd bs="$(( ${#2} + 1 ))" count=1 <<< "$2" >> "$1" 2>/dev/null || printf '%s\n' "$2" >> "$1" 2>/dev/null
+}
+
 # main의 지역 변수(event·now·providerfield·pidfield·payload·provider·remote·dir)로 outbox 한 줄을 쓴다.
 write_outbox() {
   local trimmed
   trimmed="$(outbox_payload "$payload" "$provider" "$event" "$remote")"
   [ -z "$trimmed" ] && return 0
   mkdir -p "$dir" 2>/dev/null
-  printf '{"event":"%s","receivedAt":%s%s%s,"trimmed":true,"payload":%s}\n' \
-    "$event" "$now" "$providerfield" "$pidfield" "$trimmed" >> "$dir/outbox.jsonl" 2>/dev/null
+  append_line "$dir/outbox.jsonl" \
+    "$(printf '{"event":"%s","receivedAt":%s%s%s,"trimmed":true,"payload":%s}' "$event" "$now" "$providerfield" "$pidfield" "$trimmed")"
 }
 
 main() {
@@ -336,7 +343,7 @@ main() {
 
   if [ "${WAYPOINT_HOOK_LOG:-0}" = "1" ]; then
     mkdir -p "$dir/hook-log" 2>/dev/null
-    printf '%s\n' "$line" >> "$dir/hook-log/$(date +%Y-%m-%d).jsonl" 2>/dev/null
+    append_line "$dir/hook-log/$(date +%Y-%m-%d).jsonl" "$line"
   fi
 
   # 원격 모드에서 앞서 쌓인 줄이 있으면 블록이 필요 없는 이벤트는 그 뒤에 세운다(outbox에 붙이고 replay를 띄운다).

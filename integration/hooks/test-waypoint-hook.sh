@@ -288,6 +288,18 @@ check "깨진 JSON: 최소 정보만" 'expect minimal "$TMP/line" s-bad'
 printf '%s' 'not json SECRET' | outbox_of Stop; code=$?
 check "session_id 없음: exit 0, 줄 안 씀" '[ $code -eq 0 ] && [ ! -s "$TMP/line" ]'
 
+# 7-1) 1KB 넘는 줄을 여러 훅이 동시에 써도 줄이 섞이지 않는다(한 줄 = write 한 번)
+python3 -c 'import json; print(json.dumps({"session_id": "s-big", "cwd": "/w", "prompt": "가나다라마바사아자차" * 60}))' > "$TMP/big.json"
+pids=""
+for p in 1 2 3 4 5 6 7 8; do
+  ( for i in 1 2 3 4 5 6 7 8 9 10; do WAYPOINT_SUPPORT_DIR="$TMP/concurrent" bash "$HOOK" UserPromptSubmit < "$TMP/big.json"; done ) &
+  pids="$pids $!"
+done
+wait $pids
+check "동시 쓰기: 80줄 모두 온전한 JSON" 'python3 -c "
+import json,sys; ls=open(sys.argv[1],\"rb\").read().split(b\"\\n\")[:-1]
+assert len(ls)==80 and all(len(l)>1500 and json.loads(l.decode())[\"payload\"][\"prompt\"]==\"가나다라마바사아자차\"*60 for l in ls), len(ls)" "$TMP/concurrent/outbox.jsonl"'
+
 # 8) 원격·컨테이너(TRK-53): 보낼 곳(WAYPOINT_URL), git 원격 정보(waypoint_remote), 원격 outbox replay
 cat > "$TMP/remote-server.py" <<'PY'
 import http.server, json, os, sys, time

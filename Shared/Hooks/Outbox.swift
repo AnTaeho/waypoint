@@ -90,8 +90,9 @@ public enum Outbox {
             .sorted()
         for name in pending {
             let url = directory.appendingPathComponent(name)
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
-            let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
+            guard let data = try? Data(contentsOf: url) else { continue }
+            // 줄마다 따로 읽는다. UTF-8이 깨진 줄은 그 줄만 격리한다(동시 쓰기로 섞인 줄)
+            let lines = data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
             for (index, line) in lines.enumerated() {
                 if let deadline, result.processed + result.skipped > 0, Date() >= deadline {
                     var paused = preserve(lines[index...], at: url, result: result)
@@ -99,7 +100,7 @@ public enum Outbox {
                     paused.more = true
                     return paused
                 }
-                if let entry = parse(line: line) {
+                if let text = String(data: line, encoding: .utf8), let entry = parse(line: Substring(text)) {
                     do {
                         try handle(entry)
                     } catch {
@@ -170,17 +171,22 @@ public enum Outbox {
     }
 
     /// 처리하지 못한 줄부터 끝까지를 떼어 낸 파일에 다시 쓴다. 쓰지 못하면 파일을 그대로 둔다.
-    private static func preserve(_ remaining: ArraySlice<Substring>, at url: URL, result: DrainResult) -> DrainResult {
+    private static func preserve(_ remaining: ArraySlice<Data>, at url: URL, result: DrainResult) -> DrainResult {
         var result = result
         result.retryPending = true
-        try? (remaining.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+        var data = Data()
+        for line in remaining {
+            data.append(line)
+            data.append(UInt8(ascii: "\n"))
+        }
+        try? data.write(to: url, options: .atomic)
         return result
     }
 
     /// 읽을 수 없는 줄을 격리 파일 끝에 덧붙인다(소유자만 읽기·쓰기). 실패하면 false.
-    private static func quarantine(_ line: Substring, in directory: URL, fileManager: FileManager) -> Bool {
+    private static func quarantine(_ line: Data, in directory: URL, fileManager: FileManager) -> Bool {
         let url = directory.appendingPathComponent(quarantineFileName)
-        let data = Data((line + "\n").utf8)
+        let data = line + Data([UInt8(ascii: "\n")])
         guard fileManager.fileExists(atPath: url.path) else {
             return fileManager.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600])
         }
