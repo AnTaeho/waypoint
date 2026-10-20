@@ -68,12 +68,14 @@ extension MCPTools {
         try findCard(try requiredString(args, "id"))
     }
 
-    /// "PRB-1" → 카드. 키는 대소문자 무시.
+    /// "PRB-1" → 카드. 키는 대소문자 무시. 보관된 프로젝트의 카드는 찾지 않는다.
     func findCard(_ displayID: String) throws -> Card {
         guard let (key, number) = Self.parseCardID(displayID) else {
             throw MCPToolError("카드 ID 형식이 아님: \(displayID) (예: PRB-1)")
         }
-        guard let project = allProjects().first(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame }),
+        guard let project = allProjects().first(where: {
+                  $0.archivedAt == nil && $0.key.caseInsensitiveCompare(key) == .orderedSame
+              }),
               let card = project.cards?.first(where: { $0.number == number })
         else { throw MCPToolError("카드 없음: \(displayID)") }
         return card

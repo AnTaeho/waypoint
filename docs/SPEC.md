@@ -398,7 +398,7 @@ MCP Streamable HTTP 중 필요한 부분만 직접 구현했다(`Shared/MCP/`, �
 
 ### 도구
 
-`project`는 키(대소문자 무시) 또는 폴더 경로(가장 가까운 상위 `rootPath`). `id`는 `PRB-1` 꼴 표시 ID. 모든 스키마는 `additionalProperties: false`. `provider`는 `claude`·`codex`.
+`project`는 키(대소문자 무시) 또는 폴더 경로(가장 가까운 상위 `rootPath`). `id`는 `PRB-1` 꼴 표시 ID. 보관된 프로젝트와 그 카드는 찾지 않는다. 모든 스키마는 `additionalProperties: false`. `provider`는 `claude`·`codex`.
 
 | 도구 | 입력(필수 굵게) | 동작 |
 |---|---|---|
