@@ -323,7 +323,7 @@ import Testing
 
     /// 문자열 안의 U+2028·U+2029·U+0085는 줄 끝이 아니다. CRLF 끝은 받는다.
     @Test func replaySplitsOnlyOnLineFeed() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
+        let dir = TestTemp.root.appendingPathComponent("waypoint-replay-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let unusual = #"{"event":"UserPromptSubmit","receivedAt":1,"payload":{"session_id":"s","prompt":"a\#u{2028}b\#u{2029}c\#u{85}d"}}"#
         let crlf = #"{"event":"Stop","receivedAt":2,"payload":{"session_id":"s"}}"#
