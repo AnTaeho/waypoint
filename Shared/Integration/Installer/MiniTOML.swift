@@ -32,10 +32,11 @@ struct MiniTOML {
                 let isArray = scanner.peek(at: 1) == "["
                 scanner.advance(isArray ? 2 : 1)
                 scanner.skipInlineSpace()
-                let key = try scanner.key()
+                let written = try scanner.key()
                 scanner.skipInlineSpace()
                 guard scanner.consume("]"), !isArray || scanner.consume("]") else { throw scanner.error() }
                 try scanner.endOfLine()
+                let key = Self.inLastElements(written, arrayCounts)
                 if isArray {
                     let index = arrayCounts[key, default: 0]
                     arrayCounts[key] = index + 1
@@ -55,6 +56,16 @@ struct MiniTOML {
                 try scanner.endOfLine()
             }
         }
+    }
+
+    /// 머리 키의 앞부분이 배열 표면 그 마지막 원소 아래로 옮긴다(`[x.env]` → `x.[1].env`)
+    private static func inLastElements(_ key: [String], _ arrayCounts: [[String]: Int]) -> [String] {
+        var path: [String] = []
+        for (i, part) in key.enumerated() {
+            path.append(part)
+            if i < key.count - 1, let count = arrayCounts[path] { path.append("[\(count - 1)]") }
+        }
+        return path
     }
 
     private mutating func markTables(_ path: [String]) {
