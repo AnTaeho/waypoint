@@ -99,4 +99,29 @@ public final class GuideWatcher: @unchecked Sendable {
         queue.asyncAfter(deadline: .now() + debounce, execute: item)
     }
 }
+
+/// 등록된 문서 파일만 받는 거르기 규칙. 적은 경로·링크를 푼 경로를 대소문자 없이 맞춘다.
+public struct GuideWatchTargets: Sendable {
+    private let paths: Set<String>
+
+    public init(_ files: [URL]) {
+        var paths: Set<String> = []
+        for file in files {
+            let name = file.lastPathComponent
+            let dir = file.deletingLastPathComponent().path
+            paths.insert(file.path)
+            paths.insert((Self.resolved(dir) as NSString).appendingPathComponent(name))
+            paths.insert(Self.resolved(file.path))
+        }
+        self.paths = Set(paths.map { $0.lowercased() })
+    }
+
+    public func accepts(_ path: String) -> Bool { paths.contains(path.lowercased()) }
+
+    private static func resolved(_ path: String) -> String {
+        guard let real = realpath(path, nil) else { return path }
+        defer { free(real) }
+        return String(cString: real)
+    }
+}
 #endif
