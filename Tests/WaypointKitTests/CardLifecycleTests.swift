@@ -85,6 +85,21 @@ import Testing
         #expect(events(card, .cardDetached).count == 1)
     }
 
+    // 완료 카드를 다시 작업하고 돌아가면 완료 시각은 다시 끝낸 시각이다(보드 완료 칸 7일).
+    @Test func reworkedDoneCardGetsNewDoneAt() throws {
+        let (_c, ctx) = try makeContext(); _ = _c
+        let p = makeProject(ctx)
+        let card = p.makeCard(in: ctx, title: "a", status: .next, at: t0)
+        try CardLifecycle.move(card, to: .done, at: t0, in: ctx)
+        let s = makeSession(ctx, p, id: "s1")
+        let later = t0 + 30 * 24 * 3600
+        CardLifecycle.attach(card, s, at: later, in: ctx)
+        CardLifecycle.detach(card, s, at: later + 60, in: ctx)
+        #expect(card.status == .done)
+        #expect(card.doneAt == later + 60)
+        #expect(BoardQuery.columns(for: p, now: later + 120)[.done]?.map(\.card) == [card])
+    }
+
     @Test func ideaDetachReturnsToIdeaNotDone() throws {
         let (_c, ctx) = try makeContext(); _ = _c
         let p = makeProject(ctx)

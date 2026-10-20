@@ -38,7 +38,7 @@ public enum CardLifecycle {
 
     /// 카드·세션의 열린 연결을 닫는다. 남은 열린 연결이 없고 카드가 여전히 active면
     /// `statusBeforeActive`(없으면 next)로 돌린다. 사용자가 그사이 옮겼으면 그대로 둔다.
-    /// 여기서 done으로 바꾸는 일은 없다(기억된 상태가 done이었던 경우만 done으로 돌아간다).
+    /// 여기서 done으로 바꾸는 일은 없다(기억된 상태가 done이었던 경우만 done으로 돌아가고, 그때 `doneAt`은 이 시각).
     public static func detach(_ card: Card, _ session: Session, at date: Date, in context: ModelContext, reason: String? = nil) {
         let links = card.openCardSessions.filter { $0.session === session }
         guard !links.isEmpty else { return }
@@ -50,6 +50,8 @@ public enum CardLifecycle {
         let restored = card.statusBeforeActive.flatMap(CardStatus.init(rawValue:)) ?? .next
         let target: CardStatus = restored == .active ? .next : restored
         card.status = target
+        // 완료 카드를 다시 작업했으면 다시 끝낸 시각을 완료 시각으로 적는다.
+        if target == .done { card.doneAt = date }
         card.statusBeforeActive = nil
         card.updatedAt = date
         Event.record(.cardStatus, in: context, card: card, session: session, at: date,
