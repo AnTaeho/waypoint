@@ -165,7 +165,7 @@ GuideVersion doc, content, at, source: app | local
 - 비는 구역은 머리째 숨긴다. 카드 줄을 누르면 카드 상세.
 - 검색: 이름·키가 맞거나 맞는 카드(보관 제외)가 있는 프로젝트. 이름·키가 맞으면 타일 그대로, 아니면 맞는 카드만 남긴다.
 - 도구 필터(전체/Claude/Codex): 진행 중 줄과 작업중 점만 거른다.
-- 다시 계산: 대시보드와 함께(`LiveDataTimeline`, 저장·훅 직후와 5초마다).
+- 다시 계산: 대시보드와 함께(`LiveDataTimeline`, 저장·훅 직후(잦으면 0.5초에 한 번으로 묶는다, `RefreshThrottle`)와 5초마다).
 
 ## 5. 훅 → 기록 매핑
 
