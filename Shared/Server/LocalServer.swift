@@ -33,13 +33,15 @@ public final class LocalServer {
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "dev.antaeho.waypoint.local-server")
 
-    /// 한 요청을 받는 데 허용하는 시간(초). 넘으면 연결을 끊는다.
-    private nonisolated static let receiveTimeout: TimeInterval = 5
+    /// 한 요청을 받는 데 허용하는 시간(초). 넘으면 연결을 끊는다(아무것도 안 보내는 연결 포함).
+    private let receiveTimeout: TimeInterval
 
     /// - Parameter fastHandler: 서버 큐에서 먼저 부른다. 메인 액터 상태를 건드리지 않는 요청(블록 수신 확인)만 응답하고 나머지는 nil.
-    public init(port: UInt16 = LocalServer.defaultPort, fastHandler: @escaping FastHandler = { _ in nil },
+    public init(port: UInt16 = LocalServer.defaultPort, receiveTimeout: TimeInterval = 5,
+                fastHandler: @escaping FastHandler = { _ in nil },
                 handler: @escaping (HTTPRequest) -> HTTPResponse) {
         self.port = port
+        self.receiveTimeout = receiveTimeout
         self.fastHandler = fastHandler
         self.handler = handler
     }
@@ -54,6 +56,7 @@ public final class LocalServer {
             let listener = try NWListener(using: parameters)
             let queue = queue
             let fast = fastHandler
+            let timeout = receiveTimeout
             let toMain: @Sendable (HTTPRequest, NWConnection) -> Void = { [weak self] request, connection in
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
@@ -64,7 +67,7 @@ public final class LocalServer {
                 }
             }
             listener.newConnectionHandler = { connection in
-                Self.accept(connection, queue: queue, fast: fast, toMain: toMain)
+                Self.accept(connection, queue: queue, timeout: timeout, fast: fast, toMain: toMain)
             }
             listener.stateUpdateHandler = { [weak self] newState in
                 DispatchQueue.main.async { MainActor.assumeIsolated { self?.update(newState) } }
@@ -99,22 +102,25 @@ public final class LocalServer {
         }
     }
 
-    private nonisolated static func accept(_ connection: NWConnection, queue: DispatchQueue, fast: @escaping FastHandler,
+    private nonisolated static func accept(_ connection: NWConnection, queue: DispatchQueue, timeout: TimeInterval,
+                                           fast: @escaping FastHandler,
                                            toMain: @escaping @Sendable (HTTPRequest, NWConnection) -> Void) {
         connection.start(queue: queue)
-        let acceptedAt = Date()
-        receive(on: connection, buffer: Data(), acceptedAt: acceptedAt,
-                deadline: acceptedAt.addingTimeInterval(receiveTimeout), fast: fast, toMain: toMain)
+        // 바이트가 오지 않아도 제한 시간에 끊는다. 요청을 다 받으면 취소한다(처리가 오래 걸리는 응답은 끊지 않는다).
+        let deadline = DispatchWorkItem { connection.cancel() }
+        queue.asyncAfter(deadline: .now() + timeout, execute: deadline)
+        receive(on: connection, buffer: Data(), acceptedAt: Date(), deadline: deadline, fast: fast, toMain: toMain)
     }
 
-    private nonisolated static func receive(on connection: NWConnection, buffer: Data, acceptedAt: Date, deadline: Date,
-                                            fast: @escaping FastHandler,
+    private nonisolated static func receive(on connection: NWConnection, buffer: Data, acceptedAt: Date,
+                                            deadline: DispatchWorkItem, fast: @escaping FastHandler,
                                             toMain: @escaping @Sendable (HTTPRequest, NWConnection) -> Void) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, isComplete, error in
             var buffer = buffer
             if let data { buffer.append(data) }
             switch HTTPRequestParser.parse(buffer) {
             case .request(var request):
+                deadline.cancel()
                 request.receivedAt = acceptedAt
                 if let response = fast(request) {
                     send(response, on: connection)
@@ -122,9 +128,11 @@ public final class LocalServer {
                     toMain(request, connection)
                 }
             case .invalid:
+                deadline.cancel()
                 send(.badRequest, on: connection)
             case .incomplete:
-                if error != nil || isComplete || Date() > deadline {
+                if error != nil || isComplete {
+                    deadline.cancel()
                     connection.cancel()
                 } else {
                     receive(on: connection, buffer: buffer, acceptedAt: acceptedAt, deadline: deadline,
