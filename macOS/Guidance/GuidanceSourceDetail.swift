@@ -80,6 +80,8 @@ struct GuidanceSourceDetail: View {
             if source.kind == .codexMemory { return (.codex(CodexMemoryStore.read(path: source.path)), list) }
             return (GuidanceText.load(source.path).map(Content.text) ?? .unreadable, list)
         }.value
+        // 그사이 다른 출처로 바뀌었으면 이전 출처 내용으로 덮지 않는다
+        guard !Task.isCancelled else { return }
         content = loaded.0
         backups = loaded.1
     }
