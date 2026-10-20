@@ -101,6 +101,7 @@ public final class GuideWatcher: @unchecked Sendable {
 }
 
 /// 등록된 문서 파일만 받는 거르기 규칙. 적은 경로·링크를 푼 경로를 대소문자 없이 맞춘다.
+/// 문서가 든 폴더 자체도 받는다(이벤트가 몰리면 FSEvents가 파일 대신 그 폴더를 다시 훑으라고 알린다).
 public struct GuideWatchTargets: Sendable {
     private let paths: Set<String>
 
@@ -110,13 +111,18 @@ public struct GuideWatchTargets: Sendable {
             let name = file.lastPathComponent
             let dir = file.deletingLastPathComponent().path
             paths.insert(file.path)
+            paths.insert(dir)
+            paths.insert(Self.resolved(dir))
             paths.insert((Self.resolved(dir) as NSString).appendingPathComponent(name))
             paths.insert(Self.resolved(file.path))
         }
         self.paths = Set(paths.map { $0.lowercased() })
     }
 
-    public func accepts(_ path: String) -> Bool { paths.contains(path.lowercased()) }
+    public func accepts(_ path: String) -> Bool {
+        let path = path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+        return paths.contains(path.lowercased())
+    }
 
     private static func resolved(_ path: String) -> String {
         guard let real = realpath(path, nil) else { return path }
