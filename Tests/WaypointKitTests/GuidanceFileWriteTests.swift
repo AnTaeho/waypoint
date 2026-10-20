@@ -299,6 +299,25 @@ import Testing
                                     backups: backups, reason: .edit, at: date, checkRules: { CommandRulesCheck.builtIn($0) })
         #expect(try dir.read("codex/rules/default.rules") == more)
     }
+
+    @Test func rulesChangedDuringCheckAreNotOverwritten() throws {
+        let dir = try TempDir()
+        let good = "prefix_rule(pattern=[\"ls\"], decision=\"allow\")\n"
+        let file = try dir.write("codex/rules/default.rules", good)
+        let added = good + "prefix_rule(pattern=[\"pwd\"], decision=\"allow\")\n"
+        let mine = good + "prefix_rule(pattern=[\"make\"], decision=\"allow\")\n"
+        let backups = store(dir)
+        #expect(throws: GuidanceFileWrite.Failure.changed) {
+            try GuidanceFileWrite.apply([.init(path: file.path, before: good, after: mine)],
+                                        backups: backups, reason: .edit, at: date,
+                                        checkRules: { text in
+                                            try? dir.write("codex/rules/default.rules", added)
+                                            return CommandRulesCheck.builtIn(text)
+                                        })
+        }
+        #expect(try dir.read("codex/rules/default.rules") == added)
+        #expect(backups.backups(of: file.path).isEmpty)
+    }
 }
 
 /// 규칙 파일 자체 검사와 Codex 검사.
