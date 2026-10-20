@@ -185,6 +185,34 @@ import Testing
         watcher.stop()
     }
 
+    /// 등록 문서만 받는다: 프로젝트 아래 .git·.build 이벤트는 거르고, 원자적 교체는 받는다.
+    @Test func registeredDocsOnly() async throws {
+        let dir = try TempDir()
+        let real = try #require(realpath(dir.url.path, nil).map { p in defer { free(p) }; return String(cString: p) })
+        try dir.write("AGENTS.md", "원본")
+        try FileManager.default.createSymbolicLink(atPath: dir.url.appendingPathComponent("CLAUDE.md").path,
+                                                   withDestinationPath: "AGENTS.md")
+        let targets = GuideWatchTargets([dir.url.appendingPathComponent("CLAUDE.md")])
+        #expect(targets.accepts(real + "/CLAUDE.md"))
+        #expect(targets.accepts(real + "/AGENTS.md"))
+        #expect(targets.accepts(real + "/claude.md"))
+        #expect(!targets.accepts(real + "/.git/index"))
+        #expect(!targets.accepts(real + "/.build/CLAUDE.md"))
+        #expect(!targets.accepts(real + "/.CLAUDE.md.waypoint-1234"))
+
+        let received = Received()
+        let watcher = GuideWatcher(debounce: 0.2, accept: { targets.accepts($0) }) { dirs in received.add(dirs) }
+        watcher.watch([real])
+        try await Task.sleep(for: .milliseconds(500))
+        received.reset()
+        try dir.write(".git/index", "x")
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(!received.contains(real + "/.git"))
+        try GuideFile.writeAtomically("새 내용", to: dir.url.appendingPathComponent("CLAUDE.md"))
+        #expect(await received.wait(for: real, timeout: 10))
+        watcher.stop()
+    }
+
     final class Received: @unchecked Sendable {
         private let lock = NSLock()
         private var dirs: Set<String> = []

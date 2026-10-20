@@ -1,14 +1,16 @@
 import Foundation
+import os
 import SwiftData
 import WaypointKit
 
 /// 등록된 지침 문서의 로컬 변경을 따라간다. 문서들의 부모 폴더를 FSEvents로 감시하고,
-/// 이벤트가 오면(0.4초 디바운스) 모든 문서를 해시로 다시 확인한다. 감시 폴더가 바뀔 때(등록·해제)와 시작할 때도 전부 확인한다.
+/// 문서 파일의 이벤트가 오면(0.4초 디바운스) 모든 문서를 해시로 다시 확인한다. 감시 폴더가 바뀔 때(등록·해제)와 시작할 때도 전부 확인한다.
 @MainActor
 final class GuideMonitor {
     private let context: ModelContext
     private var watcher: GuideWatcher?
     private var directories: Set<String> = []
+    private let targets = OSAllocatedUnfairLock(initialState: GuideWatchTargets([]))
     private var saveObserver: NSObjectProtocol?
 
     init(context: ModelContext) {
@@ -17,7 +19,8 @@ final class GuideMonitor {
 
     func start() {
         guard watcher == nil else { return }
-        watcher = GuideWatcher { [weak self] _ in
+        // 프로젝트 폴더 아래 .git·.build 등의 이벤트가 디바운스를 다시 걸지 않게 문서 파일만 받는다
+        watcher = GuideWatcher(accept: { [targets] path in targets.withLock { $0.accepts(path) } }) { [weak self] _ in
             Task { @MainActor in self?.checkAll() }
         }
         reload(force: true)
@@ -31,7 +34,9 @@ final class GuideMonitor {
 
     private func reload(force: Bool) {
         let docs = (try? context.fetch(FetchDescriptor<GuideDoc>())) ?? []
-        let dirs = Set(docs.compactMap { GuideLibrary.fileURL(of: $0)?.deletingLastPathComponent().path })
+        let files = docs.compactMap { GuideLibrary.fileURL(of: $0) }
+        let dirs = Set(files.map { $0.deletingLastPathComponent().path })
+        targets.withLock { $0 = GuideWatchTargets(files) }
         guard force || dirs != directories else { return }
         directories = dirs
         watcher?.watch(dirs)
