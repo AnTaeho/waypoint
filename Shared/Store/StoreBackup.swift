@@ -137,18 +137,25 @@ public struct StoreBackup: Sendable {
     @discardableResult
     public func backupOpenStore(reason: Reason = .manual, stamp: StoreVersionStamp, at date: Date) throws -> Entry {
         let folder = try makeFolder(reason: reason, at: date)
-        let target = folder.appendingPathComponent(storeURL.lastPathComponent)
-        // 0600으로 먼저 만들어 둔다(SQLite가 umask로 만들지 않게).
-        try PrivateFile.write(Data(), to: target)
-        try SQLiteFile.onlineBackup(from: storeURL, to: target)
-        // 롤백 저널로 바꾼 뒤 닫으면 -shm 빈 껍데기만 남는다(-wal 내용은 이미 본 파일에 들어갔다).
-        try? FileManager.default.removeItem(atPath: target.path + "-shm")
-        var sizes: [String: Int64] = [:]
-        for file in Self.storeFiles(of: target) where FileManager.default.fileExists(atPath: file.path) {
-            try PrivateFile.restrict(file)
-            sizes[file.lastPathComponent] = try PrivateFile.size(file)
+        let entry: Entry
+        do {
+            let target = folder.appendingPathComponent(storeURL.lastPathComponent)
+            // 0600으로 먼저 만들어 둔다(SQLite가 umask로 만들지 않게).
+            try PrivateFile.write(Data(), to: target)
+            try SQLiteFile.onlineBackup(from: storeURL, to: target)
+            // 롤백 저널로 바꾼 뒤 닫으면 -shm 빈 껍데기만 남는다(-wal 내용은 이미 본 파일에 들어갔다).
+            try? FileManager.default.removeItem(atPath: target.path + "-shm")
+            var sizes: [String: Int64] = [:]
+            for file in Self.storeFiles(of: target) where FileManager.default.fileExists(atPath: file.path) {
+                try PrivateFile.restrict(file)
+                sizes[file.lastPathComponent] = try PrivateFile.size(file)
+            }
+            entry = try finish(folder, reason: reason, stamp: stamp, at: date, method: .sqliteBackup, files: sizes)
+        } catch {
+            // 사본뿐이라 반쯤 만든 폴더는 바로 지운다.
+            try? FileManager.default.removeItem(at: folder)
+            throw error
         }
-        let entry = try finish(folder, reason: reason, stamp: stamp, at: date, method: .sqliteBackup, files: sizes)
         prune()
         return entry
     }

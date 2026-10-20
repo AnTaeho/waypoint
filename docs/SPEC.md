@@ -618,7 +618,7 @@ Claude·Codex 연동 설치의 기준은 앱 코드(`Shared/Integration/Installe
 - 판: 지금 모델은 `WaypointSchemaV1`(1.0.0), `WaypointMigrationPlan`(단계 없음).
 - **다음 판을 더할 때**: ① 지금 모델 클래스를 `WaypointSchemaV1` 안으로 옮겨 얼린다 ② 바꾼 모델로 `WaypointSchemaV2` ③ `schemas`에 V2, `stages`에 `.lightweight`(CloudKit 때문에 속성 더하기·옵셔널·기본값 안에서) ④ `WaypointStore.schema`·`currentSchemaVersion`을 V2로 ⑤ V1 → V2 여는 테스트.
 - 백업 자리: `<저장 폴더>/store-backups/<UTC yyyyMMddTHHmmss.SSSZ>-<사유>/`(0700), 저장소 파일(0600)과 마지막에 쓰는 `info.json`(사유·시각·앱 버전·빌드·판·방법·바이트). `info.json`이 없으면 끝나지 않은 백업으로 보고 지운다. 최근 7개.
-- 사유: `upgrade`(앱 버전·빌드·판이 `store-version.json`과 다르거나 없을 때, 열기 전), `daily`(마지막 백업이 24시간보다 오래될 때. macOS는 떠 있는 동안 10초 점검마다 판정, `StoreDailyBackup`), `manual`, `beforeRestore`, `beforeDelete`.
+- 사유: `upgrade`(앱 버전·빌드·판이 `store-version.json`과 다르거나 없을 때, 열기 전), `daily`(마지막 백업이 24시간보다 오래될 때. macOS는 떠 있는 동안 10초 점검마다 판정, `StoreDailyBackup`. 실패하면 만들던 폴더를 지우고 1시간 뒤 다시), `manual`, `beforeRestore`, `beforeDelete`.
 - 방법: 열기 전에는 store·-wal·-shm 파일 복사(`beforeRestore`는 옮기기), 열린 상태에서는 SQLite 온라인 백업(`sqlite3_backup_*`, 롤백 저널 파일 하나). `Waypoint_ckAssets/`는 넣지 않는다. 백업 실패는 열기를 막지 않는다.
 
 열기 순서:

@@ -37,12 +37,13 @@ import Testing
         let daily = StoreDailyBackup(storeURL: support.store, stamp: stamp)
         #expect(daily.claim(now: t0))
         #expect(!daily.claim(now: t0 + 1))  // 진행 중
-        daily.finish(nil)  // 실패로 끝남 → 다음 점검에서 다시
-        #expect(daily.claim(now: t0 + 10))
+        daily.finish(nil, failedAt: t0 + 2)  // 실패로 끝남 → 한동안 쉬었다가 다시
+        #expect(!daily.claim(now: t0 + 10))
+        #expect(daily.claim(now: t0 + 2 + StoreDailyBackup.retryDelay))
         daily.finish(nil)
     }
 
-    @Test func failureRetriesNextTime() throws {
+    @Test func failureRetriesAfterDelay() throws {
         let support = try StoreTemp()
         try support.seed(["LDG"])
         let daily = StoreDailyBackup(storeURL: support.store, stamp: stamp)
@@ -50,8 +51,18 @@ import Testing
         try Data().write(to: support.backup.root)
         #expect(throws: (any Error).self) { try daily.runIfDue(now: t0) }
         try FileManager.default.removeItem(at: support.backup.root)
-        let entry = try support.withOpenStore { _ in try daily.runIfDue(now: t0 + 10) }
+        #expect(try daily.runIfDue(now: t0 + 10) == nil)
+        let entry = try support.withOpenStore { _ in try daily.runIfDue(now: t0 + StoreDailyBackup.retryDelay) }
         #expect(entry?.info.reason == .daily)
+    }
+
+    @Test func failedAttemptLeavesNoFolder() throws {
+        let support = try StoreTemp()
+        try support.seed(["LDG"])
+        try support.corrupt(with: Data("junk".utf8))
+        let daily = StoreDailyBackup(storeURL: support.store, stamp: stamp)
+        #expect(throws: (any Error).self) { try daily.runIfDue(now: t0) }
+        #expect(((try? FileManager.default.contentsOfDirectory(atPath: support.backup.root.path)) ?? []).isEmpty)
     }
 
     @Test func startIfDueRunsInBackgroundOnce() async throws {
