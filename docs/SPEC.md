@@ -127,7 +127,7 @@ GuideVersion doc, content, at, source: app | local
 
 - 카드가 **작업중** = 열린 `CardSession` 중 세션 `state == live`인 것이 1개 이상.
 - 표시 상태는 `SessionActivityRules`로 판정한다(5장 「작업 상태」). `live`/`stalled`/`ended`는 호환용 묶음이고, `stalled`는 입력·승인 대기와 활동 없음이다. 입력 대기와 실행 중인 도구는 15분이 지나도 다른 상태로 덮지 않는다.
-- 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. **자동으로 done이 되지 않는다.** 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
+- 마지막 live 세션이 떨어지면 카드 `status`는 작업 시작 전 상태(`statusBeforeActive`)로 돌아간다. **자동으로 done이 되지 않는다.** 원래 done이던 카드(다시 작업)는 done으로 돌아가고 `doneAt`을 돌아간 시각으로 적는다. 완료는 스킬이 사용자 확인 후 `card_update(status: done)` 하거나 사용자가 앱에서 옮긴다.
 - **불변식: 열린 연결이 있으면 카드는 `active`다.** 카드가 active를 떠나면(앱 드래그·「완료로 옮기기」·iPhone 분류·`card_update(status)`, 모두 `CardLifecycle.move`) 그 카드의 열린 연결을 서브에이전트 것까지 닫고 세션마다 `card.detached`(`reason: "card-moved"`)를 남긴다. 상태는 새로 정한 그대로 둔다.
 - 어긋난 연결 점검: 앱 시작 직후, 10초마다, CloudKit 가져오기 뒤에 active가 아닌 카드의 열린 연결을 닫는다(`CardLifecycle.closeStrayLinks`, `reason: "status-not-active"`). iPhone에서 옮긴 카드(연결은 병합하지 않는다)를 위한 것이다.
 - 대시보드 "작업중" 목록 = 프로젝트별 (세션, 카드) 쌍 + 카드가 붙지 않은 끝나지 않은 메인 세션 한 줄씩(제목 자리에 `lastPrompt`, 없으면 「카드 없음」. 최근 파일은 그 세션과 서브에이전트가 카드 없이 남긴 `file.changed`). 카드 없는 서브에이전트는 줄을 만들지 않는다. 「작업 N개」는 live 줄 수, 사이드바의 작업중·멈춤 수는 카드 수 + 카드 없는 메인 세션 수.
