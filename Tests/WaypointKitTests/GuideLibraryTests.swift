@@ -199,6 +199,8 @@ import Testing
         #expect(!targets.accepts(real + "/.git/index"))
         #expect(!targets.accepts(real + "/.build/CLAUDE.md"))
         #expect(!targets.accepts(real + "/.CLAUDE.md.waypoint-1234"))
+        #expect(targets.accepts(real + "/"))
+        #expect(!targets.accepts(real + "/.git"))
 
         let received = Received()
         let watcher = GuideWatcher(debounce: 0.2, accept: { targets.accepts($0) }) { dirs in received.add(dirs) }
