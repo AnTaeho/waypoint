@@ -53,6 +53,7 @@ final class AppServices {
     @ObservationIgnored private var guides: GuideMonitor?
     @ObservationIgnored var activeObserver: NSObjectProtocol?
     @ObservationIgnored var wakeObserver: NSObjectProtocol?
+    @ObservationIgnored var terminateObserver: NSObjectProtocol?
     @ObservationIgnored private var importObserver: NSObjectProtocol?
     @ObservationIgnored private var saveObserver: NSObjectProtocol?
     /// 화면 갱신(`lastDataChange`)을 묶는다. 원격 replay처럼 저장이 잦아도 간격마다 한 번만 다시 그린다.
@@ -267,6 +268,7 @@ final class AppServices {
             try? context.save()
         }
         reliability.saveIfNeeded()
+        integration.saveIfNeeded()
         dailyBackup?.startIfDue(now: now)
     }
 
