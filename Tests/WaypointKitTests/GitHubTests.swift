@@ -332,6 +332,17 @@ func makeCheckout(origin: String? = "git@github.com:Me/App.git", branch: String 
         #expect(isError && value["error"]?.stringValue?.contains("배치") == true)
     }
 
+    @Test func missingArgumentsGetFieldError() throws {
+        let h = try MCPHarness()
+        var reply: JSONValue?
+        let taken = h.server.handleDeferred([
+            "jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": ["name": "github_issue_create"],
+        ]) { reply = $0 }
+        #expect(taken)
+        let text = try #require(reply?["result"]?["content"]?.arrayValue?.first?["text"]?.stringValue)
+        #expect(reply?["result"]?["isError"] == true && text.contains("project"))
+    }
+
     @Test func issueLinksToGivenCard() throws {
         let gh = try FakeGH(stdout: "https://github.com/Me/App/issues/12\n")
         let h = try Self.harness(gh)
