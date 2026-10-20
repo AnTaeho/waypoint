@@ -300,6 +300,41 @@ import Testing
         #expect(outcome.notes.contains { $0.hasPrefix("예약한 백업 없음") })
         #expect(support.backup.scheduledRestore() == nil)
     }
+
+    @Test func moveFailureMidwayPutsFilesBack() throws {
+        let support = try StoreTemp()
+        try support.seed(["AAA"])
+        let files = StoreBackup.storeFiles(of: support.store).filter { FileManager.default.fileExists(atPath: $0.path) }
+        try #require(files.count >= 2)
+        var backup = support.backup
+        backup.afterMove = { _ in throw CocoaError(.fileWriteUnknown) }
+        #expect(throws: (any Error).self) { try backup.moveClosedStore(reason: .beforeRestore, stamp: old, at: t0) }
+        #expect(files.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
+        #expect(((try? FileManager.default.contentsOfDirectory(atPath: support.backup.root.path)) ?? []).isEmpty)
+    }
+
+    @Test func scheduledRestoreFailingWhileMovingKeepsStore() throws {
+        let support = try StoreTemp()
+        try support.seed(["AAA"])
+        let target = try #require(try support.backup.copyClosedStore(reason: .daily, stamp: old, at: t0))
+        try support.withOpenStore { container in
+            let ctx = ModelContext(container)
+            _ = makeProject(ctx, key: "BBB", name: "나중")
+            try ctx.save()
+        }
+        try #require(FileManager.default.fileExists(atPath: support.store.path + "-wal"))
+        try support.backup.scheduleRestore(target)
+        var backup = support.backup
+        // 본 파일은 옮기고 -wal에서 실패한다
+        backup.afterMove = { url in if url.lastPathComponent.hasSuffix("-wal") { throw CocoaError(.fileWriteUnknown) } }
+        let launch = StoreLaunch(backup: backup, stamp: old)
+        let (container, outcome) = try launch.open(now: t0 + 10) { try WaypointStore.makeContainer(url: $0) }
+        #expect(try support.keys(container) == ["AAA", "BBB"])
+        #expect(outcome.restore == nil)
+        #expect(outcome.notes.contains { $0.hasPrefix("예약 복원 실패") })
+        #expect(support.backup.scheduledRestore() == nil)
+        #expect(!support.backup.list().contains { $0.info.reason == .beforeRestore })
+    }
 }
 
 /// 임시 저장 폴더 하나.

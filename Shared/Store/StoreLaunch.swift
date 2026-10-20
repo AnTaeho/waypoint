@@ -102,7 +102,11 @@ public struct StoreLaunch: Sendable {
     public let stamp: StoreVersionStamp
 
     public init(storeURL: URL, stamp: StoreVersionStamp) {
-        backup = StoreBackup(storeURL: storeURL)
+        self.init(backup: StoreBackup(storeURL: storeURL), stamp: stamp)
+    }
+
+    init(backup: StoreBackup, stamp: StoreVersionStamp) {
+        self.backup = backup
         self.stamp = stamp
     }
 
@@ -160,8 +164,10 @@ public struct StoreLaunch: Sendable {
             return false
         }
         var moved: StoreBackup.Entry?
+        var cleared = false
         do {
             moved = try backup.moveClosedStore(reason: .beforeRestore, stamp: lastOpened() ?? .beforeTracking, at: now)
+            cleared = true
             try backup.place(target)
             let record = StoreRestoreRecord(kind: .manual, at: now, backupID: target.id,
                                             backupCreatedAt: target.info.createdAt)
@@ -172,6 +178,8 @@ public struct StoreLaunch: Sendable {
             return true
         } catch {
             outcome.notes.append("예약 복원 실패 · \(error)")
+            // 옮기기에서 실패했으면 저장소 자리의 파일은 지금 저장소다(옮기기가 돌려놓았다).
+            guard cleared else { return false }
             backup.removePlacedCopies()
             if let moved, putBack(from: moved.url) {
                 try? FileManager.default.removeItem(at: moved.url)
