@@ -1,43 +1,5 @@
-# Waypoint — Claude 작업 지침
+# 찾아 쓰는 값
 
-Claude Code·Codex 세션을 프로젝트 단위로 추적하는 개인용 macOS + iOS 앱. 명세 `docs/SPEC.md`, 디자인 `docs/DESIGN.md`, 다음 일은 `docs/PRODUCT_ROADMAP.md`와 TRK 카드.
-
-## 제품 방향
-
-- 핵심은 ① 여러 프로젝트의 진행 중·할 일을 한눈에 ② 그 상황을 Claude·Codex가 MCP로 자동 갱신.
-- 사람이 값을 넣는 계획 기능(오늘 할 일·우선순위·마감일)과 외부 이슈 도구 연동은 넣지 않는다. 예외: GitHub 이슈·PR 열기·보기.
-- 새 기능은 「에이전트가 자동으로 채우나, 여러 프로젝트 상황 파악에 도움이 되나」로 거르고, 아니면 먼저 묻는다.
-
-## 진행 방식
-
-- 설계·UX 세부·보안 경계·범위·머지·브랜치 정리·SPEC 보정은 권장안으로 정해 진행하고 보고에 「내가 정한 것」으로 적는다. 묻는 것은 계정·권한, 실물 기기, 되돌리기 어려운 외부 공개뿐이다.
-- 카드 끝에서 멈추지 않고 완료 조건 충족 여부를 남긴 채 이어 간다. 멈추라고 한 범위는 지킨다.
-- Codex도 같은 작업 트리를 쓴다. 시작 전 `git status`와 열린 세션을 확인한다.
-
-## 절대 규칙
-
-- 앱은 어떤 LLM API도 호출하지 않는다. 요약·추천·자동 분류 기능을 넣지 않는다.
-- 훅 스크립트는 Claude Code를 막지 않는다: 타임아웃 1초, 실패해도 exit 0, stdout은 `SessionStart`와 블록을 못 받은 세션의 `UserPromptSubmit`에서 한 번만.
-- 카드를 자동으로 done 처리하지 않는다.
-
-## 평소용과 개발용
-
-- 평소용(`/Applications/Waypoint.app`, 47821)은 종료·교체·실측하지 않는다. 새 버전은 `scripts/install-local.sh`로만.
-- 개발·실측은 Waypoint Dev(Debug, 47822)와 `scripts/dev-probe-setup.sh` 실측 폴더에서만. 절차는 `docs/DEVELOPMENT.md`.
-- 전역 설치물(훅·상태줄·스킬)은 중복 설치하지 않고 저장소 판과 `cmp`로 맞춘다.
-- 실측에서 인증 정보를 복사하거나 신뢰 확인을 우회하지 않는다.
-- 사용자 화면을 가져가지 않는다: 앱 활성화·자동 입력(cliclick, System Events)·전체 화면 캡처 금지. 앱은 `open -g -j`로 띄우고 DB·HTTP·로그로 확인한다. 사람이 볼 것은 끝에 확인 목록으로 넘긴다. 일꾼 지시서마다 이 규칙을 넣는다.
-- 실제 `claude -p` 실측은 완료 조건 확인 때만.
-
-## 코드
-
-- 모델·동기화·서버 로직은 `Shared/`, 화면은 플랫폼별 폴더. View 파일이 150줄을 넘으면 나눈다.
-- 색·폰트·간격은 `DESIGN.md` 토큰을 `Theme` 상수로만 쓴다.
-- 외부 의존성은 이유를 말하고 확인받은 뒤 추가한다.
-- 훅 이벤트·입력 필드·MCP 등록 명령은 버전마다 바뀐다. 구현 전 최신 문서를 확인하고 다르면 `docs/SPEC.md`부터 고친다.
-
-## 테스트
-
-- 파생 규칙(작업중·멈춤 판정, 상태 복귀)은 단위 테스트 필수. 훅 수신은 `Tests/Fixtures/hooks/`의 실제 입력으로 테스트한다.
-- 스냅샷 테스트·훅 재생 도구 같은 검증 인프라는 더 만들지 않는다.
-- 뮤테이션 테스트(`scripts/mutation-test.py`)는 사용자가 요청할 때만 돌리고 지시서에 넣지 않는다. 변형을 죽이려고 본 코드나 기존 테스트를 고치지 않는다.
+- 평소용 `/Applications/Waypoint.app` 포트 47821, 설치 `scripts/install-local.sh`
+- 개발용 Waypoint Dev(Debug) 포트 47822, 실측 폴더 `scripts/dev-probe-setup.sh`
+- 번들 `dev.antaeho.waypoint`
